@@ -1,0 +1,79 @@
+/**:
+    ros__parameters:
+        common:
+            lid_topic:  "/livox/lidar"
+            # imu_topic:  "/imu/data"  #from imu_complementary_filter
+            imu_topic:  "/livox/imu"
+            odom_topic: "/Odometry"
+            con_frame: false # true: if you need to combine several LiDAR frames into one
+            con_frame_num: 2 # the number of frames combined
+            cut_frame: false # true: if you need to cut one LiDAR frame into several subframes
+            cut_frame_time_interval: 0.1 # should be integral fraction of 1 / LiDAR frequency
+            time_lag_imu_to_lidar: 0.0 # Time offset between LiDAR and IMU calibrated by other algorithms, e.g., LI-Init (find in Readme)
+                                    # the timesample of IMU is transferred from the current timeline to LiDAR's timeline by subtracting this value
+            map_frame: "map"
+            odom_frame: "livox"
+            
+
+        preprocess:
+            lidar_type: 1  
+            scan_line: 4
+            scan_rate: 10
+            timestamp_unit: 3           
+            blind: 1.0
+
+        mapping:
+            imu_en: true
+            initialize_time_threshold: 1000 #在启动时的前n次处理时不把点云加入ikdtree地图，使程序用扫到的点云与先验点云匹配，寻找正确的位姿。n次后开始增量更新，扫到的点云加入ikdtree，先验点云失效
+            start_in_aggressive_motion: false
+            extrinsic_est_en: false 
+            imu_time_inte: 0.005 
+            satu_acc: 3.0 
+            satu_gyro: 35.
+            acc_norm: 1.0
+            lidar_meas_cov: 0.001
+            acc_cov_output: 500.
+            gyr_cov_output: 1000. 
+            b_acc_cov: 0.0001 
+            b_gyr_cov: 0.0001 
+            imu_meas_acc_cov: 0.1
+            imu_meas_omg_cov: 0.1
+            gyr_cov_input: 0.01 
+            acc_cov_input: 0.1 
+            plane_thr: 0.1 
+            match_s: 81.0
+            fov_degree: 360. 
+            det_range: 450.0
+            gravity_align: false 
+            gravity: [0.0, 0.0, -0.9810] 
+            gravity_init: [0.0, 0.0, -0.9810] 
+            extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
+            extrinsic_R: [  1., 0., 0.,
+                            0., 1., 0.,
+                            0., 0., 1.]    
+        odometry: 
+            publish_odometry_without_downsample: true #//lmy到此一游，并把false改成true
+        publish:
+            path_en: false                 
+            scan_publish_en: false #//lmy到此一游，并把true改成false
+            scan_bodyframe_pub_en: true
+
+        pcd_save:
+            use_pcd_map_: true
+            prior_PCD_map_path: "/home/elsa/autosentry2025/src/auto_sentry2025/Point-LIO/PCD/2024_12_01_21_54_13_merged.pcd" #使用融合前的第一张点云，让初始位姿只在初始点附近匹配
+            #prior_PCD_map_path: "/home/cmyhj/Documents/rm/sentry/sentry2025_ws/src/auto_sentry2025/Point-LIO/PCD/test514.pcd"
+            pcd_save_en: false
+            interval: 900
+        #RMUC    
+        init_pos:
+#            init_x: 3.0
+#            init_y: 0.0
+#            init_z: 0.0
+            is_we_are_blue: true
+            init_trans_red: [0.0, 0.0, 0.0]
+            initial_rot_red: [0.0, 0.0, 0.0, 1.0]
+            init_trans_blue: [0.0, 0.0, 0.0]
+            initial_rot_blue: [0.0, 0.0, 0.0, 1.0]
+        gcl:
+            task: "A"
+            angle_threshold: 0.785 # 法向量与地面夹角的角度阈值(绝对值、弧度制)
