@@ -1,3 +1,25 @@
+behavior_control:
+    ros__parameters:
+        tank_position: [0.0, 0.0]
+        tent_position: [0.0, 0.0]
+        car_position: [0.0, 0.0]
+        pillbox_position: [0.0, 0.0]
+        passing_door_src: [0.0, 0.0]
+        passing_door_des: [0.0, 0.0]
+        target_sequence: ["tent", "car", "pillbox", "tank"]
+        cruise_height: 0.6
+        detection_height: 1.5
+        passing_door_height: 0.4
+        eject_height: 0.25
+        if_hit_tank: false
+        if_hit_car: false
+        if_hit_pillbox: false
+        if_hit_tent: false
+
+mavlink_control_node:
+    ros__parameters:
+        cruise_height: 0.6
+
 map_server:
     ros__parameters:
         yaml_filename: "/home/tc/Desktop/auto_sentry2025/src/auto_sentry2025/robot_bring_up/maps/map1.yaml" #map3 重命名 checklist
@@ -163,13 +185,13 @@ controller_server:
 
             # Robot
 
-            max_vel_x: 3.0 # 机器人最大x轴速度m/s
-            max_vel_y: 3.0 # 机器人最大y轴速度m/s
-            max_vel_x_backwards: 3.0 # 机器人最大x轴后退速度m/s
-            max_vel_theta: 3.0 # 机器人最大角速度rad/s
-            acc_lim_x: 2.0 # 机器人最大x轴平移加速度m/s^2
-            acc_lim_y: 2.0 # 机器人最大y轴平移加速度m/s^2
-            acc_lim_theta: 5.0 # 机器人最大角加速度rad/s^2
+            max_vel_x: 1.0 # 机器人最大x轴速度m/s
+            max_vel_y: 1.0 # 机器人最大y轴速度m/s
+            max_vel_x_backwards: 1.0 # 机器人最大x轴后退速度m/s
+            max_vel_theta: 0.3 # 机器人最大角速度rad/s
+            acc_lim_x: 0.5 # 机器人最大x轴平移加速度m/s^2
+            acc_lim_y: 0.5 # 机器人最大y轴平移加速度m/s^2
+            acc_lim_theta: 0.1 # 机器人最大角加速度rad/s^2
 
             min_turning_radius: 0.05 # 机器人最小转弯半径
 
@@ -181,10 +203,10 @@ controller_server:
                 # rear_offset: -0.15
                 # rear_radius: 0.2
 
-               type: "polygon"
-               vertices: "[ [0.3, 0.2], [-0.3, 0.2], [-0.3, -0.2], [0.3, -0.2] ]"
-            #    type: "circular"
-            #    radius: 0.4 # for type "circular"
+#               type: "polygon"
+#               vertices: "[ [0.3, 0.2], [-0.3, 0.2], [-0.3, -0.2], [0.3, -0.2] ]"
+                type: "circular"
+                radius: 0.23 # for type "circular"
 
             # GoalTolerance
 
@@ -192,8 +214,8 @@ controller_server:
 
             # Obstacles
 
-            min_obstacle_dist: 0.05 # 机器人与障碍物之间的最小距离（以米为单位）3.17
-            inflation_dist: 0.25 # 非零惩罚成本的障碍物周围的缓冲区（应大于min_obstacle_dist才能生效）。3.17
+            min_obstacle_dist: 0.03 # 机器人与障碍物之间的最小距离（以米为单位）3.17
+            inflation_dist: 0.15 # 非零惩罚成本的障碍物周围的缓冲区（应大于min_obstacle_dist才能生效）。3.17
             include_costmap_obstacles: True # 指定是否应考虑本地成本图的障碍。每个被标记为障碍物的单元格都被视为点障碍物。因此，不要RM选择非常小的代价图分辨率，因为它会增加计算时间。
             costmap_obstacles_behind_robot_dist: 4.0 # 限制机器人后面规划时考虑的占用的本地成本图障碍（指定距离以米为单位）。
             obstacle_poses_affected: 15 # 每个障碍物位置都附加到轨迹上最近的姿势以保持距离。还可以考虑其他邻居。如果legacy_obstacle_association是false，则不启用
@@ -216,11 +238,11 @@ controller_server:
             optimization_verbose: False
             penalty_epsilon: 0.146 # 为硬约束近似的惩罚函数添加一个小的安全裕度
             obstacle_cost_exponent: 0.65 #3.17
-            weight_max_vel_x: 2.8 # 满足最大允许平移速度的优化权重 2.28
-            weight_max_vel_y: 1.2 # 满足最大允许平移速度的优化权重 3.17
+            weight_max_vel_x: 3.0 # 满足最大允许平移速度的优化权重 2.28
+            weight_max_vel_y: 3.0 # 满足最大允许平移速度的优化权重 3.17
             weight_max_vel_theta: 0.8 # 满足最大允许角速度的优化权重
             weight_acc_lim_x: 1.5 # 满足最大允许平移加速度的优化权重
-            weight_acc_lim_y: 1.2 # 满足最大允许平移加速度的优化权重
+            weight_acc_lim_y: 1.5 # 满足最大允许平移加速度的优化权重
             weight_acc_lim_theta: 0.8 # 满足最大允许角加速度的优化权重
             weight_kinematics_nh: 1000.0 # 满足非完整运动学约束的优化权重，该参数必须很高 3.17
             weight_kinematics_forward_drive: 0.0 # 用于迫使机器人仅选择前进方向（正平移速度）的优化权重。较小的权重（例如 1.0）仍然允许向后行驶。 1000左右的值几乎可以防止向后行驶（但不能保证）。
@@ -284,11 +306,11 @@ local_costmap:
             global_frame: map
             robot_base_frame: livox
             rolling_window: True
-            width: 8
-            height: 8
+            width: 5
+            height: 5
             resolution: 0.05
             robot_radius: 0.01
-            plugins: ["static_layer", "obstacle_layer", "inflation_layer", "custom_layer"]
+            plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
             static_layer:
                 plugin: "nav2_costmap_2d::StaticLayer"
                 map_subscribe_transient_local: True
@@ -313,14 +335,7 @@ local_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
-                inflation_radius: 0.6
-            custom_layer:
-                plugin: "nav2_custom_costmap_plugin::CustomLayer"
-                enabled: False
-                removed_area_1: "[ [1.0, 1.0], [ 0.5, 1.0], [0.5, 0.5], [1.25, 0.5] ]" #map系坐标
-                removed_area_2: "[ [1.0, 1.0], [ 0.5, 1.0], [0.5, 0.5], [1.25, 0.5] ]"
-                removed_area_3: "[ [1.0, 1.0], [ 0.5, 1.0], [0.5, 0.5], [1.25, 0.5] ]"
-                removed_area_4: "[ [1.0, 1.0], [ 0.5, 1.0], [0.5, 0.5], [1.25, 0.5] ]"
+                inflation_radius: 0.4
             always_send_full_costmap: True # 是否每次更新都发送完整的成本图，而不是更新。
 
 global_costmap:
@@ -330,11 +345,11 @@ global_costmap:
             publish_frequency: 30.0
             global_frame: map
             robot_base_frame: livox
-            # robot_radius: 0.18
-            footprint: "[ [0.25, 0.13], [-0.25, 0.13], [-0.25, -0.13], [0.25, -0.13] ]"
+            robot_radius: 0.2
+#            footprint: "[ [0.25, 0.13], [-0.25, 0.13], [-0.25, -0.13], [0.25, -0.13] ]"
             resolution: 0.05
             track_unknown_space: true
-            plugins: ["static_layer", "obstacle_layer", "inflation_layer", "custom_layer"]
+            plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
             static_layer:
                 plugin: "nav2_costmap_2d::StaticLayer"
                 map_subscribe_transient_local: True
@@ -359,14 +374,7 @@ global_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
-                inflation_radius: 0.6
-            custom_layer:
-                plugin: "nav2_custom_costmap_plugin::CustomLayer"
-                enabled: True
-                removed_area_1: "[ [1.0, 1.0], [ 0.5, 1.0], [0.5, 0.5], [1.25, 0.5] ]" #map系坐标
-                removed_area_2: "[ [1.0, 1.0], [ 0.5, 1.0], [0.5, 0.5], [1.25, 0.5] ]"
-                removed_area_3: "[ [1.0, 1.0], [ 0.5, 1.0], [0.5, 0.5], [1.25, 0.5] ]"
-                removed_area_4: "[ [1.0, 1.0], [ 0.5, 1.0], [0.5, 0.5], [1.25, 0.5] ]"
+                inflation_radius: 0.4
             always_send_full_costmap: True # 是否每次更新都发送完整的成本图，而不是更新
 
 planner_server:

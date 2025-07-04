@@ -1,5 +1,5 @@
-#ifndef SERIALPRO_ROBOTSENTRY_H
-#define SERIALPRO_ROBOTSENTRY_H
+#ifndef SERIALPRO_ROBOTDRONE_H
+#define SERIALPRO_ROBOTDRONE_H
 
 #include "serial_pro.h"
 
@@ -76,4 +76,4 @@ namespace drone {
         }
     };
 }
-#endif //SERIALPRO_ROBOTSENTRY_H
+#endif //SERIALPRO_ROBOTDRONE_H

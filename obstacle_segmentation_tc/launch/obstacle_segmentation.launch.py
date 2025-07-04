@@ -10,7 +10,7 @@ def generate_launch_description():
     """launch内容描述函数，由ros2 launch 扫描调用"""
     param_yaml_path = LaunchConfiguration(
         'params_file',
-        default=os.path.join(get_package_share_directory('robot_bring_up'), 'config', 'sentry.yaml')
+        default=os.path.join(get_package_share_directory('robot_bring_up'), 'config', 'drone.yaml')
     )
     declare_yaml_path = DeclareLaunchArgument(
         'params_file',

@@ -24,7 +24,7 @@ def generate_launch_description():
     nav2_bringup_dir = get_package_share_directory("nav2_bringup") #nav2_bringup功能包
     livox_driver_path = get_package_share_directory("livox_ros_driver2")
 
-    yaml_path = os.path.join(robot_bringup_path, "config", "sentry.yaml")
+    yaml_path = os.path.join(robot_bringup_path, "config", "drone.yaml")
 
     param_if_map = LaunchConfiguration("if_map", default=if_map)
     declare_if_map = DeclareLaunchArgument(

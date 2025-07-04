@@ -1,4 +1,3 @@
-# 虽然只有一个节点，但是为了程序寄了之后自动重启，还是需要一个launch文件
 # 导入库
 from launch import LaunchDescription
 from launch_ros.actions import Node
@@ -24,13 +23,13 @@ def generate_launch_description():
         default_value=yaml_path,
         description='Full path to the pcd2pgm configuration file to load'
     )
-    
+
     node_01 = Node(
-        package="robot_serial",
-        executable="robot_serial_node",
+        package="mavlink_control",
+        executable="mavlink_control_node",
         output="screen",
         parameters=[yaml_path],
-        name="robot_serial_node",
+        name="mavlink_control_node",
         respawn=True # 重启
     )
     # 创建LaunchDescription对象launch_description,用于描述launch文件

@@ -13,7 +13,7 @@ from launch_ros.actions import Node, SetUseSimTime
 def generate_launch_description():
     package_path = get_package_share_directory('point_lio')
     config_package_path = get_package_share_directory('robot_bring_up')
-    default_config_path = os.path.join(config_package_path, 'config', 'sentry.yaml')
+    default_config_path = os.path.join(config_package_path, 'config', 'drone.yaml')
     default_rviz_config_path = os.path.join(
         package_path, 'rviz_cfg', 'loam_livox.rviz')
 
