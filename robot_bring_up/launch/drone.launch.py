@@ -97,11 +97,17 @@ def generate_launch_description():
         output="screen",
         condition=IfCondition(param_launch_rviz),
     )
-    livox_to_body = Node(
+    livox_to_mavlink_body = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        name='livox2body_broadcaster',
-        arguments=['-0.117', '-0.158', '0',  '0', '0', '-0.707107', '0.707107','lidar_base_link', 'livox_192_168_1_104']
+        name='livox_to_mavlink_body_broadcaster',
+        arguments=['0.0', '0.0', '0',  '0', '0', '0.0', '1.0','livox', 'mavlink_body']
+    )
+    livox_to_camera = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='livox_to_camera_broadcaster',
+        arguments=['0.0', '0.0', '0',  '0', '0', '0.0', '1.0','livox', 'camera_color_frame']
     )
 
     # 创建LaunchDescription对象launch_description,用于描述launch文件
@@ -113,7 +119,8 @@ def generate_launch_description():
         declare_launch_rviz,
         declare_if_map,
         declare_rviz_config_dir,
-        livox_to_body,
+        livox_to_mavlink_body,
+        livox_to_camera,
         navigation_launch,
         rviz_node,
         TimerAction(

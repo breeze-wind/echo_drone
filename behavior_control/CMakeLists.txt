@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 include_directories(
         include
@@ -18,6 +19,7 @@ add_executable(behavior_control_node src/behavior_control_node.cpp src/behavior_
 ament_target_dependencies(behavior_control_node
         rclcpp
         geometry_msgs
+        std_msgs
 )
 
 install(TARGETS behavior_control_node

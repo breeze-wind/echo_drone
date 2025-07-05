@@ -15,6 +15,7 @@ behavior_control:
         if_hit_car: false
         if_hit_pillbox: false
         if_hit_tent: false
+        if_passing_door: false
 
 mavlink_control_node:
     ros__parameters:

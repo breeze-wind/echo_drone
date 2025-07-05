@@ -5,6 +5,7 @@ import rclpy
 from rclpy.node import Node
 
 from geometry_msgs.msg import PoseStamped, Twist
+from std_msgs.msg import Bool
 
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
@@ -47,6 +48,7 @@ class MavlinkControl(Node):
         )
 
         self.current_pose_pub = self.create_publisher(PoseStamped, '/robot/current_pose', 10)
+        self.arm_state_pub = self.create_publisher(Bool, '/robot/arm_state', 10)
         self.target_pose_sub = self.create_subscription(
             PoseStamped,
             '/robot/target_pose',
@@ -57,8 +59,14 @@ class MavlinkControl(Node):
             '/cmd_vel',
             self.cmd_vel_callback,
             10) #导航规划速度
+        self.landing_state_sub = self.create_subscription(
+            Bool,
+            '/robot/landing_state',
+            self.landing_state_callback,
+            10) #导航定点
         self.target_pose_sub  # prevent unused variable warning
         self.cmd_vel_sub
+        self.landing_state_sub
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -126,7 +134,7 @@ class MavlinkControl(Node):
                     if channels.chan1_raw < -0.98:
                         if channels.chan2_raw > 0.98:
                             if channels.chan3_raw > 0.98:
-                                if channels.chan4_raw < -0.98:
+                                if channels.chan4_raw < -0.98: #!!!!
                                     self.ready_to_arm = True #可以起飞
                                     return
                     self.ready_to_arm = False
@@ -138,10 +146,13 @@ class MavlinkControl(Node):
             armed = (hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
             print(f"Vehicle armed? {armed}")
             print(' ')
+            msg = Bool() #给决策发送是否解锁
             if armed:
                 self.arming_state = True
             else:
                 self.arming_state = False
+            msg.data = self.arming_state
+            self.arm_state_pub.publish(msg)
 
         #如果可以起飞就发送解锁命令
         if not self.arming_state:
@@ -169,7 +180,7 @@ class MavlinkControl(Node):
                     self.master.target_system, self.master.target_component,
                     mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
                     0,  # Confirmation
-                    0, 0, 0, 0, 0, 0, 0.5  # 参数（俯仰角、纬度、经度、高度等）
+                    0, 0, 0, 0, 0, 0, self.cruise_height  # 参数（俯仰角、纬度、经度、高度等）
                 )
 
     #发送teb速度到飞控
@@ -197,6 +208,8 @@ class MavlinkControl(Node):
             x, y ,z
         )
 
+    def landing_state_callback(self, msg):
+        self.land_state = msg.data
 
 def main(args=None):
     rclpy.init(args=args)
