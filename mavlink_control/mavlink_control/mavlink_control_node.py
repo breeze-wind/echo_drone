@@ -33,8 +33,10 @@ class MavlinkControl(Node):
         self.arming_state = False #飞控解锁状态
         self.land_state = False #降落状态
 
+        self.if_is_flying = False
+
         # Connect to PX4 over serial or UDP
-        self.master = mavutil.mavlink_connection('/dev/ttyACM0', baud=57600)
+        self.master = mavutil.mavlink_connection('/dev/ttyACM0')
         self.master.wait_heartbeat()
         print("Connected")
 
@@ -97,6 +99,7 @@ class MavlinkControl(Node):
         timestamp_us = int(time.time() * 1e6)
         # Position in meters (NED)
         self.current_x, self.current_y, self.current_z = t.transform.translation.x, t.transform.translation.y, t.transform.translation.z
+        # self.current_x, self.current_y, self.current_z = 0.0, 0.0, 0.0
         roll, pitch, yaw = 0.0, 0.0, 0.0  # Orientation in radians
 
         self.master.mav.vision_position_estimate_send(
@@ -107,7 +110,7 @@ class MavlinkControl(Node):
 
         #发送当前位置到决策
         msg = PoseStamped()
-        msg.header = timestamp_us
+        msg.header.frame_id = "map"
         msg.pose.position.x = self.current_x
         msg.pose.position.y = self.current_y
         msg.pose.position.z = self.current_z
@@ -117,11 +120,11 @@ class MavlinkControl(Node):
         msg.pose.orientation.w = 1.0
         self.current_pose_pub.publish(msg)
 
-        self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f' %self.current_x, self.current_y, self.current_z)
+        self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f' %(self.current_x, self.current_y, self.current_z))
 
     #读取遥控杆位置
     def channel_position_timer_callback(self):
-        if not self.arming_state:
+        if not self.ready_to_arm:
             channels = self.master.recv_match(type=['RC_CHANNELS', 'RC_CHANNELS_RAW'], blocking=False)
             if channels:
                 # RC_CHANNELS gives chan1_raw to chan8_raw (and up to chan18_raw)
@@ -131,10 +134,10 @@ class MavlinkControl(Node):
                     print(f"Chan3: {channels.chan3_raw}")
                     print(f"Chan4: {channels.chan4_raw}")
                     print(' ')
-                    if channels.chan1_raw < -0.98:
-                        if channels.chan2_raw > 0.98:
-                            if channels.chan3_raw > 0.98:
-                                if channels.chan4_raw < -0.98: #!!!!
+                    if channels.chan1_raw < 1100:
+                        if channels.chan2_raw > 1930:
+                            if channels.chan3_raw < 1100:
+                                if channels.chan4_raw > 1930:
                                     self.ready_to_arm = True #可以起飞
                                     return
                     self.ready_to_arm = False
@@ -145,7 +148,7 @@ class MavlinkControl(Node):
         if hb:
             armed = (hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
             print(f"Vehicle armed? {armed}")
-            print(' ')
+            print('')
             msg = Bool() #给决策发送是否解锁
             if armed:
                 self.arming_state = True
@@ -157,31 +160,38 @@ class MavlinkControl(Node):
         #如果可以起飞就发送解锁命令
         if not self.arming_state:
             if self.ready_to_arm:
-                self.master.mav.command_long_send(
-                    self.master.target_system, self.master.target_component,
-                    mavutil.mavlink.MAV_CMD_ARM_AUTHORIZATION_REQUEST,
-                    self.master.target_system
-                )
+                if not self.if_is_flying:
+                    self.master.mav.command_long_send(
+                        self.master.target_system, self.master.target_component,
+                        mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+                        0,
+                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+
+                    )
 
     #控制起飞降落动作
     def mode_control_timer_callback(self):
         if self.land_state:
-            self.get_logger().info('进入降落状态')
-            self.master.mav.command_long_send(
-                self.master.target_system, self.master.target_component,
-                mavutil.mavlink.MAV_CMD_NAV_LAND,
-                0,  # Confirmation
-                0, 0, 0, 0, 0, 0, -0.2  # 参数（俯仰角、纬度、经度、高度等）
-            )
-        elif self.arming_state:
-            if self.ready_to_arm: #可以起飞
-                self.get_logger().info('-------------起飞--------------')
+            if self.if_is_flying:
+                self.get_logger().info('进入降落状态')
                 self.master.mav.command_long_send(
                     self.master.target_system, self.master.target_component,
-                    mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+                    mavutil.mavlink.MAV_CMD_NAV_LAND,
                     0,  # Confirmation
-                    0, 0, 0, 0, 0, 0, self.cruise_height  # 参数（俯仰角、纬度、经度、高度等）
+                    0, 0, 0, 0, 0, 0, -0.2  # 参数（俯仰角、纬度、经度、高度等）
                 )
+                self.if_is_flying = False
+        elif self.arming_state:
+            if self.ready_to_arm: #可以起飞
+                if not self.if_is_flying:
+                    self.get_logger().info('-------------起飞--------------')
+                    self.master.mav.command_long_send(
+                        self.master.target_system, self.master.target_component,
+                        mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+                        0,  # Confirmation
+                        0, 0, 0, 0, 0, 0, self.cruise_height  # 参数（俯仰角、纬度、经度、高度等）
+                    )
+                    self.if_is_flying = True
 
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):
@@ -195,7 +205,7 @@ class MavlinkControl(Node):
             vx, vy, vz
         )
 
-        self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %vx, vy, vz)
+        self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %(vx, vy, vz))
 
     #发送目标点位置到飞控
     def target_pose_callback(self, msg):
