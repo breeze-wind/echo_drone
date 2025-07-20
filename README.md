@@ -330,7 +330,7 @@ chmod +x ./QGroundControl.AppImage
 运行
 
 ```bash
-./QGroundControl.AppImage
+./QGroundControl.AppImage        *********************************
 ```
 
 仿真时需要同时运行地面站，否则无法进行起飞降落等指令
