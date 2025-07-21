@@ -4,7 +4,7 @@ import time
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import PoseStamped, Twist
+from geometry_msgs.msg import PoseStamped, Twist, TransformStamped
 from std_msgs.msg import Bool
 
 from tf2_ros import TransformException
@@ -52,7 +52,7 @@ class MavlinkControl(Node):
         self.current_pose_pub = self.create_publisher(PoseStamped, '/robot/current_pose', 10)
         self.arm_state_pub = self.create_publisher(Bool, '/robot/arm_state', 10)
         self.target_pose_sub = self.create_subscription(
-            PoseStamped,
+            TransformStamped,
             '/robot/target_pose',
             self.target_pose_callback,
             10) #导航定点
@@ -99,7 +99,7 @@ class MavlinkControl(Node):
         timestamp_us = int(time.time() * 1e6)
         # Position in meters (NED)
         self.current_x, self.current_y, self.current_z = t.transform.translation.x, t.transform.translation.y, t.transform.translation.z
-        # self.current_x, self.current_y, self.current_z = 0.0, 0.0, 0.0
+        # self.current_x, self.current_y, self.current_z = 0.0, 0.0, 1.0
         roll, pitch, yaw = 0.0, 0.0, 0.0  # Orientation in radians
 
         self.master.mav.vision_position_estimate_send(
@@ -191,7 +191,7 @@ class MavlinkControl(Node):
                         0,  # Confirmation
                         0, 0, 0, 0, 0, 0, self.cruise_height  # 参数（俯仰角、纬度、经度、高度等）
                     )
-                    self.if_is_flying = True
+                    # self.if_is_flying = True
 
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):

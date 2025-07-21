@@ -16,30 +16,47 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 
 #include "std_msgs/msg/bool.hpp"
+
+#include <tf2_eigen/tf2_eigen.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 class BehaviorControl : public rclcpp::Node
 {
 public:
     explicit BehaviorControl(std::string name);
+    /// 控制当前执行步骤
     void step_timer_callback();
+    /// 控制当前步骤执行任务
     void mission_timer_callback();
 
 private:
+    /// 接收从飞控通信节点传来的当前位姿
     void CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+    /// 接收从飞控通信节点传来的起飞状态消息
     void ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg);
 
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr target_pose_pub_;
+    /// 发布目标点位姿
+    rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
+    /// 发布当前降落状态
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr landing_state_pub_;
+    /// 接收当前位姿
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub_;
+    /// 接收当前起飞状态
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_state_sub_;
 
+    /// 执行步骤计时器
     rclcpp::TimerBase::SharedPtr step_timer_;
+    /// 执行任务计时器
     rclcpp::TimerBase::SharedPtr mission_timer_;
     std::chrono::seconds step_period_ms;
     std::chrono::seconds mission_period_ms;
 
+    /* 标靶坐标以及穿门起点终点坐标 */
     std::vector<double> tank_;
     std::vector<double> tent_;
     std::vector<double> car_;
@@ -47,36 +64,70 @@ private:
     std::vector<double> passing_door_src_;
     std::vector<double> passing_door_des_;
 
+    /// 当前识别到的目标坐标xy
     std::vector<double> detected_target;
 
+    /// 靶子id对应的坐标
     std::map<std::string, std::vector<double>> target_positions_;
+    /// 靶子id对应的是否投掷
     std::map<std::string, bool> if_hit_target_;
 
+    /// 目标点顺序
     std::vector<std::string> target_sequence_;
 
-    double cruise_height_, detection_height_, passing_door_height_, eject_height_;
+    /// 巡航高度
+    double cruise_height_;
+    /// 识别高度
+    double detection_height_;
+    /// 穿门高度
+    double passing_door_height_;
+    /// 投掷高度
+    double eject_height_;
 
+    /* 是否投掷该目标 */
     bool if_hit_tank_;
     bool if_hit_car_;
     bool if_hit_pillbox_;
     bool if_hit_tent_;
+    /// 是否穿门
     bool if_passing_door_;
 
+    /// 当前是否能够起飞
     bool if_ready_to_fly;
+    /// 是否在准备降落状态
     bool if_landing;
 
+    /* 当前位置 */
     double current_x_;
     double current_y_;
     double current_z_;
 
+    /// 当前步骤
     int current_step;
 
+    /* 计时计数及阈值 */
     int eject_cnt;
     int detection_cnt;
     int eject_cnt_threshold_;
     int detection_cnt_threshold_;
 
-    geometry_msgs::msg::PoseStamped::SharedPtr current_target_position_;
+    /// 舵机投放位置参数控制
+    rclcpp::Parameter servo_param;
+    /// 舵机投放位置序号
+    int servo_index_;
+    /// 相机坐标系
+    std::string camera_frame_;
+    /// 目标坐标系
+    std::string target_frame_;
+    /// 世界系
+    std::string map_frame_;
+
+    /// 当前识别目标的坐标系变换
+    geometry_msgs::msg::TransformStamped current_target_position_;
+    geometry_msgs::msg::TransformStamped map_to_target;
+
+    std::unique_ptr<tf2_ros::Buffer> tfbuffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
 };
 
 #endif //BEHAVIOR_CONTROL_HPP

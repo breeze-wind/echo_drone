@@ -8,6 +8,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 {
     RCLCPP_INFO(this->get_logger(), "%s node create", name.c_str());
 
+    /* 读yaml文件参数 */
     this->declare_parameter<std::vector<double>>("tank_position", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("tent_position", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("car_position", std::vector<double>{0.0, 0.0});
@@ -24,6 +25,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("if_hit_pillbox", false);
     this->declare_parameter("if_hit_tent", false);
     this->declare_parameter("if_passing_door", false);
+    this->declare_parameter<int>("/servo/servo", 0);
 
     this->get_parameter<std::vector<double>>("tank_position", tank_);
     this->get_parameter<std::vector<double>>("tent_position", tent_);
@@ -63,14 +65,22 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     eject_cnt_threshold_ = 3.0 / 0.25; //等待投掷时间
     detection_cnt_threshold_ = 5.0 / 0.25; //等待识别时间
 
+    servo_index_ = 0;
+    servo_param = rclcpp::Parameter("/servo/servo", servo_index_);
+    this->set_parameter(servo_param);
+    servo_index_++;
+
     if_ready_to_fly = false;
     if_landing = false;
 
-    current_target_position_ = std::make_shared<geometry_msgs::msg::PoseStamped>();
-    current_target_position_->pose.orientation.x = 0.0;
-    current_target_position_->pose.orientation.y = 0.0;
-    current_target_position_->pose.orientation.z = 0.0;
-    current_target_position_->pose.orientation.w = 1.0;
+    current_target_position_.transform.rotation.x = 0.0;
+    current_target_position_.transform.rotation.y = 0.0;
+    current_target_position_.transform.rotation.z = 0.0;
+    current_target_position_.transform.rotation.w = 1.0;
+
+    map_frame_ = "map";
+    camera_frame_ = "camera_color_frame";
+    target_frame_ = "target_position";
 
     if(!if_passing_door_)
     {
@@ -81,15 +91,19 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
         passing_door_height_ = cruise_height_;
     }
 
+    /* 计时器，pubsub初始化 */
     step_period_ms = std::chrono::seconds(static_cast<int64_t>(0.25));
     mission_period_ms = std::chrono::seconds(static_cast<int64_t>(0.05));
 
-    target_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/robot/target_pose", 10);
+    target_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/target_pose", 10);
     landing_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/landing_state", 10);
     current_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("/robot/current_pose",
         10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
         std::bind(&BehaviorControl::ArmStateCallback, this, std::placeholders::_1));
+
+    tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tfbuffer_);
 
     step_timer_ = this->create_wall_timer(step_period_ms, std::bind(&BehaviorControl::step_timer_callback, this));
     mission_timer_ = this->create_wall_timer(mission_period_ms, std::bind(&BehaviorControl::mission_timer_callback, this));
@@ -279,18 +293,18 @@ void BehaviorControl::mission_timer_callback()
 
     if(current_step == 0)
     {
-        current_target_position_->pose.position.x = 0.0;
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = 0.0;
-        target_pose_pub_->publish(*current_target_position_);
+        current_target_position_.transform.translation.x = 0.0;
+        current_target_position_.transform.translation.y = 0.0;
+        current_target_position_.transform.translation.z = 0.0;
+        target_pose_pub_->publish(current_target_position_);
         RCLCPP_INFO(this->get_logger(), "等待飞控解锁...");
     }
     else if(current_step == 1)
     {
-        current_target_position_->pose.position.x = 0.0;
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = cruise_height_;
-        target_pose_pub_->publish(*current_target_position_);
+        current_target_position_.transform.translation.x = 0.0;
+        current_target_position_.transform.translation.y = 0.0;
+        current_target_position_.transform.translation.z = cruise_height_;
+        target_pose_pub_->publish(current_target_position_);
         RCLCPP_INFO(this->get_logger(), "等待起飞至巡航高度...");
     }
     else if(current_step == 21)
@@ -299,20 +313,32 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 22)
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = detection_height_;
-        target_pose_pub_->publish(*current_target_position_);
-        RCLCPP_INFO(this->get_logger(), "识别中...");
+        try {
+            map_to_target = tfbuffer_->lookupTransform(target_frame_, map_frame_, rclcpp::Time(),
+                                               rclcpp::Duration::from_seconds(0.5));
+        } catch (tf2::TransformException &ex) {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+            return;
+        }
         RCLCPP_INFO(this->get_logger(), "detected id: ");
         RCLCPP_INFO(this->get_logger(), "detection position: ");
+
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = detection_height_;
+        target_pose_pub_->publish(current_target_position_);
     }
     else if(current_step == 23)
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = eject_height_;
-        target_pose_pub_->publish(*current_target_position_);
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = eject_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if(eject_cnt >= 4)
+        {
+            servo_param = rclcpp::Parameter("/servo/servo", servo_index_);
+            this->set_parameter(servo_param);
+        }
         RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
@@ -322,20 +348,32 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 32)
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = detection_height_;
-        target_pose_pub_->publish(*current_target_position_);
-        RCLCPP_INFO(this->get_logger(), "识别中...");
+        try {
+            map_to_target = tfbuffer_->lookupTransform(target_frame_, map_frame_, rclcpp::Time(),
+                                               rclcpp::Duration::from_seconds(0.5));
+        } catch (tf2::TransformException &ex) {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+            return;
+        }
         RCLCPP_INFO(this->get_logger(), "detected id: ");
         RCLCPP_INFO(this->get_logger(), "detection position: ");
+
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = detection_height_;
+        target_pose_pub_->publish(current_target_position_);
     }
     else if(current_step == 33)
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = eject_height_;
-        target_pose_pub_->publish(*current_target_position_);
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = eject_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if(eject_cnt >= 4)
+        {
+            servo_param = rclcpp::Parameter("/servo/servo", servo_index_);
+            this->set_parameter(servo_param);
+        }
         RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
@@ -345,20 +383,32 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 42)
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = detection_height_;
-        target_pose_pub_->publish(*current_target_position_);
-        RCLCPP_INFO(this->get_logger(), "识别中...");
+        try {
+            map_to_target = tfbuffer_->lookupTransform(target_frame_, map_frame_, rclcpp::Time(),
+                                               rclcpp::Duration::from_seconds(0.5));
+        } catch (tf2::TransformException &ex) {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+            return;
+        }
         RCLCPP_INFO(this->get_logger(), "detected id: ");
         RCLCPP_INFO(this->get_logger(), "detection position: ");
+
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = detection_height_;
+        target_pose_pub_->publish(current_target_position_);
     }
     else if(current_step == 43)
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = eject_height_;
-        target_pose_pub_->publish(*current_target_position_);
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = eject_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if(eject_cnt >= 4)
+        {
+            servo_param = rclcpp::Parameter("/servo/servo", servo_index_);
+            this->set_parameter(servo_param);
+        }
         RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
@@ -366,22 +416,34 @@ void BehaviorControl::mission_timer_callback()
     {
         RCLCPP_INFO(this->get_logger(), "动态目标点，current x y: %lf, %lf", current_x_, current_y_);
     }
-    else if(current_step == 52)
+    else if(current_step == 52) //识别投掷策略待修改
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = detection_height_;
-        target_pose_pub_->publish(*current_target_position_);
-        RCLCPP_INFO(this->get_logger(), "识别中...");
+        try {
+            map_to_target = tfbuffer_->lookupTransform(target_frame_, map_frame_, rclcpp::Time(),
+                                               rclcpp::Duration::from_seconds(0.5));
+        } catch (tf2::TransformException &ex) {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+            return;
+        }
         RCLCPP_INFO(this->get_logger(), "detected id: ");
         RCLCPP_INFO(this->get_logger(), "detection position: ");
+
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = detection_height_;
+        target_pose_pub_->publish(current_target_position_);
     }
     else if(current_step == 53)
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = eject_height_;
-        target_pose_pub_->publish(*current_target_position_);
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = eject_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if(eject_cnt >= 4)
+        {
+            servo_param = rclcpp::Parameter("/servo/servo", servo_index_);
+            this->set_parameter(servo_param);
+        }
         RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
@@ -398,11 +460,20 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 63)
     {
-        current_target_position_->pose.position.x = 0.0; //改识别位置
-        current_target_position_->pose.position.y = 0.0;
-        current_target_position_->pose.position.z = passing_door_height_;
-        target_pose_pub_->publish(*current_target_position_);
+        try {
+            map_to_target = tfbuffer_->lookupTransform(target_frame_, map_frame_, rclcpp::Time(),
+                                               rclcpp::Duration::from_seconds(0.5));
+        } catch (tf2::TransformException &ex) {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+            return;
+        }
         RCLCPP_INFO(this->get_logger(), "识别终点H...");
+        RCLCPP_INFO(this->get_logger(), "detection position: ");
+
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.z = passing_door_height_;
+        target_pose_pub_->publish(current_target_position_);
     }
     else if(current_step == 71)
     {
