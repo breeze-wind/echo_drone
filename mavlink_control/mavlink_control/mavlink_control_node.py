@@ -65,7 +65,7 @@ class MavlinkControl(Node):
             Bool,
             '/robot/landing_state',
             self.landing_state_callback,
-            10) #导航定点
+            10) #
         self.target_pose_sub  # prevent unused variable warning
         self.cmd_vel_sub
         self.landing_state_sub
@@ -87,8 +87,8 @@ class MavlinkControl(Node):
         #获取坐标系变换
         try:
             t = self.tf_buffer.lookup_transform(
-                self.source_frame,
                 self.target_frame,
+                self.source_frame,
                 rclpy.time.Time())
         except TransformException as ex:
             self.get_logger().info(
@@ -120,7 +120,7 @@ class MavlinkControl(Node):
         msg.pose.orientation.w = 1.0
         self.current_pose_pub.publish(msg)
 
-        self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f' %(self.current_x, self.current_y, self.current_z))
+        # self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f' %(self.current_x, self.current_y, self.current_z))
 
     #读取遥控杆位置
     def channel_position_timer_callback(self):
@@ -165,9 +165,9 @@ class MavlinkControl(Node):
                         self.master.target_system, self.master.target_component,
                         mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
                         0,
-                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-
+                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.6
                     )
+                    if_is_flying = True
 
     #控制起飞降落动作
     def mode_control_timer_callback(self):
@@ -178,19 +178,19 @@ class MavlinkControl(Node):
                     self.master.target_system, self.master.target_component,
                     mavutil.mavlink.MAV_CMD_NAV_LAND,
                     0,  # Confirmation
-                    0, 0, 0, 0, 0, 0, -0.2  # 参数（俯仰角、纬度、经度、高度等）
+                    0, 0, 0, 0, 0, 0, 0.2  # 参数（俯仰角、纬度、经度、高度等）
                 )
                 self.if_is_flying = False
-        elif self.arming_state:
-            if self.ready_to_arm: #可以起飞
-                if not self.if_is_flying:
-                    self.get_logger().info('-------------起飞--------------')
-                    self.master.mav.command_long_send(
-                        self.master.target_system, self.master.target_component,
-                        mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
-                        0,  # Confirmation
-                        0, 0, 0, 0, 0, 0, self.cruise_height  # 参数（俯仰角、纬度、经度、高度等）
-                    )
+        # elif self.arming_state:
+        #     if self.ready_to_arm: #可以起飞
+        #         if not self.if_is_flying:
+        #             self.get_logger().info('-------------起飞--------------')
+        #             self.master.mav.command_long_send(
+        #                 self.master.target_system, self.master.target_component,
+        #                 mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+        #                 0,  # Confirmation
+        #                 0, 0, 0, 0, 0, 0, -self.cruise_height  # 参数（俯仰角、纬度、经度、高度等）
+        #             )
                     # self.if_is_flying = True
 
     #发送teb速度到飞控
@@ -210,13 +210,30 @@ class MavlinkControl(Node):
     #发送目标点位置到飞控
     def target_pose_callback(self, msg):
         #发送定点指令给飞控
-        timestamp_us = int(time.time() * 1e6)
-        x, y ,z = msg.data.x, msg.data.y, msg.data.z
-        self.master.mav.set_position_target_local_ned(
-            timestamp_us,
-            self.master.target_system, self.master.target_component,
-            x, y ,z
+        time_boot_ms = int(time.time()*1000) & 0xFFFFFFFF
+        type_mask = (
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
         )
+        x, y ,z = 0.0, 0.0, 1.0
+        # x, y ,z = msg.data.x, msg.data.y, msg.data.z
+        self.master.mav.set_position_target_local_ned_send(
+            time_boot_ms,
+            self.master.target_system, self.master.target_component,
+            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+            0b0000000000000000,
+            x, y ,z,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0
+        )
+        self.get_logger().info('mavlink: send target pose x y z: %f, %f, %f' %(x, y, z))
 
     def landing_state_callback(self, msg):
         self.land_state = msg.data

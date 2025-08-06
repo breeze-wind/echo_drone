@@ -23,7 +23,7 @@ mavlink_control_node:
 
 map_server:
     ros__parameters:
-        yaml_filename: "/home/tc/Desktop/auto_sentry2025/src/auto_sentry2025/robot_bring_up/maps/map1.yaml" #map3 重命名 checklist
+        yaml_filename: "/home/ckyf/roboposter/src/roboposter/robot_bring_up/maps/2025_07_22_18_48_07_1.yaml" #map3 重命名 checklist
 
 obstacle_segmentation_node:
     ros__parameters:
@@ -130,14 +130,14 @@ laser_mapping:
             scan_bodyframe_pub_en: true
 
         pcd_save:
-            use_pcd_map_: true
+            use_pcd_map_: false
             prior_PCD_map_path: "/home/tc/Desktop/auto_sentry2025/src/auto_sentry2025/Point-LIO/PCD/RMUC/RMUC.pcd" #map3 重命名和路径 checklist
             pcd_save_en: false
             interval: 900
         #RMUC
         init_pos:
-            init_trans: [1.7, 20.3, 0.0]
-            initial_rot: [0.0, 0.0, 1.0, 0.0]
+            init_trans: [0.0, 0.0, 0.0]
+            initial_rot: [0.0, 0.0, 0.0, 1.0]
         gcl:
             task: "A"
             angle_threshold: 0.785 # 法向量与地面夹角的角度阈值(绝对值、弧度制)
