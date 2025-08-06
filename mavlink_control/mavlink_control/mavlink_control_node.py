@@ -45,7 +45,7 @@ class MavlinkControl(Node):
             self.master.target_system,
             self.master.target_component,
             mavutil.mavlink.MAV_DATA_STREAM_RC_CHANNELS,
-            5,  # Hz
+            10,  # Hz
             1   # start (1 to start, 0 to stop)
         )
 
@@ -76,9 +76,7 @@ class MavlinkControl(Node):
         #发送自身当前测量位置, 10Hz
         self.vision_pose_timer = self.create_timer(0.1, self.vision_pose_timer_callback)
         #读取遥控杆位置
-        self.channel_position_timer = self.create_timer(0.2, self.channel_position_timer_callback)
-        #控制起飞降落动作
-        self.mode_control_timer = self.create_timer(1.0, self.mode_control_timer_callback)
+        self.channel_position_timer = self.create_timer(0.1, self.channel_position_timer_callback)
         #监测心跳信号，是否已经解锁
         self.state_timer = self.create_timer(1.0, self.state_timer_callback)
 
@@ -138,7 +136,13 @@ class MavlinkControl(Node):
                         if channels.chan2_raw > 1930:
                             if channels.chan3_raw < 1100:
                                 if channels.chan4_raw > 1930:
-                                    self.ready_to_arm = True #可以起飞
+                                    self.ready_to_arm = True
+                                    self.master.mav.command_long_send( #板外解锁命令
+                                        self.master.target_system, self.master.target_component,
+                                        mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+                                        0,
+                                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+                                    )
                                     return
                     self.ready_to_arm = False
 
@@ -150,59 +154,41 @@ class MavlinkControl(Node):
             print(f"Vehicle armed? {armed}")
             print('')
             msg = Bool() #给决策发送是否解锁
-            if armed:
+            if armed: #飞控实际状态解锁
                 self.arming_state = True
             else:
                 self.arming_state = False
+                if self.ready_to_arm:
+                    self.ready_to_arm = False #重新发解锁命令
+
             msg.data = self.arming_state
             self.arm_state_pub.publish(msg)
-
-        #如果可以起飞就发送解锁命令
-        if not self.arming_state:
-            if self.ready_to_arm:
-                if not self.if_is_flying:
-                    self.master.mav.command_long_send(
-                        self.master.target_system, self.master.target_component,
-                        mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-                        0,
-                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.6
-                    )
-                    if_is_flying = True
-
-    #控制起飞降落动作
-    def mode_control_timer_callback(self):
-        if self.land_state:
-            if self.if_is_flying:
-                self.get_logger().info('进入降落状态')
-                self.master.mav.command_long_send(
-                    self.master.target_system, self.master.target_component,
-                    mavutil.mavlink.MAV_CMD_NAV_LAND,
-                    0,  # Confirmation
-                    0, 0, 0, 0, 0, 0, 0.2  # 参数（俯仰角、纬度、经度、高度等）
-                )
-                self.if_is_flying = False
-        # elif self.arming_state:
-        #     if self.ready_to_arm: #可以起飞
-        #         if not self.if_is_flying:
-        #             self.get_logger().info('-------------起飞--------------')
-        #             self.master.mav.command_long_send(
-        #                 self.master.target_system, self.master.target_component,
-        #                 mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
-        #                 0,  # Confirmation
-        #                 0, 0, 0, 0, 0, 0, -self.cruise_height  # 参数（俯仰角、纬度、经度、高度等）
-        #             )
-                    # self.if_is_flying = True
 
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):
         # Send vision speed estimate
-        timestamp_us = int(time.time() * 1e6)
+        time_boot_ms = int(time.time()*1000) & 0xFFFFFFFF
+        type_mask = (
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
+        )
         vx, vy, vz = msg.data.x, msg.data.y, self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
 
-        self.master.mav.set_position_target_local_ned(
-            timestamp_us,
+        self.master.mav.set_position_target_local_ned_send(
+            time_boot_ms,
             self.master.target_system, self.master.target_component,
-            vx, vy, vz
+            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+            0b0000000000000000,
+            0, 0, 0,
+            vx, vy, vz,
+            0, 0, 0,
+            0, 0
         )
 
         self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %(vx, vy, vz))

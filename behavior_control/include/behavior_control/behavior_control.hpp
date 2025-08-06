@@ -92,8 +92,8 @@ private:
     /// 是否穿门
     bool if_passing_door_;
 
-    /// 当前是否能够起飞
-    bool if_ready_to_fly;
+    /// 当前是否已经解锁
+    bool arming_state;
     /// 是否在准备降落状态
     bool if_landing;
 

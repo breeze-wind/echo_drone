@@ -70,7 +70,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->set_parameter(servo_param);
     servo_index_++;
 
-    if_ready_to_fly = false;
+    arming_state = false;
     if_landing = false;
 
     current_target_position_.transform.rotation.x = 0.0;
@@ -121,7 +121,7 @@ void BehaviorControl::step_timer_callback()
     RCLCPP_INFO(this->get_logger(), "---------->current step: %d", current_step);
     if(current_step == 0) //等待飞控解锁
     {
-        if(if_ready_to_fly)
+        if(arming_state)
             current_step = 1;
     }
     else if(current_step == 1) //等待起飞至巡航高度
@@ -485,5 +485,5 @@ void BehaviorControl::mission_timer_callback()
 
 void BehaviorControl::ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
-    if_ready_to_fly = msg->data;
+    arming_state = msg->data; 
 }
