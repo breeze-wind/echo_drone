@@ -101,7 +101,7 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='livox_to_mavlink_body_broadcaster',
-        arguments=['0.0', '0.0', '0',  '0', '0', '0.0', '1.0','livox', 'mavlink_body']
+        arguments=['0.0', '0.0', '-0.06',  '1.0', '0.0', '0.0', '0.0','livox', 'mavlink_body']
     )
     livox_to_camera = Node(
         package='tf2_ros',

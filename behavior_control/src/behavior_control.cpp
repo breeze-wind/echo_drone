@@ -112,8 +112,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
     current_x_ = msg->pose.position.x;
-    current_y_ = msg->pose.position.y;
-    current_z_ = msg->pose.position.z;
+    current_y_ = -msg->pose.position.y;
+    current_z_ = -msg->pose.position.z;
 }
 
 void BehaviorControl::step_timer_callback()

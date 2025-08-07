@@ -22,7 +22,7 @@ class MavlinkControl(Node):
         self.cruise_height = self.get_parameter('cruise_height').get_parameter_value().double_value
 
         self.target_frame = "map" #世界系
-        self.source_frame = "livox" #机体系
+        self.source_frame = "mavlink_body" #机体系
 
         self.pid_height = 0.4
         self.current_x = 0.0
@@ -169,9 +169,9 @@ class MavlinkControl(Node):
         # Send vision speed estimate
         time_boot_ms = int(time.time()*1000) & 0xFFFFFFFF
         type_mask = (
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE |
                 mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
                 mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
                 mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
