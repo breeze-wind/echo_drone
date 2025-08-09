@@ -1,0 +1,8 @@
+<class_libraries>
+	<library path="nav2_keep_away_from_obstacles_behavior">
+		<class name="nav2_behaviors/KeepAwayFromObstacles"
+			type="nav2_behaviors::KeepAwayFromObstacles" base_class_type="nav2_core::Behavior">
+			<description></description>
+		</class>
+	</library>
+</class_libraries>

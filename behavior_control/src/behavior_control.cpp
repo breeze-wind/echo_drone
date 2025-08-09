@@ -96,6 +96,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     mission_period_ms = std::chrono::seconds(static_cast<int64_t>(0.05));
 
     target_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/target_pose", 10);
+    goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/robot/goal_pose", 10);
     landing_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/landing_state", 10);
     current_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("/robot/current_pose",
         10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
@@ -289,8 +290,6 @@ void BehaviorControl::step_timer_callback()
 
 void BehaviorControl::mission_timer_callback()
 {
-    // RCLCPP_INFO(this->get_logger(), "current target: %d", current_step);
-
     if(current_step == 0)
     {
         current_target_position_.transform.translation.x = 0.0;
@@ -309,6 +308,11 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 21)
     {
+        geometry_msgs::msg::PoseStamped goal_pose_;
+        goal_pose_.pose.position.x = target_positions_[target_sequence_[0]][0];
+        goal_pose_.pose.position.y = target_positions_[target_sequence_[0]][1];
+        goal_pose_.pose.position.z = cruise_height_;
+        goal_pose_pub_->publish(goal_pose_);
         RCLCPP_INFO(this->get_logger(), "第一个目标点，current x y: %lf, %lf", current_x_, current_y_);
     }
     else if(current_step == 22)
@@ -344,6 +348,11 @@ void BehaviorControl::mission_timer_callback()
 
     else if(current_step == 31)
     {
+        geometry_msgs::msg::PoseStamped goal_pose_;
+        goal_pose_.pose.position.x = target_positions_[target_sequence_[1]][0];
+        goal_pose_.pose.position.y = target_positions_[target_sequence_[1]][1];
+        goal_pose_.pose.position.z = cruise_height_;
+        goal_pose_pub_->publish(goal_pose_);
         RCLCPP_INFO(this->get_logger(), "第二个目标点，current x y: %lf, %lf", current_x_, current_y_);
     }
     else if(current_step == 32)
@@ -379,6 +388,11 @@ void BehaviorControl::mission_timer_callback()
 
     else if(current_step == 41)
     {
+        geometry_msgs::msg::PoseStamped goal_pose_;
+        goal_pose_.pose.position.x = target_positions_[target_sequence_[2]][0];
+        goal_pose_.pose.position.y = target_positions_[target_sequence_[2]][1];
+        goal_pose_.pose.position.z = cruise_height_;
+        goal_pose_pub_->publish(goal_pose_);
         RCLCPP_INFO(this->get_logger(), "第三个目标点，current x y: %lf, %lf", current_x_, current_y_);
     }
     else if(current_step == 42)

@@ -42,6 +42,7 @@ private:
 
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_pub_;
     /// 发布当前降落状态
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr landing_state_pub_;
     /// 接收当前位姿

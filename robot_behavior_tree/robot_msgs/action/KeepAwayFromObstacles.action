@@ -1,0 +1,9 @@
+#goal definition
+float32 speed
+float32 distance
+---
+#result definition
+builtin_interfaces/Duration total_elapsed_time
+---
+#feedback definition
+float32 distance_remaining
