@@ -550,13 +550,13 @@ bool LaserMappingNode::sync_packages(MeasureGroup &meas)
             meas.lidar_last_time = lidar_end_time;
             return true;
         }
-        RCLCPP_ERROR(get_logger(), "sync_packages: lidar_buffer.empty()");
+        //RCLCPP_ERROR(get_logger(), "sync_packages: lidar_buffer.empty()");
         return false;
     }
 
     if(lidar_buffer.empty())
     {
-        RCLCPP_ERROR(get_logger(), "lidar_buffer.empty()");
+        //RCLCPP_ERROR(get_logger(), "lidar_buffer.empty()");
         return false;
     }
     if (imu_deque.empty())

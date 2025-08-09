@@ -38,7 +38,7 @@ void MergePCD::merge_pcd()
     tm *ltm = localtime(&now);
     char merge_file_name[200];
 
-    sprintf(merge_file_name, "/RMUC.pcd"); //"/%d_%02d_%02d_%02d_%02d_%02d_merged.pcd", 1900 + ltm->tm_year, 1 + ltm->tm_mon, ltm->tm_mday, ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
+    sprintf(merge_file_name, "/%d_%02d_%02d_%02d_%02d_%02d_merged.pcd", 1900 + ltm->tm_year, 1 + ltm->tm_mon, ltm->tm_mday, ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
     std::string merge_file_name_string(merge_file_name);
 
     pcl::io::savePCDFileASCII(pcd_folder_ + merge_file_name_string, *cloud);

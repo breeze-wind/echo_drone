@@ -11,6 +11,9 @@ from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
+# from tf2.transformations import quaternion_from_euler, euler_from_quaternion
+import transforms3d as tfs
+import numpy as np
 
 class MavlinkControl(Node):
 
@@ -22,7 +25,7 @@ class MavlinkControl(Node):
         self.cruise_height = self.get_parameter('cruise_height').get_parameter_value().double_value
 
         self.target_frame = "map" #世界系
-        self.source_frame = "mavlink_body" #机体系
+        self.source_frame = "livox" #雷达系
 
         self.pid_height = 0.4
         self.current_x = 0.0
@@ -36,7 +39,7 @@ class MavlinkControl(Node):
         self.if_is_flying = False
 
         # Connect to PX4 over serial or UDP
-        self.master = mavutil.mavlink_connection('/dev/ttyACM0')
+        self.master = mavutil.mavlink_connection('/dev/ttyACM0', band=57600)
         self.master.wait_heartbeat()
         print("Connected")
 
@@ -96,15 +99,19 @@ class MavlinkControl(Node):
         # Send vision pose estimate
         timestamp_us = int(time.time() * 1e6)
         # Position in meters (NED)
-        self.current_x, self.current_y, self.current_z = t.transform.translation.x, t.transform.translation.y, t.transform.translation.z
-        # self.current_x, self.current_y, self.current_z = 0.0, 0.0, 1.0
-        roll, pitch, yaw = 0.0, 0.0, 0.0  # Orientation in radians
+        self.current_x, self.current_y, self.current_z = (t.transform.translation.x, t.transform.translation.y,
+                                                          t.transform.translation.z)
+        roll, pitch, yaw = tfs.euler.quat2euler([t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y,
+                                                 t.transform.rotation.z], "sxyz")  # Orientation in radians
 
         self.master.mav.vision_position_estimate_send(
             timestamp_us,
-            self.current_x, self.current_y, self.current_z,
-            roll, pitch, yaw
+            self.current_x, -self.current_y, -(self.current_z-0.06),
+            roll, -pitch, -yaw
         )
+        # self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f'
+        #                        % (self.current_x, -self.current_y, -(self.current_z - 0.06)))
+        # self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
 
         #发送当前位置到决策
         msg = PoseStamped()
@@ -117,8 +124,6 @@ class MavlinkControl(Node):
         msg.pose.orientation.z = 0.0
         msg.pose.orientation.w = 1.0
         self.current_pose_pub.publish(msg)
-
-        # self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f' %(self.current_x, self.current_y, self.current_z))
 
     #读取遥控杆位置
     def channel_position_timer_callback(self):
@@ -143,6 +148,7 @@ class MavlinkControl(Node):
                                         0,
                                         1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
                                     )
+                                    self.get_logger().info('mavlink: vehicle armed!!!!')
                                     return
                     self.ready_to_arm = False
 
@@ -151,7 +157,7 @@ class MavlinkControl(Node):
         hb = self.master.recv_match(type='HEARTBEAT', blocking=False)
         if hb:
             armed = (hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
-            print(f"Vehicle armed? {armed}")
+            print(f"????????Vehicle armed? {armed}")
             print('')
             msg = Bool() #给决策发送是否解锁
             if armed: #飞控实际状态解锁
@@ -167,24 +173,14 @@ class MavlinkControl(Node):
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):
         # Send vision speed estimate
-        time_boot_ms = int(time.time()*1000) & 0xFFFFFFFF
-        type_mask = (
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
-        )
-        vx, vy, vz = msg.data.x, msg.data.y, self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
+        time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
+        vx, vy, vz = msg.data.x, -msg.data.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
 
         self.master.mav.set_position_target_local_ned_send(
             time_boot_ms,
             self.master.target_system, self.master.target_component,
-            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
-            0b0000000000000000,
+            1,
+            0b0000000111000111,
             0, 0, 0,
             vx, vy, vz,
             0, 0, 0,
@@ -196,28 +192,18 @@ class MavlinkControl(Node):
     #发送目标点位置到飞控
     def target_pose_callback(self, msg):
         #发送定点指令给飞控
-        time_boot_ms = int(time.time()*1000) & 0xFFFFFFFF
-        type_mask = (
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE |
-                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
-        )
-        x, y ,z = 0.0, 0.0, 1.0
-        # x, y ,z = msg.data.x, msg.data.y, msg.data.z
+        time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
+        x, y ,z = (msg.transform.translation.x, -msg.transform.translation.y,
+                   -(msg.transform.translation.z-0.06))
         self.master.mav.set_position_target_local_ned_send(
             time_boot_ms,
             self.master.target_system, self.master.target_component,
-            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
-            0b0000000000000000,
-            x, y ,z,
-            0, 0, 0,
-            0, 0, 0,
-            0, 0
+            1,
+            0b0000000111111000,
+            x, y, z,
+            0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0,
+            0.0, 0.0
         )
         self.get_logger().info('mavlink: send target pose x y z: %f, %f, %f' %(x, y, z))
 

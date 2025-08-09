@@ -40,7 +40,7 @@ NavigateToPoseNavigator::configure(
     node->declare_parameter("path_blackboard_id", std::string("path"));
   }
 
-  path_blackboard_id_ = "truncated_path"; //node->get_parameter("path_blackboard_id").as_string();
+  path_blackboard_id_ = node->get_parameter("path_blackboard_id").as_string();
   RCLCPP_INFO(logger_, "------------>>>>>>>>>path_blackboard_id_: %s", path_blackboard_id_.c_str());
 
   // Odometry smoother object for getting current speed
@@ -224,9 +224,6 @@ NavigateToPoseNavigator::initializeGoalPose(ActionT::Goal::ConstSharedPtr goal)
   start_time_ = clock_->now();
   auto blackboard = bt_action_server_->getBlackboard();
   blackboard->set<int>("number_recoveries", 0);  // NOLINT
-
-  double distance = 0.0;
-  blackboard->set<double>("distance", distance);
 
   // Update the goal pose on the blackboard
   blackboard->set<geometry_msgs::msg::PoseStamped>(goal_blackboard_id_, goal->pose);

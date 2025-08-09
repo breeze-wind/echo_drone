@@ -8,7 +8,6 @@ find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(nav2_behavior_tree REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -38,7 +37,6 @@ set(dependencies
   rclcpp_components
   std_msgs
   nav2_util
-  nav2_behavior_tree
   nav2_msgs
   nav_msgs
   tf2

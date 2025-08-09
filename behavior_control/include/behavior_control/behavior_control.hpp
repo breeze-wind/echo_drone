@@ -54,14 +54,15 @@ private:
     rclcpp::TimerBase::SharedPtr step_timer_;
     /// 执行任务计时器
     rclcpp::TimerBase::SharedPtr mission_timer_;
-    std::chrono::seconds step_period_ms;
-    std::chrono::seconds mission_period_ms;
+    std::chrono::milliseconds step_period_ms;
+    std::chrono::milliseconds mission_period_ms;
 
     /* 标靶坐标以及穿门起点终点坐标 */
     std::vector<double> tank_;
     std::vector<double> tent_;
     std::vector<double> car_;
     std::vector<double> pillbox_;
+    std::vector<double> bridge_;
     std::vector<double> passing_door_src_;
     std::vector<double> passing_door_des_;
 
@@ -90,6 +91,7 @@ private:
     bool if_hit_car_;
     bool if_hit_pillbox_;
     bool if_hit_tent_;
+    bool if_hit_bridge_;
     /// 是否穿门
     bool if_passing_door_;
 
