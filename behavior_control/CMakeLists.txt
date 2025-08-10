@@ -14,6 +14,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
 
 include_directories(
         include
@@ -28,6 +29,7 @@ ament_target_dependencies(behavior_control_node
         tf2
         tf2_eigen
         tf2_geometry_msgs
+        nav2_msgs
 )
 
 install(TARGETS behavior_control_node

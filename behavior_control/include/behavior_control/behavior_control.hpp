@@ -14,6 +14,7 @@
 #include <map>
 
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
@@ -25,6 +26,8 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+#include "nav2_msgs/action/navigate_to_pose.hpp"
+
 class BehaviorControl : public rclcpp::Node
 {
 public:
@@ -33,6 +36,7 @@ public:
     void step_timer_callback();
     /// 控制当前步骤执行任务
     void mission_timer_callback();
+    void send_action_goal();
 
 private:
     /// 接收从飞控通信节点传来的当前位姿
@@ -43,6 +47,8 @@ private:
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_pub_;
+    rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigate_to_pose_client_;
+    rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal navigate_to_pose_goal_;
     /// 发布当前降落状态
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr landing_state_pub_;
     /// 接收当前位姿
@@ -126,6 +132,7 @@ private:
     std::string map_frame_;
 
     /// 当前识别目标的坐标系变换
+    nav2_msgs::action::NavigateToPose::Goal navigate_to_pose_action_;
     geometry_msgs::msg::TransformStamped current_target_position_;
     geometry_msgs::msg::TransformStamped map_to_target;
 

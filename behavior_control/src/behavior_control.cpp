@@ -107,6 +107,21 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     step_period_ms = std::chrono::milliseconds(static_cast<int64_t>(250));
     mission_period_ms = std::chrono::milliseconds(static_cast<int64_t>(100));
 
+    navigate_to_pose_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "navigate_to_pose");
+    if (!this->navigate_to_pose_client_->wait_for_action_server()) {
+        RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
+        rclcpp::shutdown();
+    }
+    navigate_to_pose_action_ = nav2_msgs::action::NavigateToPose::Goal();
+    navigate_to_pose_action_.pose.pose.position.x = 0.0;
+    navigate_to_pose_action_.pose.pose.position.y = 0.0;
+    navigate_to_pose_action_.pose.pose.position.z = 0.0;
+    navigate_to_pose_action_.pose.pose.orientation.x = 0.0;
+    navigate_to_pose_action_.pose.pose.orientation.y = 0.0;
+    navigate_to_pose_action_.pose.pose.orientation.z = 0.0;
+    navigate_to_pose_action_.pose.pose.orientation.w = 1.0;
+    navigate_to_pose_goal_ = nav2_msgs::action::NavigateToPose::Goal();
+
     target_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/target_pose", 10);
     goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/robot/goal_pose", 10);
     landing_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/landing_state", 10);
@@ -350,11 +365,20 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 21)
     {
-        geometry_msgs::msg::PoseStamped goal_pose_;
-        goal_pose_.pose.position.x = target_positions_[target_sequence_[0]][0];
-        goal_pose_.pose.position.y = target_positions_[target_sequence_[0]][1];
-        goal_pose_.pose.position.z = cruise_height_;
-        goal_pose_pub_->publish(goal_pose_);
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.pose.position.x = target_positions_[target_sequence_[0]][0];
+        action_goal.pose.pose.position.y = target_positions_[target_sequence_[0]][1];
+        action_goal.pose.pose.position.z = cruise_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
+        // geometry_msgs::msg::PoseStamped goal_pose_;
+        // goal_pose_.pose.position.x = target_positions_[target_sequence_[0]][0];
+        // goal_pose_.pose.position.y = target_positions_[target_sequence_[0]][1];
+        // goal_pose_.pose.position.z = cruise_height_;
+        // goal_pose_pub_->publish(goal_pose_);
         RCLCPP_INFO(this->get_logger(), "第一个目标点: %lf, %lf", target_positions_[target_sequence_[0]][0],
                             target_positions_[target_sequence_[0]][1]);    }
     else if(current_step == 22)
@@ -390,11 +414,20 @@ void BehaviorControl::mission_timer_callback()
 
     else if(current_step == 31)
     {
-        geometry_msgs::msg::PoseStamped goal_pose_;
-        goal_pose_.pose.position.x = target_positions_[target_sequence_[1]][0];
-        goal_pose_.pose.position.y = target_positions_[target_sequence_[1]][1];
-        goal_pose_.pose.position.z = cruise_height_;
-        goal_pose_pub_->publish(goal_pose_);
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.pose.position.x = target_positions_[target_sequence_[1]][0];
+        action_goal.pose.pose.position.y = target_positions_[target_sequence_[1]][1];
+        action_goal.pose.pose.position.z = cruise_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
+        // geometry_msgs::msg::PoseStamped goal_pose_;
+        // goal_pose_.pose.position.x = target_positions_[target_sequence_[1]][0];
+        // goal_pose_.pose.position.y = target_positions_[target_sequence_[1]][1];
+        // goal_pose_.pose.position.z = cruise_height_;
+        // goal_pose_pub_->publish(goal_pose_);
         RCLCPP_INFO(this->get_logger(), "第二个目标点: %lf, %lf", target_positions_[target_sequence_[1]][0],
                             target_positions_[target_sequence_[1]][1]);    }
     else if(current_step == 32)
@@ -430,11 +463,20 @@ void BehaviorControl::mission_timer_callback()
 
     else if(current_step == 41)
     {
-        geometry_msgs::msg::PoseStamped goal_pose_;
-        goal_pose_.pose.position.x = target_positions_[target_sequence_[2]][0];
-        goal_pose_.pose.position.y = target_positions_[target_sequence_[2]][1];
-        goal_pose_.pose.position.z = cruise_height_;
-        goal_pose_pub_->publish(goal_pose_);
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.pose.position.x = target_positions_[target_sequence_[2]][0];
+        action_goal.pose.pose.position.y = target_positions_[target_sequence_[2]][1];
+        action_goal.pose.pose.position.z = cruise_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
+        // geometry_msgs::msg::PoseStamped goal_pose_;
+        // goal_pose_.pose.position.x = target_positions_[target_sequence_[2]][0];
+        // goal_pose_.pose.position.y = target_positions_[target_sequence_[2]][1];
+        // goal_pose_.pose.position.z = cruise_height_;
+        // goal_pose_pub_->publish(goal_pose_);
         RCLCPP_INFO(this->get_logger(), "第三个目标点: %lf, %lf", target_positions_[target_sequence_[2]][0],
                             target_positions_[target_sequence_[2]][1]);    }
     else if(current_step == 42)
@@ -470,10 +512,15 @@ void BehaviorControl::mission_timer_callback()
 
     else if(current_step == 51)
     {
-        //current_target_position_.transform.translation.x = target_positions_[target_sequence_[3]][0];
-        //current_target_position_.transform.translation.y = target_positions_[target_sequence_[3]][1];
-        //current_target_position_.transform.translation.z = cruise_height_;
-        //target_pose_pub_->publish(current_target_position_);
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.pose.position.x = target_positions_[target_sequence_[3]][0];
+        action_goal.pose.pose.position.y = target_positions_[target_sequence_[3]][1];
+        action_goal.pose.pose.position.z = cruise_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
         RCLCPP_INFO(this->get_logger(), "第四个目标点: %lf, %lf", target_positions_[target_sequence_[3]][0],
 					target_positions_[target_sequence_[3]][1]);
     }
@@ -510,6 +557,15 @@ void BehaviorControl::mission_timer_callback()
 
     else if(current_step == 61)
     {
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.pose.position.x = target_positions_[target_sequence_[4]][0];
+        action_goal.pose.pose.position.y = target_positions_[target_sequence_[4]][1];
+        action_goal.pose.pose.position.z = cruise_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
         RCLCPP_INFO(this->get_logger(), "动态目标点，current x y: %lf, %lf", current_x_, current_y_);
     }
     else if(current_step == 62) //识别投掷策略待修改
@@ -594,4 +650,9 @@ void BehaviorControl::ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
     arming_state = msg->data;
     RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>>>>>>arming_state: %d", arming_state);
+}
+
+void BehaviorControl::send_action_goal()
+{
+
 }
