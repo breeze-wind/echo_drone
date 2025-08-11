@@ -34,9 +34,7 @@ class MavlinkControl(Node):
 
         self.ready_to_arm = False #是否准备解锁
         self.arming_state = False #飞控解锁状态
-        self.land_state = False #降落状态
-
-        self.if_is_flying = False
+        self.if_nav = False
 
         # Connect to PX4 over serial or UDP
         self.master = mavutil.mavlink_connection('/dev/ttyACM0', band=230400)
@@ -64,14 +62,14 @@ class MavlinkControl(Node):
             '/cmd_vel',
             self.cmd_vel_callback,
             10) #导航规划速度
-        self.landing_state_sub = self.create_subscription(
+        self.nav_state_sub = self.create_subscription(
             Bool,
-            '/robot/landing_state',
-            self.landing_state_callback,
+            '/robot/nav_state',
+            self.nav_state_callback,
             10) #
         self.target_pose_sub  # prevent unused variable warning
         self.cmd_vel_sub
-        self.landing_state_sub
+        self.nav_state_sub
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -171,42 +169,44 @@ class MavlinkControl(Node):
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):
         # Send vision speed estimate
-        time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
-        vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
+        if self.if_nav:
+            time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
+            vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
 
-        self.master.mav.set_position_target_local_ned_send(
-            time_boot_ms,
-            self.master.target_system, self.master.target_component,
-            1,
-            0b0000000111000111,
-            0, 0, 0,
-            vx, vy, vz,
-            0, 0, 0,
-            0, 0
-        )
+            self.master.mav.set_position_target_local_ned_send(
+                time_boot_ms,
+                self.master.target_system, self.master.target_component,
+                1,
+                0b0000000111000111,
+                0, 0, 0,
+                vx, vy, vz,
+                0, 0, 0,
+                0, 0
+            )
 
-        self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %(vx, vy, vz))
+            self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %(vx, vy, vz))
 
     #发送目标点位置到飞控
     def target_pose_callback(self, msg):
         #发送定点指令给飞控
-        time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
-        x, y ,z = (msg.transform.translation.x, -msg.transform.translation.y,
-                   -(msg.transform.translation.z-0.06))
-        self.master.mav.set_position_target_local_ned_send(
-            time_boot_ms,
-            self.master.target_system, self.master.target_component,
-            1,
-            0b0000000111111000,
-            x, y, z,
-            0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0,
-            0.0, 0.0
-        )
-        self.get_logger().info('mavlink: send target pose x y z: %f, %f, %f' %(x, y, z))
+        if not self.if_nav:
+            time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
+            x, y ,z = (msg.transform.translation.x, -msg.transform.translation.y,
+                       -(msg.transform.translation.z-0.06))
+            self.master.mav.set_position_target_local_ned_send(
+                time_boot_ms,
+                self.master.target_system, self.master.target_component,
+                1,
+                0b0000000111111000,
+                x, y, z,
+                0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0,
+                0.0, 0.0
+            )
+            self.get_logger().info('mavlink: send target pose x y z: %f, %f, %f' %(x, y, z))
 
-    def landing_state_callback(self, msg):
-        self.land_state = msg.data
+    def nav_state_callback(self, msg):
+        self.if_nav = msg.data
 
 def main(args=None):
     rclpy.init(args=args)

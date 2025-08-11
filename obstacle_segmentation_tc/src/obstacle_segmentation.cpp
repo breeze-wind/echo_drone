@@ -54,12 +54,16 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
     //pass_through_filter_z_.setFilterLimitsNegative(false);
     voxfilter.setLeafSize(leaf_size_, leaf_size_, leaf_size_);
 
+    current_z_ = 0.0;
+
     tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tfbuffer_);
     // 初始化pub和sub
     output_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(output_cloud_topic_, 10);
     input_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         input_cloud_topic_, 10, std::bind(&ObstacleSegmentationNode::cloudCallback, this, std::placeholders::_1));
+    current_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("/robot/current_pose",
+            10, std::bind(&ObstacleSegmentationNode::CurrentPoseCallback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "点云分割节点初始化完成");
 }
 
@@ -91,28 +95,21 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
 //    RCLCPP_INFO(this->get_logger(), "obstacle_segmentation: 滤波后点云数量： %lu", cloud->points.size());
 
     // 创建法向量估计对象
-    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-    ne.setInputCloud(cloud);
+    //pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+    //ne.setInputCloud(cloud);
     // 创建一个空的kdtree对象，并把它传递给法向量估计对象
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
-    ne.setSearchMethod(tree);
+    //pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
+    //ne.setSearchMethod(tree);
     // 输出数据集
-    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
-    ne.setKSearch(point_num_for_normal_); // 使用最近的point_num_for_normal_个点计算法向量
-    ne.compute(*cloud_normals); // 计算法向量
+    //pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
+    //ne.setKSearch(point_num_for_normal_); // 使用最近的point_num_for_normal_个点计算法向量
+    //ne.compute(*cloud_normals); // 计算法向量
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     for (long i = 0; i < cloud->points.size(); i++)
     {
-        float gradient = acos(
-            sqrt(pow(cloud_normals->points[i].normal_x, 2) + pow(cloud_normals->points[i].normal_y, 2)) /
-            sqrt(pow(cloud_normals->points[i].normal_x, 2) + pow(cloud_normals->points[i].normal_y, 2) +
-                pow(cloud_normals->points[i].normal_z, 2)));
-        // 如果法向量与地面的夹角小于角度阈值则认为是障碍物
-        if (gradient < angle_threshold_)
-        {
+        if(cloud->points[i].z - current_z_ < 0.2 && cloud->points[i].z - current_z_ > -0.4)
             segement_cloud->points.push_back(cloud->points[i]);
-        }
     }
     // 再过滤一次离群点
     //pcl::RadiusOutlierRemoval<pcl::PointXYZ> radiusoutlier;
@@ -134,4 +131,9 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     output_cloud->header.stamp = msg->header.stamp;
     output_cloud_pub_->publish(*output_cloud);
     // RCLCPP_INFO(this->get_logger(), "障碍物点云数据正在发布");
+}
+
+void ObstacleSegmentationNode::CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+{
+    current_z_ = msg->pose.position.z;
 }

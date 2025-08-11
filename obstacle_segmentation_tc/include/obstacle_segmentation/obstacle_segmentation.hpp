@@ -28,6 +28,7 @@
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 #include "nav_msgs/msg/occupancy_grid.hpp"
 
@@ -45,6 +46,9 @@ public:
     explicit ObstacleSegmentationNode(std::string name, const rclcpp::NodeOptions &options);
 
     void cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+
+    /// 接收从飞控通信节点传来的当前位姿
+    void CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 
 private:
     // 创建滤波器对象
@@ -69,9 +73,12 @@ private:
     bool use_downsample_;
     int cout;
     std::string base_frame_;
+    double current_z_;
 
     std::unique_ptr<tf2_ros::Buffer> tfbuffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+    /// 接收当前位姿
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr input_cloud_sub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr output_cloud_pub_;
 };

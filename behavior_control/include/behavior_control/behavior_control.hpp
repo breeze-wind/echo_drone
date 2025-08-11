@@ -48,8 +48,7 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_pub_;
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigate_to_pose_client_;
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal navigate_to_pose_goal_;
-    /// 发布当前降落状态
-    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr landing_state_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr nav_state_pub_;
     /// 接收当前位姿
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub_;
     /// 接收当前起飞状态
@@ -104,6 +103,7 @@ private:
     bool arming_state;
     /// 是否在准备降落状态
     bool if_landing;
+    bool if_nav;
 
     /* 当前位置 */
     double current_x_;
