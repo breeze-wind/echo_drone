@@ -8,9 +8,9 @@ behavior_control_node:
         passing_door_src: [0.0, 0.0]
         passing_door_des: [0.0, 0.0]
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]
-        cruise_height: 0.6
+        cruise_height: 1.0
         detection_height: 1.5
-        passing_door_height: 0.4
+        passing_door_height: 0.6
         eject_height: 0.3
         if_hit_tank: false
         if_hit_car: true
@@ -64,20 +64,17 @@ obstacle_segmentation_node:
         input_cloud_topic: "/cloud_registered_body"
         output_cloud_topic: "/cloud_obstacle"
         use_downsample: false # 是否使用体素滤波器
-        leaf_size: 0.1 # 体素滤波器的体素大小
+        leaf_size: 0.25 # 体素滤波器的体素大小
         point_num_for_normal: 10 # 用于计算法向量的点的数量
         angle_threshold: 0.785 # 法向量与地面夹角的角度阈值(绝对值、弧度制)
-        obstacle_x_min: -10.0 # 障碍物的x最小值(livox坐标系)
-        obstacle_x_max: 10.0 # 障碍物的x最大值(livox坐标系)
-        obstacle_y_min: -10.0 # 障碍物的y最小值(livox坐标系)
-        obstacle_y_max: 10.0 # 障碍物的y最大值(livox坐标系)
+        obstacle_x_min: -5.0 # 障碍物的x最小值(livox坐标系)
+        obstacle_x_max: 5.0 # 障碍物的x最大值(livox坐标系)
+        obstacle_y_min: -5.0 # 障碍物的y最小值(livox坐标系)
+        obstacle_y_max: 5.0 # 障碍物的y最大值(livox坐标系)
         obstacle_z_min: -1.0 # 障碍物的z最小值(livox坐标系)
-        obstacle_z_max: 0.02 # 障碍物的z最大值(livox坐标系)
-        obstacle_range_min: 0.12 # 障碍物的最近距离(livox坐标系)
-        obstacle_range_max: 15.0 # 障碍物的最远距离(livox坐标系)
-        cluster_tolerance: 0.1 # 聚类距离阈值
-        min_cluster_size: 100 # 最小聚类大小
-        max_cluster_size: 25000 # 最大聚类大小
+        obstacle_z_max: 1.0 # 障碍物的z最大值(livox坐标系)
+        obstacle_range_min: 0.2 # 障碍物的最近距离(livox坐标系)
+        obstacle_range_max: 10.0 # 障碍物的最远距离(livox坐标系)
 
 bt_navigator:
     ros__parameters:
@@ -175,11 +172,6 @@ laser_mapping:
             angle_threshold: 0.785 # 法向量与地面夹角的角度阈值(绝对值、弧度制)
         runtime_pos_log_enable: false
 
-robot_serial_node:
-    ros__parameters:
-        dog_threshold: 100
-        frequency: 50.0
-
 # teb控制器
 controller_server:
     ros__parameters:
@@ -218,13 +210,13 @@ controller_server:
 
             # Robot
 
-            max_vel_x: 0.15 # 机器人最大x轴速度m/s
-            max_vel_y: 0.15 # 机器人最大y轴速度m/s
-            max_vel_x_backwards: 0.15 # 机器人最大x轴后退速度m/s
+            max_vel_x: 1.0 # 机器人最大x轴速度m/s
+            max_vel_y: 1.0 # 机器人最大y轴速度m/s
+            max_vel_x_backwards: 0.7 # 机器人最大x轴后退速度m/s
             max_vel_theta: 0.15 # 机器人最大角速度rad/s
-            acc_lim_x: 0.15 # 机器人最大x轴平移加速度m/s^2
-            acc_lim_y: 0.15 # 机器人最大y轴平移加速度m/s^2
-            acc_lim_theta: 0.15 # 机器人最大角加速度rad/s^2
+            acc_lim_x: 0.3 # 机器人最大x轴平移加速度m/s^2
+            acc_lim_y: 0.3 # 机器人最大y轴平移加速度m/s^2
+            acc_lim_theta: 0.2 # 机器人最大角加速度rad/s^2
 
             min_turning_radius: 0.5 # 机器人最小转弯半径
 
@@ -239,7 +231,7 @@ controller_server:
 
             # Obstacles
 
-            min_obstacle_dist: 0.1 # 机器人与障碍物之间的最小距离（以米为单位）3.17
+            min_obstacle_dist: 0.12 # 机器人与障碍物之间的最小距离（以米为单位）3.17
             inflation_dist: 0.15 # 非零惩罚成本的障碍物周围的缓冲区（应大于min_obstacle_dist才能生效）。3.17
             include_costmap_obstacles: True # 指定是否应考虑本地成本图的障碍。每个被标记为障碍物的单元格都被视为点障碍物。因此，不要RM选择非常小的代价图分辨率，因为它会增加计算时间。
             costmap_obstacles_behind_robot_dist: 4.0 # 限制机器人后面规划时考虑的占用的本地成本图障碍（指定距离以米为单位）。
@@ -263,12 +255,12 @@ controller_server:
             optimization_verbose: False
             penalty_epsilon: 0.146 # 为硬约束近似的惩罚函数添加一个小的安全裕度
             obstacle_cost_exponent: 0.65 #3.17
-            weight_max_vel_x: 3.0 # 满足最大允许平移速度的优化权重 2.28
-            weight_max_vel_y: 3.0 # 满足最大允许平移速度的优化权重 3.17
+            weight_max_vel_x: 2.5 # 满足最大允许平移速度的优化权重 2.28
+            weight_max_vel_y: 2.5 # 满足最大允许平移速度的优化权重 3.17
             weight_max_vel_theta: 0.8 # 满足最大允许角速度的优化权重
-            weight_acc_lim_x: 1.5 # 满足最大允许平移加速度的优化权重
-            weight_acc_lim_y: 1.5 # 满足最大允许平移加速度的优化权重
-            weight_acc_lim_theta: 0.8 # 满足最大允许角加速度的优化权重
+            weight_acc_lim_x: 1.0 # 满足最大允许平移加速度的优化权重
+            weight_acc_lim_y: 1.0 # 满足最大允许平移加速度的优化权重
+            weight_acc_lim_theta: 0.5 # 满足最大允许角加速度的优化权重
             weight_kinematics_nh: 1000.0 # 满足非完整运动学约束的优化权重，该参数必须很高 3.17
             weight_kinematics_forward_drive: 0.0 # 用于迫使机器人仅选择前进方向（正平移速度）的优化权重。较小的权重（例如 1.0）仍然允许向后行驶。 1000左右的值几乎可以防止向后行驶（但不能保证）。
             weight_optimaltime: 1000.0 # must be > 0 用于收缩相对于转换/执行时间的轨迹的优化权重 2.28
@@ -344,11 +336,11 @@ local_costmap:
                 enabled: True
                 observation_sources: scan1
                 min_obstacle_height: 0.0
-                max_obstacle_height: 0.2
+                max_obstacle_height: 1.0
                 scan1:
                     topic: "/cloud_obstacle"
                     expected_update_rate: 30.0
-                    max_obstacle_height: 0.2 # 障碍物最大高度
+                    max_obstacle_height: 1.0 # 障碍物最大高度
                     min_obstacle_height: 0.0 # 障碍物最小高度
                     clearing: True
                     marking: True
@@ -383,11 +375,11 @@ global_costmap:
                 enabled: True
                 observation_sources: scan1
                 min_obstacle_height: 0.0
-                max_obstacle_height: 0.2
+                max_obstacle_height: 1.0
                 scan1:
                     topic: "/cloud_obstacle"
                     expected_update_rate: 30.0
-                    max_obstacle_height: 0.2 # 障碍物最大高度
+                    max_obstacle_height: 1.0 # 障碍物最大高度
                     min_obstacle_height: 0.0 # 障碍物最小高度
                     clearing: True
                     marking: True

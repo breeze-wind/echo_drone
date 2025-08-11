@@ -24,9 +24,6 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
     this->declare_parameter("body_min_y", -0.2);
     this->declare_parameter("body_max_y", 0.2);
     this->declare_parameter("use_downsample", true);
-    this->declare_parameter("cluster_tolerance", 0.1);
-    this->declare_parameter("min_cluster_size", 10);
-    this->declare_parameter("max_cluster_size", 25000);
 
     RCLCPP_INFO(this->get_logger(), "点云分割节点初始化");
     this->get_parameter("input_cloud_topic", input_cloud_topic_);
@@ -43,14 +40,7 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
     this->get_parameter("obstacle_z_max", obstacle_z_max_);
     this->get_parameter("obstacle_range_min", obstacle_range_min_);
     this->get_parameter("obstacle_range_max", obstacle_range_max_);
-    this->get_parameter("body_min_x", body_min_x_);
-    this->get_parameter("body_max_x", body_max_x_);
-    this->get_parameter("body_min_y", body_min_y_);
-    this->get_parameter("body_max_y", body_max_y_);
     this->get_parameter("use_downsample", use_downsample_);
-    this->get_parameter("cluster_tolerance", cluster_tolerance_);
-    this->get_parameter("min_cluster_size", min_cluster_size_);
-    this->get_parameter("max_cluster_size", max_cluster_size_);
 
     // 设置滤波器的体素大小
     pass_through_filter_x_.setFilterFieldName("x");
@@ -59,63 +49,20 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
     pass_through_filter_y_.setFilterFieldName("y");
     pass_through_filter_y_.setFilterLimits(obstacle_y_min_, obstacle_y_max_);
     pass_through_filter_y_.setFilterLimitsNegative(false);
-    pass_through_filter_y_.setFilterFieldName("z");
-    pass_through_filter_y_.setFilterLimits(obstacle_z_min_, obstacle_z_max_);
-    pass_through_filter_y_.setFilterLimitsNegative(false);
+    //pass_through_filter_z_.setFilterFieldName("z");
+    //pass_through_filter_z_.setFilterLimits(obstacle_z_min_, obstacle_z_max_);
+    //pass_through_filter_z_.setFilterLimitsNegative(false);
     voxfilter.setLeafSize(leaf_size_, leaf_size_, leaf_size_);
-    ec.setClusterTolerance(cluster_tolerance_); // 聚类距离阈值
-    ec.setMinClusterSize(min_cluster_size_); // 最小聚类点数
-    ec.setMaxClusterSize(max_cluster_size_); // 最大聚类点数
-
-    map = std::make_shared<nav_msgs::msg::OccupancyGrid>();
-    map->header.frame_id = "map";
-    map->header.stamp = this->get_clock()->now();
-    map->info.resolution = 0.1;         // float32
-    map->info.width      = 256;           // uint32
-    map->info.height     = 128;           // uint32
-    map->info.origin.position.x = 0.0;
-    map->info.origin.position.y = 0.0;
-    map->info.origin.position.z = 0.0;
-    map->info.origin.orientation.x = 0.0;
-    map->info.origin.orientation.y = 0.0;
-    map->info.origin.orientation.z = 0.0;
-    map->info.origin.orientation.w = 1.0;
-    map->data.resize(map->info.width * map->info.height);
 
     tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tfbuffer_);
     // 初始化pub和sub
     output_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(output_cloud_topic_, 10);
-    had_been_deleted_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/had_been_deleted_cloud", 10);
-    // cluster_cloud_1_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud_1", 10);
-    // cluster_cloud_2_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud_2", 10);
-    // cluster_cloud_3_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud_3", 10);
-    // cluster_cloud_4_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud_4", 10);
-    // cluster_cloud_5_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cluster_cloud_5", 10);
     input_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         input_cloud_topic_, 10, std::bind(&ObstacleSegmentationNode::cloudCallback, this, std::placeholders::_1));
-    map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-        "/map", 10, std::bind(&ObstacleSegmentationNode::mapCallback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "点云分割节点初始化完成");
 }
-void ObstacleSegmentationNode::mapCallback(const nav_msgs::msg::OccupancyGrid::ConstPtr msg){
-    map->header.frame_id = "map";
-    map->header.stamp = msg->header.stamp;
-    map->info.resolution = msg->info.resolution;
-    map->info.width = msg->info.width;
-    map->info.height = msg->info.height;
-    map->info.map_load_time = msg->info.map_load_time;
-    map->info.origin.position.x = msg->info.origin.position.x;
-    map->info.origin.position.y = msg->info.origin.position.y;
-    map->info.origin.position.z = msg->info.origin.position.z;
-    map->info.origin.orientation.x = msg->info.origin.orientation.x;
-    map->info.origin.orientation.y = msg->info.origin.orientation.y;
-    map->info.origin.orientation.z = msg->info.origin.orientation.z;
-    map->info.origin.orientation.w = msg->info.origin.orientation.w;
-    map->data.resize(map->info.width * map->info.height);
-    map->data = msg->data;
-    RCLCPP_INFO(this->get_logger(), "map: width: %d, height: %d", map->info.width, map->info.height);
-}
+
 void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
     // RCLCPP_INFO(this->get_logger(), "障碍物点云数据回调");
@@ -168,14 +115,14 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
         }
     }
     // 再过滤一次离群点
-    pcl::RadiusOutlierRemoval<pcl::PointXYZ> radiusoutlier;
+    //pcl::RadiusOutlierRemoval<pcl::PointXYZ> radiusoutlier;
     // 设置输入点云
-    radiusoutlier.setInputCloud(segement_cloud);
+    //radiusoutlier.setInputCloud(segement_cloud);
     // 设置半径,在该范围内找临近点
-    radiusoutlier.setRadiusSearch(0.15);
+    //radiusoutlier.setRadiusSearch(0.15);
     // 设置查询点的邻域点集数，小于该阈值的删除
-    radiusoutlier.setMinNeighborsInRadius(3);
-    radiusoutlier.filter(*segement_cloud);
+    //radiusoutlier.setMinNeighborsInRadius(3);
+    //radiusoutlier.filter(*segement_cloud);
 //    RCLCPP_INFO(this->get_logger(), "obstacle_segmentation: 点云分割剩余点云数： %lu", segement_cloud->points.size());
 
     segement_cloud->width = segement_cloud->points.size();

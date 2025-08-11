@@ -123,7 +123,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     navigate_to_pose_goal_ = nav2_msgs::action::NavigateToPose::Goal();
 
     target_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/target_pose", 10);
-    goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/robot/goal_pose", 10);
+    goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal_pose", 10);
     landing_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/landing_state", 10);
     current_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("/robot/current_pose",
         10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
@@ -249,13 +249,13 @@ void BehaviorControl::step_timer_callback()
             current_step = 51;
         }
     }
-    //进入第三个目标点循环
+    //进入第四个目标点循环
     else if(current_step == 51) //是否到目标点附近
     {
         if(fabs(current_x_ - target_positions_[target_sequence_[2]][0]) < 0.25)
             if(fabs(current_y_ - target_positions_[target_sequence_[2]][1]) < 0.25)
             {
-                if(if_hit_target_[target_sequence_[2]]) //进行投掷
+                if(if_hit_target_[target_sequence_[3]]) //进行投掷
                     current_step = 52;
                 else //不投掷
                     current_step = 61;
@@ -285,7 +285,7 @@ void BehaviorControl::step_timer_callback()
         if(fabs(current_x_ - target_positions_[target_sequence_[3]][0]) < 0.15)
             if(fabs(current_y_ - target_positions_[target_sequence_[3]][1]) < 0.15)
             {
-                if(if_hit_target_[target_sequence_[3]]) //进行投掷
+                if(if_hit_target_[target_sequence_[4]]) //进行投掷
                     current_step = 62;
                 else //不投掷
                     current_step = 71;
@@ -366,6 +366,7 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 21)
     {
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+		action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = target_positions_[target_sequence_[0]][0];
         action_goal.pose.pose.position.y = target_positions_[target_sequence_[0]][1];
         action_goal.pose.pose.position.z = cruise_height_;
@@ -415,6 +416,7 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 31)
     {
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+		action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = target_positions_[target_sequence_[1]][0];
         action_goal.pose.pose.position.y = target_positions_[target_sequence_[1]][1];
         action_goal.pose.pose.position.z = cruise_height_;
@@ -464,6 +466,7 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 41)
     {
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+		action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = target_positions_[target_sequence_[2]][0];
         action_goal.pose.pose.position.y = target_positions_[target_sequence_[2]][1];
         action_goal.pose.pose.position.z = cruise_height_;
@@ -513,6 +516,7 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 51)
     {
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+		action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = target_positions_[target_sequence_[3]][0];
         action_goal.pose.pose.position.y = target_positions_[target_sequence_[3]][1];
         action_goal.pose.pose.position.z = cruise_height_;
@@ -558,6 +562,7 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 61)
     {
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+		action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = target_positions_[target_sequence_[4]][0];
         action_goal.pose.pose.position.y = target_positions_[target_sequence_[4]][1];
         action_goal.pose.pose.position.z = cruise_height_;
@@ -570,7 +575,7 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 62) //识别投掷策略待修改
     {
-        try {
+        /*try {
             map_to_target = tfbuffer_->lookupTransform(target_frame_, map_frame_, rclcpp::Time(),
                                                rclcpp::Duration::from_seconds(0.5));
         } catch (tf2::TransformException &ex) {
@@ -578,7 +583,7 @@ void BehaviorControl::mission_timer_callback()
             return;
         }
         RCLCPP_INFO(this->get_logger(), "detected id: ");
-        RCLCPP_INFO(this->get_logger(), "detection position: ");
+        RCLCPP_INFO(this->get_logger(), "detection position: ");*/
 
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
@@ -602,19 +607,45 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 71)
     {
         if(if_passing_door_){
-            RCLCPP_INFO(this->get_logger(), "穿门起点，current x y: %lf, %lf", current_x_, current_y_);
+            rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+            action_goal.pose.header.frame_id = "map";
+            action_goal.pose.pose.position.x = passing_door_src_[0];
+            action_goal.pose.pose.position.y = passing_door_src_[1];
+            action_goal.pose.pose.position.z = passing_door_height_;
+            action_goal.pose.pose.orientation.x = 0.0;
+            action_goal.pose.pose.orientation.y = 0.0;
+            action_goal.pose.pose.orientation.z = 0.0;
+            action_goal.pose.pose.orientation.w = 1.0;
+            navigate_to_pose_client_->async_send_goal(action_goal);
+            RCLCPP_INFO(this->get_logger(), "穿门起点: %lf, %lf", passing_door_src_[0], passing_door_src_[1]);
         }
         else{
-            current_target_position_.transform.translation.x = 0.0;
-            current_target_position_.transform.translation.y = 0.0;
-            current_target_position_.transform.translation.z = cruise_height_;
-            target_pose_pub_->publish(current_target_position_);
+            rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+            action_goal.pose.header.frame_id = "map";
+            action_goal.pose.pose.position.x = 0.0;
+            action_goal.pose.pose.position.y = 0.0;
+            action_goal.pose.pose.position.z = cruise_height_;
+            action_goal.pose.pose.orientation.x = 0.0;
+            action_goal.pose.pose.orientation.y = 0.0;
+            action_goal.pose.pose.orientation.z = 0.0;
+            action_goal.pose.pose.orientation.w = 1.0;
+            navigate_to_pose_client_->async_send_goal(action_goal);
             RCLCPP_INFO(this->get_logger(), "返回起点，current x y: %lf, %lf", current_x_, current_y_);
         }
     }
     else if(current_step == 72)
     {
-        RCLCPP_INFO(this->get_logger(), "穿门终点，current x y: %lf, %lf", current_x_, current_y_);
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.header.frame_id = "map";
+        action_goal.pose.pose.position.x = passing_door_des_[0];
+        action_goal.pose.pose.position.y = passing_door_des_[1];
+        action_goal.pose.pose.position.z = passing_door_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
+        RCLCPP_INFO(this->get_logger(), "穿门终点: %lf, %lf", passing_door_des_[0], passing_door_des_[1]);
     }
     else if(current_step == 73)
     {
@@ -640,9 +671,6 @@ void BehaviorControl::mission_timer_callback()
         current_target_position_.transform.translation.z = -0.2;
         target_pose_pub_->publish(current_target_position_);
         RCLCPP_INFO(this->get_logger(), "降落中...");
-        //std_msgs::msg::Bool msg;
-        //msg.data = if_landing;
-        //landing_state_pub_->publish(msg);
     }
 }
 
@@ -650,9 +678,4 @@ void BehaviorControl::ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
     arming_state = msg->data;
     RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>>>>>>arming_state: %d", arming_state);
-}
-
-void BehaviorControl::send_action_goal()
-{
-
 }

@@ -45,12 +45,12 @@ public:
     explicit ObstacleSegmentationNode(std::string name, const rclcpp::NodeOptions &options);
 
     void cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
-    void mapCallback(const nav_msgs::msg::OccupancyGrid::ConstPtr msg);
+
 private:
     // 创建滤波器对象
     pcl::PassThrough<pcl::PointXYZ> pass_through_filter_x_;
     pcl::PassThrough<pcl::PointXYZ> pass_through_filter_y_;
-    //pcl::PassThrough<pcl::PointXYZ> pass_through_filter_z_;
+    pcl::PassThrough<pcl::PointXYZ> pass_through_filter_z_;
     pcl::VoxelGrid<pcl::PointXYZ> voxfilter;
     std::string input_cloud_topic_;
     std::string output_cloud_topic_;
@@ -66,31 +66,14 @@ private:
     float obstacle_z_max_;
     float obstacle_range_min_; // 障碍物点云范围(livox坐标系)
     float obstacle_range_max_;
-    float body_min_x_; // 车体范围x
-    float body_max_x_;
-    float body_min_y_; // 车体范围y
-    float body_max_y_;
     bool use_downsample_;
-    float cluster_tolerance_;
-    int min_cluster_size_;
-    int max_cluster_size_;
     int cout;
     std::string base_frame_;
-
-    nav_msgs::msg::OccupancyGrid::SharedPtr map;
 
     std::unique_ptr<tf2_ros::Buffer> tfbuffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr input_cloud_sub_;
-    rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr output_cloud_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr had_been_deleted_cloud_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cluster_cloud_1_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cluster_cloud_2_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cluster_cloud_3_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cluster_cloud_4_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr cluster_cloud_5_pub_;
-
 };
 
 #endif //OBSTACLE_SEGMENTATION_NODE_HPP

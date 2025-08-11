@@ -36,7 +36,6 @@ public:
     void step_timer_callback();
     /// 控制当前步骤执行任务
     void mission_timer_callback();
-    void send_action_goal();
 
 private:
     /// 接收从飞控通信节点传来的当前位姿

@@ -39,7 +39,7 @@ class MavlinkControl(Node):
         self.if_is_flying = False
 
         # Connect to PX4 over serial or UDP
-        self.master = mavutil.mavlink_connection('/dev/ttyACM0', band=57600)
+        self.master = mavutil.mavlink_connection('/dev/ttyACM0', band=230400)
         self.master.wait_heartbeat()
         print("Connected")
 
@@ -132,11 +132,10 @@ class MavlinkControl(Node):
             if channels:
                 # RC_CHANNELS gives chan1_raw to chan8_raw (and up to chan18_raw)
                 if channels.get_type() == 'RC_CHANNELS':
-                    print(f"Chan1: {channels.chan1_raw}")
-                    print(f"Chan2: {channels.chan2_raw}")
-                    print(f"Chan3: {channels.chan3_raw}")
-                    print(f"Chan4: {channels.chan4_raw}")
-                    print(' ')
+                    # self.get_logger().info('Chan1: %d' %channels.chan1_raw)
+                    # self.get_logger().info('Chan2: %d' %channels.chan2_raw)
+                    # self.get_logger().info('Chan3: %d' %channels.chan3_raw)
+                    # self.get_logger().info('Chan4: %d' %channels.chan4_raw)
                     if channels.chan1_raw < 1100:
                         if channels.chan2_raw > 1930:
                             if channels.chan3_raw < 1100:
@@ -157,8 +156,7 @@ class MavlinkControl(Node):
         hb = self.master.recv_match(type='HEARTBEAT', blocking=False)
         if hb:
             armed = (hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
-            print(f"????????Vehicle armed? {armed}")
-            print('')
+            self.get_logger().info('????????Vehicle armed?  %d' %armed)
             msg = Bool() #给决策发送是否解锁
             if armed: #飞控实际状态解锁
                 self.arming_state = True
@@ -174,7 +172,7 @@ class MavlinkControl(Node):
     def cmd_vel_callback(self, msg):
         # Send vision speed estimate
         time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
-        vx, vy, vz = msg.data.x, -msg.data.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
+        vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
 
         self.master.mav.set_position_target_local_ned_send(
             time_boot_ms,
