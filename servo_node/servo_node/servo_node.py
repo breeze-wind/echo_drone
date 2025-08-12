@@ -15,7 +15,6 @@ class MyNode(Node):
         ports = serial.tools.list_ports.comports()
         for port in ports:
             if port.manufacturer == 'STMicroelectronics':
-                # print(f"Device: {}")
                 self.serial_port = serial.Serial(#what the fuck
                     port=port.device,
                     baudrate=115200,
@@ -30,7 +29,7 @@ class MyNode(Node):
 
         servo_cmd = servo_param.get_parameter_value().integer_value
         self.get_logger().info(f'Parameter value: {servo_cmd}')
-        serial_buff = struct.pack('BBB', 0x5F, 0x01, servo_cmd)
+        serial_buff = struct.pack('B', servo_cmd)
         self.serial_port.write(serial_buff)
 
 def main(args=None):

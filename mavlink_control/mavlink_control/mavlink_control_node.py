@@ -39,7 +39,7 @@ class MavlinkControl(Node):
         # Connect to PX4 over serial or UDP
         self.master = mavutil.mavlink_connection('/dev/ttyACM0', band=230400)
         self.master.wait_heartbeat()
-        print("Connected")
+        self.get_logger().info('Connected')
 
         #请求飞控以5Hz发送RC_CHANNELS信息
         self.master.mav.request_data_stream_send(
@@ -107,8 +107,8 @@ class MavlinkControl(Node):
             self.current_x, -self.current_y, -(self.current_z-0.06),
             roll, -pitch, -yaw
         )
-        # self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f'
-        #                        % (self.current_x, -self.current_y, -(self.current_z - 0.06)))
+        self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f'
+                               % (self.current_x, -self.current_y, -(self.current_z - 0.06)))
         # self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
 
         #发送当前位置到决策
@@ -130,7 +130,7 @@ class MavlinkControl(Node):
             if channels:
                 # RC_CHANNELS gives chan1_raw to chan8_raw (and up to chan18_raw)
                 if channels.get_type() == 'RC_CHANNELS':
-                    # self.get_logger().info('Chan1: %d' %channels.chan1_raw)
+                    self.get_logger().info('Chan1: %d' %channels.chan1_raw)
                     # self.get_logger().info('Chan2: %d' %channels.chan2_raw)
                     # self.get_logger().info('Chan3: %d' %channels.chan3_raw)
                     # self.get_logger().info('Chan4: %d' %channels.chan4_raw)
