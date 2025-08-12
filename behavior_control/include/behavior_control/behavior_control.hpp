@@ -15,6 +15,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include "rcl_interfaces/srv/set_parameters.hpp"
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
@@ -36,6 +37,8 @@ public:
     void step_timer_callback();
     /// 控制当前步骤执行任务
     void mission_timer_callback();
+    void set_parameter();
+    void handle_parameter_response(rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future);
 
 private:
     /// 接收从飞控通信节点传来的当前位姿
@@ -53,6 +56,8 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub_;
     /// 接收当前起飞状态
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_state_sub_;
+
+    std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> servo_parameter_client_;
 
     /// 执行步骤计时器
     rclcpp::TimerBase::SharedPtr step_timer_;
@@ -123,6 +128,7 @@ private:
     rclcpp::Parameter servo_param;
     /// 舵机投放位置序号
     int servo_index_;
+    int last_servo_index_;
     /// 相机坐标系
     std::string camera_frame_;
     /// 目标坐标系

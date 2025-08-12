@@ -78,9 +78,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     detection_cnt_threshold_ = 5.0 / 0.25; //等待识别时间
 
     servo_index_ = 0;
-    servo_param = rclcpp::Parameter("/servo/servo", servo_index_);
-    this->set_parameter(servo_param);
-    servo_index_++;
+    last_servo_index_ = 0;
 
     arming_state = false;
     if_landing = false;
@@ -130,6 +128,12 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
         10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
         std::bind(&BehaviorControl::ArmStateCallback, this, std::placeholders::_1));
+    servo_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/servo_node/set_parameters");
+
+    while (!servo_parameter_client_->wait_for_service(std::chrono::seconds(1)))
+    {
+        RCLCPP_WARN(this->get_logger(), "servo_parameter service not available, waiting...");
+    }
 
     tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tfbuffer_);
@@ -414,10 +418,13 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         if(eject_cnt >= 4)
         {
-            servo_param = rclcpp::Parameter("/servo/servo", 1);
-            this->set_parameter(servo_param);
+            servo_index_ = 1;
+            RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
+            if (servo_index_ == last_servo_index_)
+                return;
+            last_servo_index_ = servo_index_;
+            set_parameter();
         }
-        RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
     else if(current_step == 31)
@@ -468,10 +475,13 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         if(eject_cnt >= 4)
         {
-            servo_param = rclcpp::Parameter("/servo/servo", 2);
-            this->set_parameter(servo_param);
+            servo_index_ = 2;
+            RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
+            if (servo_index_ == last_servo_index_)
+                return;
+            last_servo_index_ = servo_index_;
+            set_parameter();
         }
-        RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
     else if(current_step == 41)
@@ -522,10 +532,13 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         if(eject_cnt >= 4)
         {
-            servo_param = rclcpp::Parameter("/servo/servo", servo_index_);
-            this->set_parameter(servo_param);
+            servo_index_ = 3;
+            RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
+            if (servo_index_ == last_servo_index_)
+                return;
+            last_servo_index_ = servo_index_;
+            set_parameter();
         }
-        RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
     else if(current_step == 51)
@@ -572,10 +585,13 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         if(eject_cnt >= 4)
         {
-            servo_param = rclcpp::Parameter("/servo/servo", 3);
-            this->set_parameter(servo_param);
+            servo_index_ = 3;
+            RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
+            if (servo_index_ == last_servo_index_)
+                return;
+            last_servo_index_ = servo_index_;
+            set_parameter();
         }
-        RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
     else if(current_step == 61)
@@ -621,10 +637,13 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         if(eject_cnt >= 4)
         {
-            servo_param = rclcpp::Parameter("/servo/servo", servo_index_);
-            this->set_parameter(servo_param);
+            servo_index_ = 3;
+            RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
+            if (servo_index_ == last_servo_index_)
+                return;
+            last_servo_index_ = servo_index_;
+            set_parameter();
         }
-        RCLCPP_INFO(this->get_logger(), "下降投掷");
     }
 
     else if(current_step == 71)
@@ -711,4 +730,42 @@ void BehaviorControl::ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
     arming_state = msg->data;
     RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>>>>>>arming_state: %d", arming_state);
+}
+
+void BehaviorControl::set_parameter()
+{
+    // 构建请求
+    auto servo_server_request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
+
+    rcl_interfaces::msg::Parameter servo_server_param_servo_index;
+    servo_server_param_servo_index.name = "/servo/servo";
+    servo_server_param_servo_index.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER;
+    servo_server_param_servo_index.value.integer_value = servo_index_;
+
+    servo_server_request->parameters.push_back(servo_server_param_servo_index);
+
+    // 使用回调的异步调用
+    auto servo_server_future = servo_parameter_client_->async_send_request(
+        servo_server_request,
+        [this](rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future) {
+            this->handle_parameter_response(future);
+        });
+}
+
+void BehaviorControl::handle_parameter_response(
+        rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future)
+{
+    try {
+        auto response = future.get();
+        for (const auto& result : response->results) {
+            if (result.successful) {
+                RCLCPP_INFO(this->get_logger(), "Parameter set successfully");
+            } else {
+                RCLCPP_ERROR(this->get_logger(), "Failed to set parameter: %s",
+                            result.reason.c_str());
+            }
+        }
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Service call failed: %s", e.what());
+    }
 }

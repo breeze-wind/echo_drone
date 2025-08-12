@@ -13,7 +13,9 @@ from tf2_ros.transform_listener import TransformListener
 
 # from tf2.transformations import quaternion_from_euler, euler_from_quaternion
 import transforms3d as tfs
-import numpy as np
+
+import serial
+import serial.tools.list_ports
 
 class MavlinkControl(Node):
 
@@ -37,11 +39,14 @@ class MavlinkControl(Node):
         self.if_nav = False
 
         # Connect to PX4 over serial or UDP
-        self.master = mavutil.mavlink_connection('/dev/ttyACM0', band=230400)
+        ports = serial.tools.list_ports.comports()
+        for port in ports:
+            if port.manufacturer == 'CUAV':
+                self.master = mavutil.mavlink_connection(port.device, band=230400)
         self.master.wait_heartbeat()
         self.get_logger().info('Connected')
 
-        #请求飞控以5Hz发送RC_CHANNELS信息
+        #请求飞控以10Hz发送RC_CHANNELS信息
         self.master.mav.request_data_stream_send(
             self.master.target_system,
             self.master.target_component,

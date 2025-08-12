@@ -107,7 +107,7 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='livox_to_camera_broadcaster',
-        arguments=['0.0', '0.0', '0',  '0', '0', '0.0', '1.0','livox', 'camera_color_frame']
+        arguments=['0.0', '0.0', '0',  '0', '0', '0.0', '1.0','livox', 'camera_link']
     )
 
     # 创建LaunchDescription对象launch_description,用于描述launch文件

@@ -25,16 +25,16 @@ mavlink_control_node:
 
 merge_pcd_node:
     ros__parameters:
-        pcd_folder: "/home/ckyf/roboposter/src/roboposter/Point-LIO/PCD/merge"
+        pcd_folder: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge"
 
 ## PCD转二维栅格地图 map3
 pcd2pgm_node:
     ros__parameters: # map2 修改路径和名称
-        pcd_path: "/home/ckyf/roboposter/src/roboposter/Point-LIO/PCD/merge" # 点云路径
-        pcd_name: "2025_08_09_14_04_23_merged.pcd"
-        map_path: "/home/ckyf/roboposter/src/roboposter/robot_bring_up/maps"
-        map_name: "2025_08_09_14_04_23_merged.png"
-        yaml_name: "2025_08_09_14_04_23_merged.yaml"
+        pcd_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge" # 点云路径
+        pcd_name: "2025_08_12_16_49_08_merged.pcd"
+        map_path: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps"
+        map_name: "2025_08_12_16_49_08_merged.png"
+        yaml_name: "2025_08_12_16_49_08_merged.yaml"
 
         method: "point" # normal、height或者point，代表不同的转换方法
         thre_x_min: -50.0 # 点云范围
@@ -57,7 +57,7 @@ pcd2pgm_node:
 
 map_server:
     ros__parameters:
-        yaml_filename: "/home/ckyf/roboposter/src/roboposter/robot_bring_up/maps/2025_08_09_14_04_23_merged.yaml" #map3 重命名 checklist
+        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_08_12_16_49_08_merged.yaml" #map3 重命名 checklist
 
 obstacle_segmentation_node:
     ros__parameters:
@@ -159,7 +159,7 @@ laser_mapping:
             scan_bodyframe_pub_en: true
 
         pcd_save:
-            use_pcd_map_: true
+            use_pcd_map_: false
             prior_PCD_map_path: "/home/ckyf/roboposter/src/roboposter/Point-LIO/PCD/merge/2025_08_09_14_04_23_merged.pcd" #map3 重命名和路径 checklist
             pcd_save_en: false
             interval: 900
