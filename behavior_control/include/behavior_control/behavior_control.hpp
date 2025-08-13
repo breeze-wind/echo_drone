@@ -38,6 +38,7 @@ public:
     /// 控制当前步骤执行任务
     void mission_timer_callback();
     void set_parameter();
+    void change_mode();
     void handle_parameter_response(rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future);
 
 private:
@@ -58,6 +59,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_state_sub_;
 
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> servo_parameter_client_;
+    std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> controller_server_parameter_client_;
 
     /// 执行步骤计时器
     rclcpp::TimerBase::SharedPtr step_timer_;
@@ -135,6 +137,35 @@ private:
     std::string target_frame_;
     /// 世界系
     std::string map_frame_;
+
+    //导航时teb参数
+    double max_vel_x_navigation;
+    double max_vel_y_navigation;
+    double max_vel_x_backwards_navigation;
+    double max_vel_theta_navigation;
+    double acc_lim_x_navigation;
+    double acc_lim_y_navigation;
+    double acc_lim_theta_navigation;
+    //识别时teb参数
+    double max_vel_x_detection;
+    double max_vel_y_detection;
+    double max_vel_x_backwards_detection;
+    double max_vel_theta_detection;
+    double acc_lim_x_detection;
+    double acc_lim_y_detection;
+    double acc_lim_theta_detection;
+    //实际切换参数
+    double max_vel_x;
+    double max_vel_y;
+    double max_vel_x_backwards;
+    double max_vel_theta;
+    double acc_lim_x;
+    double acc_lim_y;
+    double acc_lim_theta;
+
+    //导航模式，0--正常导航，1--识别时导航
+    int current_nav_mode;
+    int last_nav_mode;
 
     /// 当前识别目标的坐标系变换
     nav2_msgs::action::NavigateToPose::Goal navigate_to_pose_action_;

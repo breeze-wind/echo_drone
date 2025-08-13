@@ -28,6 +28,20 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("if_hit_bridge", false);
     this->declare_parameter("if_passing_door", false);
     this->declare_parameter<int>("/servo/servo", 0);
+    this->declare_parameter("max_vel_x_navigation", 1.0);
+    this->declare_parameter("max_vel_y_navigation", 1.0);
+    this->declare_parameter("max_vel_x_backwards_navigation", 1.0);
+    this->declare_parameter("max_vel_theta_navigation", 0.15);
+    this->declare_parameter("acc_lim_x_navigation", 0.3);
+    this->declare_parameter("acc_lim_y_navigation", 0.3);
+    this->declare_parameter("acc_lim_theta_navigation", 0.2);
+    this->declare_parameter("max_vel_x_detection", 0.6);
+    this->declare_parameter("max_vel_y_detection", 1.5);
+    this->declare_parameter("max_vel_x_backwards_detection", 0.4);
+    this->declare_parameter("max_vel_theta_detection", 0.25);
+    this->declare_parameter("acc_lim_x_detection", 1.5);
+    this->declare_parameter("acc_lim_y_detection", 0.4);
+    this->declare_parameter("acc_lim_theta_detection", 0.25);
 
     this->get_parameter<std::vector<double>>("tank_position", tank_);
     this->get_parameter<std::vector<double>>("tent_position", tent_);
@@ -47,6 +61,20 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter("if_hit_tent", if_hit_tent_);
     this->get_parameter("if_hit_bridge", if_hit_bridge_);
     this->get_parameter("if_passing_door", if_passing_door_);
+    this->get_parameter("max_vel_x_navigation", max_vel_x_navigation);
+    this->get_parameter("max_vel_y_navigation", max_vel_y_navigation);
+    this->get_parameter("max_vel_x_backwards_navigation", max_vel_x_backwards_navigation);
+    this->get_parameter("max_vel_theta_navigation", max_vel_theta_navigation);
+    this->get_parameter("acc_lim_x_navigation", acc_lim_x_navigation);
+    this->get_parameter("acc_lim_y_navigation", acc_lim_y_navigation);
+    this->get_parameter("acc_lim_theta_navigation", acc_lim_theta_navigation);
+    this->get_parameter("max_vel_x_detection", max_vel_x_detection);
+    this->get_parameter("max_vel_y_detection", max_vel_y_detection);
+    this->get_parameter("max_vel_x_backwards_detection", max_vel_x_backwards_detection);
+    this->get_parameter("max_vel_theta_detection", max_vel_theta_detection);
+    this->get_parameter("acc_lim_x_detection", acc_lim_x_detection);
+    this->get_parameter("acc_lim_y_detection", acc_lim_y_detection);
+    this->get_parameter("acc_lim_theta_detection", acc_lim_theta_detection);
 
     RCLCPP_INFO(this->get_logger(), "tank_position: %lf, %lf", tank_[0], tank_[1]);
     RCLCPP_INFO(this->get_logger(), "tent_position: %lf, %lf", tent_[0], tent_[1]);
@@ -79,6 +107,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 
     servo_index_ = 0;
     last_servo_index_ = 0;
+    current_nav_mode = 0;
+    last_nav_mode = 0;
 
     arming_state = false;
     if_landing = false;
@@ -128,11 +158,17 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
         10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
         std::bind(&BehaviorControl::ArmStateCallback, this, std::placeholders::_1));
-    servo_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/servo_node/set_parameters");
 
+    servo_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/servo_node/set_parameters");
+    controller_server_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/controller_server/set_parameters");
+    //等待服务可用
     while (!servo_parameter_client_->wait_for_service(std::chrono::seconds(1)))
     {
         RCLCPP_WARN(this->get_logger(), "servo_parameter service not available, waiting...");
+    }
+    while (!controller_server_parameter_client_->wait_for_service(std::chrono::seconds(1)))
+    {
+        RCLCPP_WARN(this->get_logger(), "controller_server_parameter service not available, waiting...");
     }
 
     tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -451,7 +487,10 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        current_target_position_.transform.translation.z = eject_height_;
+        if(current_z_ - eject_height_ >= 0.4)
+            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        else
+            current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         if(eject_cnt >= 14)
@@ -518,7 +557,10 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        current_target_position_.transform.translation.z = eject_height_;
+        if(current_z_ - eject_height_ >= 0.4)
+            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        else
+            current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         if(eject_cnt >= 14)
@@ -585,7 +627,10 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        current_target_position_.transform.translation.z = eject_height_;
+        if(current_z_ - eject_height_ >= 0.4)
+            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        else
+            current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         if(eject_cnt >= 14)
@@ -647,7 +692,10 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        current_target_position_.transform.translation.z = eject_height_;
+        if(current_z_ - eject_height_ >= 0.4)
+            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        else
+            current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         if(eject_cnt >= 14)
@@ -699,7 +747,10 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        current_target_position_.transform.translation.z = eject_height_;
+        if(current_z_ - eject_height_ >= 0.4)
+            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        else
+            current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         if(eject_cnt >= 14)
@@ -835,4 +886,56 @@ void BehaviorControl::handle_parameter_response(
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Service call failed: %s", e.what());
     }
+}
+
+void BehaviorControl::change_mode()
+{
+    // 构建请求
+    auto controller_server_request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
+
+    rcl_interfaces::msg::Parameter controller_server_param_max_vel_theta;
+    controller_server_param_max_vel_theta.name = "FollowPath.max_vel_theta";
+    controller_server_param_max_vel_theta.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_max_vel_x;
+    controller_server_param_max_vel_x.name = "FollowPath.max_vel_x";
+    controller_server_param_max_vel_x.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_max_vel_y;
+    controller_server_param_max_vel_y.name = "FollowPath.max_vel_y";
+    controller_server_param_max_vel_y.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_max_vel_x_backwards;
+    controller_server_param_max_vel_x_backwards.name = "FollowPath.max_vel_x_backwards";
+    controller_server_param_max_vel_x_backwards.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_acc_lim_x;
+    controller_server_param_acc_lim_x.name = "FollowPath.acc_lim_x";
+    controller_server_param_acc_lim_x.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_acc_lim_y;
+    controller_server_param_acc_lim_y.name = "FollowPath.acc_lim_y";
+    controller_server_param_acc_lim_y.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_acc_lim_theta;
+    controller_server_param_acc_lim_theta.name = "FollowPath.acc_lim_theta";
+    controller_server_param_acc_lim_theta.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+
+    controller_server_param_max_vel_theta.value.double_value = max_vel_theta;
+    controller_server_param_max_vel_x.value.double_value = max_vel_x;
+    controller_server_param_max_vel_y.value.double_value = max_vel_y;
+    controller_server_param_max_vel_x_backwards.value.double_value = max_vel_x_backwards;
+    controller_server_param_acc_lim_x.value.double_value = acc_lim_x;
+    controller_server_param_acc_lim_y.value.double_value = acc_lim_y;
+    controller_server_param_acc_lim_theta.value.double_value = acc_lim_theta;
+
+    // 所有要修改的参数一起push_back
+    controller_server_request->parameters.push_back(controller_server_param_max_vel_theta);
+    controller_server_request->parameters.push_back(controller_server_param_max_vel_x);
+    controller_server_request->parameters.push_back(controller_server_param_max_vel_y);
+    controller_server_request->parameters.push_back(controller_server_param_max_vel_x_backwards);
+    controller_server_request->parameters.push_back(controller_server_param_acc_lim_x);
+    controller_server_request->parameters.push_back(controller_server_param_acc_lim_y);
+    controller_server_request->parameters.push_back(controller_server_param_acc_lim_theta);
+
+    // 使用回调的异步调用
+    auto controller_server_future = controller_server_parameter_client_->async_send_request(
+        controller_server_request,
+        [this](rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future) {
+            this->handle_parameter_response(future);
+        });
 }

@@ -9,7 +9,7 @@ behavior_control_node: #雷达离地面高度0.4m
         passing_door_des: [0.0, 0.0]
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]
         cruise_height: 1.0
-        detection_height: 1.6
+        detection_height: 1.7
         passing_door_height: 0.6
         eject_height: 0.26
         if_hit_tank: false
@@ -18,6 +18,20 @@ behavior_control_node: #雷达离地面高度0.4m
         if_hit_tent: true
         if_hit_bridge: true
         if_passing_door: false
+        max_vel_x_navigation: 1.0
+        max_vel_y_navigation: 1.0
+        max_vel_x_backwards_navigation: 1.0
+        max_vel_theta_navigation: 0.15
+        acc_lim_x_navigation: 0.3
+        acc_lim_y_navigation: 0.3
+        acc_lim_theta_navigation: 0.2
+        max_vel_x_detection: 1.0
+        max_vel_y_detection: 1.0
+        max_vel_x_backwards_detection: 1.0
+        max_vel_theta_detection: 0.15
+        acc_lim_x_detection: 0.3
+        acc_lim_y_detection: 0.3
+        acc_lim_theta_detection: 0.2
 
 mavlink_control_node:
     ros__parameters:
