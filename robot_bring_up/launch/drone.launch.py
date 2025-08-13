@@ -97,22 +97,29 @@ def generate_launch_description():
         output="screen",
         condition=IfCondition(param_launch_rviz),
     )
+    map_to_odom = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='map_to_odom_broadcaster',
+        arguments=['0.0', '0.0', '0.43',  '0.0', '0.0', '0.0', '1.0','map', 'odom']
+    )
     livox_to_mavlink_body = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         name='livox_to_mavlink_body_broadcaster',
-        arguments=['0.0', '0.0', '-0.06',  '1.0', '0.0', '0.0', '0.0','livox', 'mavlink_body']
+        arguments=['0.0', '0.0', '-0.08',  '1.0', '0.0', '0.0', '0.0','livox', 'mavlink_body']
     )
     livox_to_camera = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         name='livox_to_camera_broadcaster',
-        arguments=['0.0', '0.0', '0',  '0', '0', '0.0', '1.0','livox', 'camera_link']
+        arguments=['0.0', '0.0', '-0.4',  '0.707', '0.707', '0.0', '0.0','livox', 'camera_link']
     )
 
     # 创建LaunchDescription对象launch_description,用于描述launch文件
     # 我尝试下来，在lio启动时，系统不能负载太高，因此，选择在lio启动后再启动其他节点，这个时间可以根据实际情况调整
     list = [
+        map_to_odom,
         livox_driver_launch,
         declare_launch_gazebo,
         declare_yaml_path,

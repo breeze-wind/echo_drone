@@ -109,11 +109,11 @@ class MavlinkControl(Node):
 
         self.master.mav.vision_position_estimate_send(
             timestamp_us,
-            self.current_x, -self.current_y, -(self.current_z-0.06),
+            self.current_x, -self.current_y, -(self.current_z-0.08),
             roll, -pitch, -yaw
         )
         self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f'
-                               % (self.current_x, -self.current_y, -(self.current_z - 0.06)))
+                               % (self.current_x, -self.current_y, -(self.current_z - 0.08)))
         # self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
 
         #发送当前位置到决策
@@ -197,7 +197,7 @@ class MavlinkControl(Node):
         if not self.if_nav:
             time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
             x, y ,z = (msg.transform.translation.x, -msg.transform.translation.y,
-                       -(msg.transform.translation.z-0.06))
+                       -(msg.transform.translation.z-0.08))
             self.master.mav.set_position_target_local_ned_send(
                 time_boot_ms,
                 self.master.target_system, self.master.target_component,

@@ -1,10 +1,10 @@
-behavior_control_node:
+behavior_control_node: #雷达离地面高度0.4m
     ros__parameters:
         tank_position: [2.0, 0.8]
-        bridge_position: [2.0, 0.8]
-        tent_position: [1.0, 1.0]
-        car_position: [0.8, 2.0]
-        pillbox_position: [1.5, 0.0]
+        bridge_position: [1.2, 2.8]
+        tent_position: [1.1, 1.5]
+        car_position: [4.5, 0.5]
+        pillbox_position: [2.8, 0.0]
         passing_door_src: [0.0, 0.0]
         passing_door_des: [0.0, 0.0]
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]
@@ -31,10 +31,10 @@ merge_pcd_node:
 pcd2pgm_node:
     ros__parameters: # map2 修改路径和名称
         pcd_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge" # 点云路径
-        pcd_name: "2025_08_12_16_49_08_merged.pcd"
+        pcd_name: "2025_08_12_20_52_24_merged.pcd"
         map_path: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps"
-        map_name: "2025_08_12_16_49_08_merged.png"
-        yaml_name: "2025_08_12_16_49_08_merged.yaml"
+        map_name: "2025_08_12_20_52_24_merged.png"
+        yaml_name: "2025_08_12_20_52_24_merged.yaml"
 
         method: "point" # normal、height或者point，代表不同的转换方法
         thre_x_min: -50.0 # 点云范围
@@ -57,7 +57,7 @@ pcd2pgm_node:
 
 map_server:
     ros__parameters:
-        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_08_12_16_49_08_merged.yaml" #map3 重命名 checklist
+        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_08_12_20_52_24_merged.yaml" #map3 重命名 checklist
 
 obstacle_segmentation_node:
     ros__parameters:
@@ -112,7 +112,7 @@ laser_mapping:
             cut_frame_time_interval: 0.1 # should be integral fraction of 1 / LiDAR frequency
             time_lag_imu_to_lidar: 0.0 # Time offset between LiDAR and IMU calibrated by other algorithms, e.g., LI-Init (find in Readme)
             # the timesample of IMU is transferred from the current timeline to LiDAR's timeline by subtracting this value
-            map_frame: "map"
+            map_frame: "odom"
             odom_frame: "livox"
 
         preprocess:
@@ -160,7 +160,7 @@ laser_mapping:
 
         pcd_save:
             use_pcd_map_: false
-            prior_PCD_map_path: "/home/ckyf/roboposter/src/roboposter/Point-LIO/PCD/merge/2025_08_09_14_04_23_merged.pcd" #map3 重命名和路径 checklist
+            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/2025_08_12_20_30_24_1.pcd" #map3 重命名和路径 checklist
             pcd_save_en: false
             interval: 900
         #RMUC

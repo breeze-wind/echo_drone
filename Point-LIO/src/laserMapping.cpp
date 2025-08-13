@@ -191,7 +191,7 @@ void LaserMappingNode::readParameters()
     this->get_parameter_or<bool>("common.cut_frame", cut_frame, false);
     this->get_parameter_or<double>("common.cut_frame_time_interval", cut_frame_time_interval, 0.1);
     this->get_parameter_or<double>("common.time_lag_imu_to_lidar", time_lag_imu_to_lidar, 0.0);
-    this->get_parameter_or<std::string>("common.map_frame", map_frame, "map");
+    this->get_parameter_or<std::string>("common.map_frame", map_frame, "odom");
     this->get_parameter_or<std::string>("common.odom_frame", odom_frame, "livox");
     this->get_parameter_or<double>("filter_size_surf", filter_size_surf_min, 0.3);
     this->get_parameter_or<double>("filter_size_map", filter_size_map_min, 0.2);
