@@ -37,6 +37,7 @@ class MavlinkControl(Node):
         self.ready_to_arm = False #是否准备解锁
         self.arming_state = False #飞控解锁状态
         self.if_nav = False
+        self.current_passing_door = False
 
         # Connect to PX4 over serial or UDP
         ports = serial.tools.list_ports.comports()
@@ -72,9 +73,15 @@ class MavlinkControl(Node):
             '/robot/nav_state',
             self.nav_state_callback,
             10) #
+        self.passing_door_state_sub = self.create_subscription(
+            Bool,
+            '/robot/passing_door_state',
+            self.passing_door_state_callback,
+            10) #
         self.target_pose_sub  # prevent unused variable warning
         self.cmd_vel_sub
         self.nav_state_sub
+        self.passing_door_state_sub
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -176,18 +183,32 @@ class MavlinkControl(Node):
         # Send vision speed estimate
         if self.if_nav:
             time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
-            vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
+            if not self.current_passing_door:
+                vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
 
-            self.master.mav.set_position_target_local_ned_send(
-                time_boot_ms,
-                self.master.target_system, self.master.target_component,
-                1,
-                0b0000000111000111,
-                0, 0, 0,
-                vx, vy, vz,
-                0, 0, 0,
-                0, 0
-            )
+                self.master.mav.set_position_target_local_ned_send(
+                    time_boot_ms,
+                    self.master.target_system, self.master.target_component,
+                    1,
+                    0b0000000111000111,
+                    0, 0, 0,
+                    vx, vy, vz,
+                    0, 0, 0,
+                    0, 0
+                )
+            else: #穿门状态
+                vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
+
+                self.master.mav.set_position_target_local_ned_send(
+                    time_boot_ms,
+                    self.master.target_system, self.master.target_component,
+                    1,
+                    0b0000010111000111,
+                    0, 0, 0,
+                    vx, vy, vz,
+                    0, 0, 0,
+                    1.57, 0
+                )
 
             self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %(vx, vy, vz))
 
@@ -198,20 +219,35 @@ class MavlinkControl(Node):
             time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
             x, y ,z = (msg.transform.translation.x, -msg.transform.translation.y,
                        -(msg.transform.translation.z-0.08))
-            self.master.mav.set_position_target_local_ned_send(
-                time_boot_ms,
-                self.master.target_system, self.master.target_component,
-                1,
-                0b0000000111111000,
-                x, y, z,
-                0.0, 0.0, 0.0,
-                0.0, 0.0, 0.0,
-                0.0, 0.0
-            )
+            if not self.current_passing_door:
+                self.master.mav.set_position_target_local_ned_send(
+                    time_boot_ms,
+                    self.master.target_system, self.master.target_component,
+                    1,
+                    0b0000000111111000,
+                    x, y, z,
+                    0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0,
+                    0.0, 0.0
+                )
+            else: #穿门状态
+                self.master.mav.set_position_target_local_ned_send(
+                    time_boot_ms,
+                    self.master.target_system, self.master.target_component,
+                    1,
+                    0b0000010111111000,
+                    x, y, z,
+                    0.0, 0.0, 0.0,
+                    0.0, 0.0, 0.0,
+                    1.57, 0.0
+                )
             self.get_logger().info('mavlink: send target pose x y z: %f, %f, %f' %(x, y, z))
 
     def nav_state_callback(self, msg):
         self.if_nav = msg.data
+
+    def passing_door_state_callback(self, msg):
+        self.current_passing_door = msg.data
 
 def main(args=None):
     rclpy.init(args=args)

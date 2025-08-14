@@ -1,10 +1,10 @@
 behavior_control_node: #雷达离地面高度0.4m
     ros__parameters:
         tank_position: [2.0, 0.8]
-        bridge_position: [2.8, 2.8]
-        tent_position: [1.0, 2.8]
-        car_position: [4.4, 2.0]
-        pillbox_position: [2.8, -0.5]
+        bridge_position: [5.5, 0.3]
+        tent_position: [4.0, 1.5]
+        car_position: [2.0, 1.0]
+        pillbox_position: [3.5, -1.5]
         passing_door_src: [0.0, 0.0]
         passing_door_des: [0.0, 0.0]
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]

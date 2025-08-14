@@ -99,6 +99,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     if_hit_target_["pillbox"] = if_hit_pillbox_;
     if_hit_target_["bridge"] = if_hit_bridge_;
 
+    current_passing_door_ = false;
+
     detected_target.reserve(2);
 
     current_x_ = 0.0;
@@ -160,6 +162,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     target_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/target_pose", 10);
     goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal_pose", 10);
     nav_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/nav_state", 10);
+    passing_door_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/passing_door_state", 10);
     current_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("/robot/current_pose",
         10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
@@ -390,21 +393,25 @@ void BehaviorControl::step_timer_callback()
         if(fabs(current_x_ - passing_door_src_[0]) < 0.15)
             if(fabs(current_y_ - passing_door_src_[1]) < 0.15)
             {
-                if(!if_passing_door_)
-                    current_step = 73;
+                if(!if_passing_door_) //不穿门回起点
+                    current_step = 75;
                 else
                     current_step = 72;
             }
     }
-    else if(current_step == 72) //导航至穿门终点
+    else if(current_step == 72) //原地转向90度
+    {
+
+    }
+    else if(current_step == 73) //导航至穿门终点
     {
         if(fabs(current_x_ - passing_door_des_[0]) < 0.15)
             if(fabs(current_y_ - passing_door_des_[1]) < 0.15)
             {
-                current_step = 73;
+                current_step = 74;
             }
     }
-    else if(current_step == 73) //终点/起点H识别
+    else if(current_step == 74) //终点/起点H识别
     {
         detection_cnt++;
         if(detection_cnt >= detection_cnt_threshold_)
@@ -412,6 +419,14 @@ void BehaviorControl::step_timer_callback()
             detection_cnt = 0;
             current_step = 81;
         }
+    }
+    else if(current_step == 75) //回起点
+    {
+        if(fabs(current_x_) < 0.1)
+            if(fabs(current_y_) < 0.1)
+            {
+                current_step = 81;
+            }
     }
     //进入降落状态
     else if(current_step == 81)
@@ -429,6 +444,7 @@ void BehaviorControl::mission_timer_callback()
         current_target_position_.transform.translation.z = 0.0;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
+        current_passing_door_ = false;
         RCLCPP_INFO(this->get_logger(), "等待飞控解锁...");
     }
     else if(current_step == 1)
@@ -804,6 +820,16 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 72)
     {
+        current_target_position_.transform.translation.x = passing_door_des_[0];
+        current_target_position_.transform.translation.y = passing_door_des_[1];
+        current_target_position_.transform.translation.z = passing_door_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        current_passing_door_ = true;
+        RCLCPP_INFO(this->get_logger(), "穿门前转向中...");
+    }
+    else if(current_step == 73)
+    {
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
         action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = passing_door_des_[0];
@@ -815,23 +841,34 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.w = 1.0;
         navigate_to_pose_client_->async_send_goal(action_goal);
         if_nav = true;
+        current_passing_door_ = true;
         RCLCPP_INFO(this->get_logger(), "穿门终点: %lf, %lf", passing_door_des_[0], passing_door_des_[1]);
     }
-    else if(current_step == 73)
+    else if(current_step == 74)
     {
-        /*try {
+        try {
             map_to_target = tfbuffer_->lookupTransform(map_frame_, target_frame_, rclcpp::Time(),
                                                rclcpp::Duration::from_seconds(0.5));
         } catch (tf2::TransformException &ex) {
             RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
             return;
-        }*/
+        }
 
-        current_target_position_.transform.translation.x = passing_door_des_[0]; //map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = passing_door_des_[1]; //map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
+        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
         current_target_position_.transform.translation.z = passing_door_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
+        current_passing_door_ = true;
+    }
+    else if(current_step == 75)
+    {
+        current_target_position_.transform.translation.x = 0.0;
+        current_target_position_.transform.translation.y = 0.0;
+        current_target_position_.transform.translation.z = cruise_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        current_passing_door_ = false;
     }
     else if(current_step == 81)
     {
@@ -843,12 +880,17 @@ void BehaviorControl::mission_timer_callback()
             current_target_position_.transform.translation.z = -0.3;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
+        current_passing_door_ = false;
         RCLCPP_INFO(this->get_logger(), "降落中...");
     }
     std_msgs::msg::Bool nav_state_msg;
     nav_state_msg.data = if_nav;
     nav_state_pub_->publish(nav_state_msg);
     RCLCPP_INFO(this->get_logger(), "<<<<<<<<<<<<<<<<<<<<<<< if_nav: %d", if_nav);
+    std_msgs::msg::Bool passing_door_state_msg;
+    passing_door_state_msg.data = current_passing_door_;
+    passing_door_state_pub_->publish(passing_door_state_msg);
+    RCLCPP_INFO(this->get_logger(), "/////////////////////// current_passing_door_: %d", current_passing_door_);
 }
 
 void BehaviorControl::ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg)

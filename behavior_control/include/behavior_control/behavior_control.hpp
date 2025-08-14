@@ -53,6 +53,7 @@ private:
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigate_to_pose_client_;
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal navigate_to_pose_goal_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr nav_state_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr passing_door_state_pub_;
     /// 接收当前位姿
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub_;
     /// 接收当前起飞状态
@@ -105,6 +106,7 @@ private:
     bool if_hit_bridge_;
     /// 是否穿门
     bool if_passing_door_;
+    bool current_passing_door_;
 
     /// 当前是否已经解锁
     bool arming_state;
