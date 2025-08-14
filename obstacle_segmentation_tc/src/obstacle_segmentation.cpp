@@ -49,9 +49,9 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
     pass_through_filter_y_.setFilterFieldName("y");
     pass_through_filter_y_.setFilterLimits(obstacle_y_min_, obstacle_y_max_);
     pass_through_filter_y_.setFilterLimitsNegative(false);
-    //pass_through_filter_z_.setFilterFieldName("z");
-    //pass_through_filter_z_.setFilterLimits(obstacle_z_min_, obstacle_z_max_);
-    //pass_through_filter_z_.setFilterLimitsNegative(false);
+    pass_through_filter_z_.setFilterFieldName("z");
+    pass_through_filter_z_.setFilterLimits(obstacle_z_min_, obstacle_z_max_);
+    pass_through_filter_z_.setFilterLimitsNegative(false);
     voxfilter.setLeafSize(leaf_size_, leaf_size_, leaf_size_);
 
     current_z_ = 0.0;
@@ -84,8 +84,8 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     pass_through_filter_x_.filter(*cloud);
     pass_through_filter_y_.setInputCloud(cloud);
     pass_through_filter_y_.filter(*cloud);
-    //pass_through_filter_z_.setInputCloud(cloud);
-    //pass_through_filter_z_.filter(*cloud);
+    pass_through_filter_z_.setInputCloud(cloud);
+    pass_through_filter_z_.filter(*cloud);
     // 创建体素滤波器主要作用是对点云进行降采样，可以在保证点云原有几何结构基本不变的前提下减少点的数量
     if (use_downsample_)
     {
@@ -108,19 +108,9 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     for (long i = 0; i < cloud->points.size(); i++)
     {
-        if(cloud->points[i].z - current_z_ < 0.2 && cloud->points[i].z - current_z_ > -0.4)
+        if(cloud->points[i].z - current_z_ < 0.2 && cloud->points[i].z - current_z_ > -0.5)
             segement_cloud->points.push_back(cloud->points[i]);
     }
-    // 再过滤一次离群点
-    //pcl::RadiusOutlierRemoval<pcl::PointXYZ> radiusoutlier;
-    // 设置输入点云
-    //radiusoutlier.setInputCloud(segement_cloud);
-    // 设置半径,在该范围内找临近点
-    //radiusoutlier.setRadiusSearch(0.15);
-    // 设置查询点的邻域点集数，小于该阈值的删除
-    //radiusoutlier.setMinNeighborsInRadius(3);
-    //radiusoutlier.filter(*segement_cloud);
-//    RCLCPP_INFO(this->get_logger(), "obstacle_segmentation: 点云分割剩余点云数： %lu", segement_cloud->points.size());
 
     segement_cloud->width = segement_cloud->points.size();
     segement_cloud->height = 1;
