@@ -29,7 +29,7 @@ class MavlinkControl(Node):
         self.target_frame = "map" #世界系
         self.source_frame = "livox" #雷达系
 
-        self.pid_height = 0.4
+        self.pid_height = 0.65
         self.current_x = 0.0
         self.current_y = 0.0
         self.current_z = 0.0
@@ -87,7 +87,7 @@ class MavlinkControl(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         #发送自身当前测量位置, 10Hz
-        self.vision_pose_timer = self.create_timer(0.1, self.vision_pose_timer_callback)
+        self.vision_pose_timer = self.create_timer(0.08, self.vision_pose_timer_callback)
         #读取遥控杆位置
         self.channel_position_timer = self.create_timer(0.1, self.channel_position_timer_callback)
         #监测心跳信号，是否已经解锁
@@ -184,7 +184,7 @@ class MavlinkControl(Node):
         if self.if_nav:
             time_boot_ms = int(self.get_clock().now().nanoseconds / 1e6) & 0xFFFFFFFF
             if not self.current_passing_door:
-                vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
+                vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - (self.current_z - 0.08))   # Speed in m/s
 
                 self.master.mav.set_position_target_local_ned_send(
                     time_boot_ms,
@@ -197,7 +197,7 @@ class MavlinkControl(Node):
                     0, 0
                 )
             else: #穿门状态
-                vx, vy, vz = msg.linear.x, -msg.linear.y, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
+                vx, vy, vz = msg.linear.y, msg.linear.x, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
 
                 self.master.mav.set_position_target_local_ned_send(
                     time_boot_ms,

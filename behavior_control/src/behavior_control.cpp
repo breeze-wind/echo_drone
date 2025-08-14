@@ -204,7 +204,7 @@ void BehaviorControl::step_timer_callback()
     }
     else if(current_step == 1) //等待起飞至巡航高度
     {
-        if(fabs(current_z_ - cruise_height_) <= 0.03)
+        if(fabs(current_z_ - cruise_height_) <= 0.05)
         {
             current_step = 21;
         }

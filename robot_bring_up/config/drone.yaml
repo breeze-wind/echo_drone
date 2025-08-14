@@ -1,17 +1,17 @@
 behavior_control_node: #雷达离地面高度0.4m
     ros__parameters:
         tank_position: [2.0, 0.8]
-        bridge_position: [5.5, 0.3]
-        tent_position: [4.0, 1.5]
-        car_position: [2.0, 1.0]
-        pillbox_position: [3.5, -1.5]
-        passing_door_src: [0.0, 0.0]
-        passing_door_des: [0.0, 0.0]
+        bridge_position: [3.47, 0.6]
+        tent_position: [1.21, -1.51]
+        car_position: [3.38, -1.57]
+        pillbox_position: [5.23, -0.1]
+        passing_door_src: [8.51, -0.65]
+        passing_door_des: [8.54, -3.77]
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]
-        cruise_height: 1.4
-        detection_height: 1.7
+        cruise_height: 1.2
+        detection_height: 1.6
         passing_door_height: 0.6
-        eject_height: 0.6
+        eject_height: 0.7
         if_hit_tank: false
         if_hit_car: true
         if_hit_pillbox: false
@@ -35,7 +35,7 @@ behavior_control_node: #雷达离地面高度0.4m
 
 mavlink_control_node:
     ros__parameters:
-        cruise_height: 0.75
+        cruise_height: 1.2
 
 merge_pcd_node:
     ros__parameters:
@@ -45,10 +45,10 @@ merge_pcd_node:
 pcd2pgm_node:
     ros__parameters: # map2 修改路径和名称
         pcd_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge" # 点云路径
-        pcd_name: "2025_08_14_20_39_38_merged.pcd"
+        pcd_name: "2025_08_14_23_19_27_merged.pcd"
         map_path: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps"
-        map_name: "2025_08_14_20_39_38_merged.png"
-        yaml_name: "2025_08_14_20_39_38_merged.yaml"
+        map_name: "2025_08_14_23_19_27_merged.png"
+        yaml_name: "2025_08_14_23_19_27_merged.yaml"
 
         method: "point" # normal、height或者point，代表不同的转换方法
         thre_x_min: -50.0 # 点云范围
@@ -71,7 +71,7 @@ pcd2pgm_node:
 
 map_server:
     ros__parameters:
-        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_08_14_20_39_38_merged.yaml" #map3 重命名 checklist
+        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_08_14_23_19_27_merged.yaml" #map3 重命名 checklist
 
 obstacle_segmentation_node:
     ros__parameters:
@@ -173,8 +173,8 @@ laser_mapping:
             scan_bodyframe_pub_en: true
 
         pcd_save:
-            use_pcd_map_: true
-            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge/2025_08_14_20_39_38_merged.pcd" #map3 重命名和路径 checklist
+            use_pcd_map_: false
+            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge/2025_08_14_23_19_27_merged.pcd" #map3 重命名和路径 checklist
             pcd_save_en: false
             interval: 900
         #RMUC
@@ -203,15 +203,15 @@ controller_server:
             plugin: teb_local_planner::TebLocalPlannerROS
 
             teb_autosize: 1.0
-            dt_ref: 0.2 # 所需的轨迹时间分辨率#3.17
+            dt_ref: 0.4 # 所需的轨迹时间分辨率#3.17
             dt_hysteresis: 0.02 # 根据当前时间分辨率自动调整大小的滞后，建议使用dt_ref的 10%#3.17
             max_samples: 500
             min_samples: 3 # 最小采样数,大于2
             global_plan_overwrite_orientation: True # 覆盖全局规划器提供的局部子目标的方向（因为它们通常仅提供 2D 路径）
             allow_init_with_backwards_motion: False
-            max_global_plan_lookahead_dist: 0.5 # 指定考虑优化的全局计划子集的最大长度（累积欧几里得距离）。实际长度由本地成本图大小和该最大界限的逻辑与确定。设置为零或负数以停用此限制。
-            global_plan_viapoint_sep: 1.0 # 如果为正，则从全局计划中提取途经点（路径跟踪模式）。该值确定参考路径的分辨率（沿全局规划的每两个连续经由点之间的最小间隔，如果为负值：禁用）。
-            global_plan_prune_distance: 0.2 #3.17
+            max_global_plan_lookahead_dist: 1.45 # 指定考虑优化的全局计划子集的最大长度（累积欧几里得距离）。实际长度由本地成本图大小和该最大界限的逻辑与确定。设置为零或负数以停用此限制。
+            global_plan_viapoint_sep: -0.1 # 如果为正，则从全局计划中提取途经点（路径跟踪模式）。该值确定参考路径的分辨率（沿全局规划的每两个连续经由点之间的最小间隔，如果为负值：禁用）。
+            global_plan_prune_distance: 0.6 #3.17
             # via_points_ordered: TDOD
             force_reinit_new_goal_dist: 1.0 # 如果之前的目标更新后的间隔超过指定值（以米为单位），则重新初始化轨迹（跳过热启动）
             force_reinit_new_goal_angular: 0.78 #3.17
@@ -224,12 +224,12 @@ controller_server:
 
             # Robot
 
-            max_vel_x: 0.2 # 机器人最大x轴速度m/s
-            max_vel_y: 0.2 # 机器人最大y轴速度m/s
-            max_vel_x_backwards: 0.22 # 机器人最大x轴后退速度m/s
+            max_vel_x: 0.6 # 机器人最大x轴速度m/s
+            max_vel_y: 0.6 # 机器人最大y轴速度m/s
+            max_vel_x_backwards: 0.6 # 机器人最大x轴后退速度m/s
             max_vel_theta: 0.1 # 机器人最大角速度rad/s
-            acc_lim_x: 0.15 # 机器人最大x轴平移加速度m/s^2
-            acc_lim_y: 0.15 # 机器人最大y轴平移加速度m/s^2
+            acc_lim_x: 0.1 # 机器人最大x轴平移加速度m/s^2
+            acc_lim_y: 0.1 # 机器人最大y轴平移加速度m/s^2
             acc_lim_theta: 0.1 # 机器人最大角加速度rad/s^2
 
             min_turning_radius: 0.0 # 机器人最小转弯半径
@@ -237,7 +237,7 @@ controller_server:
             is_footprint_dynamic: False
             footprint_model: # types: "point", "circular", "two_circles", "line", "polygon"
                 type: "circular"
-                radius: 0.4 # for type "circular"
+                radius: 0.5 # for type "circular"
 
             # GoalTolerance
 
@@ -245,8 +245,8 @@ controller_server:
 
             # Obstacles
 
-            min_obstacle_dist: 0.04 # 机器人与障碍物之间的最小距离（以米为单位）3.17
-            inflation_dist: 0.06 # 非零惩罚成本的障碍物周围的缓冲区（应大于min_obstacle_dist才能生效）。3.17
+            min_obstacle_dist: 0.12 # 机器人与障碍物之间的最小距离（以米为单位）3.17
+            inflation_dist: 0.15 # 非零惩罚成本的障碍物周围的缓冲区（应大于min_obstacle_dist才能生效）。3.17
             include_costmap_obstacles: True # 指定是否应考虑本地成本图的障碍。每个被标记为障碍物的单元格都被视为点障碍物。因此，不要RM选择非常小的代价图分辨率，因为它会增加计算时间。
             costmap_obstacles_behind_robot_dist: 4.0 # 限制机器人后面规划时考虑的占用的本地成本图障碍（指定距离以米为单位）。
             obstacle_poses_affected: 15 # 每个障碍物位置都附加到轨迹上最近的姿势以保持距离。还可以考虑其他邻居。如果legacy_obstacle_association是false，则不启用
@@ -270,17 +270,17 @@ controller_server:
             penalty_epsilon: 0.1 # 为硬约束近似的惩罚函数添加一个小的安全裕度
             obstacle_cost_exponent: 2.0 #3.17
             weight_max_vel_x: 2.5 # 满足最大允许平移速度的优化权重 2.28
-            weight_max_vel_y: 2.3 # 满足最大允许平移速度的优化权重 3.17
-            weight_max_vel_theta: 0.5 # 满足最大允许角速度的优化权重
+            weight_max_vel_y: 2.5 # 满足最大允许平移速度的优化权重 3.17
+            weight_max_vel_theta: 0.8 # 满足最大允许角速度的优化权重
             weight_acc_lim_x: 1.0 # 满足最大允许平移加速度的优化权重
             weight_acc_lim_y: 1.0 # 满足最大允许平移加速度的优化权重
-            weight_acc_lim_theta: 0.2 # 满足最大允许角加速度的优化权重
+            weight_acc_lim_theta: 0.5 # 满足最大允许角加速度的优化权重
             weight_kinematics_nh: 0.01 # 满足非完整运动学约束（不平移，原地旋转）的优化权重，该参数必须很高 3.17
             weight_kinematics_forward_drive: 0.01 # 用于迫使机器人仅选择前进方向（正平移速度）的优化权重。较小的权重（例如 1.0）仍然允许向后行驶。 1000左右的值几乎可以防止向后行驶（但不能保证）。
             weight_optimaltime: 500.0 # must be > 0 用于收缩相对于转换/执行时间的轨迹的优化权重 2.28
             weight_shortest_path: 10.0
             weight_obstacle: 500.0 # 用于满足与障碍物距离的权重 2.28
-            weight_inflation: 0.8 # 膨胀区域的权重 应该很小
+            weight_inflation: 1.0 # 膨胀区域的权重 应该很小
             weight_dynamic_obstacle: 10.0 # not in use yet
             weight_dynamic_obstacle_inflation: 0.2
             weight_viapoint: 1000.0 # 用于最小化到过点（或参考路径）的距离的优化权重。
@@ -340,7 +340,7 @@ local_costmap:
             width: 8
             height: 8
             resolution: 0.05
-            robot_radius: 0.05
+            robot_radius: 0.1
             plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
             static_layer:
                 plugin: "nav2_costmap_2d::StaticLayer"
@@ -376,7 +376,7 @@ global_costmap:
             publish_frequency: 30.0
             global_frame: map
             robot_base_frame: livox
-            robot_radius: 0.1
+            robot_radius: 0.2
 #            footprint: "[ [0.25, 0.13], [-0.25, 0.13], [-0.25, -0.13], [0.25, -0.13] ]"
             resolution: 0.05
             track_unknown_space: true
