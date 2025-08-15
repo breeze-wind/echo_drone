@@ -38,6 +38,8 @@ class MavlinkControl(Node):
         self.arming_state = False #飞控解锁状态
         self.if_nav = False
         self.current_passing_door = False
+        self.if_turning = False
+        self.target_yaw = 0.0 #弧度
 
         # Connect to PX4 over serial or UDP
         ports = serial.tools.list_ports.comports()
@@ -78,10 +80,16 @@ class MavlinkControl(Node):
             '/robot/passing_door_state',
             self.passing_door_state_callback,
             10) #
+        self.turning_state_sub = self.create_subscription(
+            Bool,
+            '/robot/turning_state',
+            self.turning_state_callback,
+            10) #
         self.target_pose_sub  # prevent unused variable warning
         self.cmd_vel_sub
         self.nav_state_sub
         self.passing_door_state_sub
+        self.turning_state_sub
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -231,6 +239,8 @@ class MavlinkControl(Node):
                     0.0, 0.0
                 )
             else: #穿门状态
+                if self.if_turning:
+                    self.target_yaw = self.target_yaw + 1.57 / 20
                 self.master.mav.set_position_target_local_ned_send(
                     time_boot_ms,
                     self.master.target_system, self.master.target_component,
@@ -239,8 +249,9 @@ class MavlinkControl(Node):
                     x, y, z,
                     0.0, 0.0, 0.0,
                     0.0, 0.0, 0.0,
-                    -1.57, 0.0
+                    -self.target_yaw, 0.0
                 )
+
             self.get_logger().info('mavlink: send target pose x y z: %f, %f, %f' %(x, y, z))
 
     def nav_state_callback(self, msg):
@@ -248,6 +259,9 @@ class MavlinkControl(Node):
 
     def passing_door_state_callback(self, msg):
         self.current_passing_door = msg.data
+
+    def turning_state_callback(self, msg):
+        self.if_turning = msg.data
 
 def main(args=None):
     rclpy.init(args=args)
