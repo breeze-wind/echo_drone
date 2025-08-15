@@ -114,7 +114,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     turning_cnt = 0;
     eject_cnt_threshold_ = 5.0 / 0.25; //等待投掷时间
     detection_cnt_threshold_ = 2.5 / 0.25; //等待识别时间
-    turning_cnt_threshold_ = 1000.0 / 0.25; //等待转向时间
+    turning_cnt_threshold_ = 6.0 / 0.25; //等待转向时间
 
     servo_index_ = 0;
     last_servo_index_ = 0;
@@ -830,8 +830,8 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 72)
     {
-        current_target_position_.transform.translation.x = passing_door_des_[0];
-        current_target_position_.transform.translation.y = passing_door_des_[1];
+        current_target_position_.transform.translation.x = passing_door_src_[0];
+        current_target_position_.transform.translation.y = passing_door_src_[1];
         current_target_position_.transform.translation.z = passing_door_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;

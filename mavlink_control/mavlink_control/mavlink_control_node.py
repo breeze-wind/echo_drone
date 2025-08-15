@@ -129,7 +129,7 @@ class MavlinkControl(Node):
         )
         self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f'
                                % (self.current_x, -self.current_y, -(self.current_z - 0.08)))
-        # self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
+        self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
 
         #发送当前位置到决策
         msg = PoseStamped()
@@ -150,7 +150,7 @@ class MavlinkControl(Node):
             if channels:
                 # RC_CHANNELS gives chan1_raw to chan8_raw (and up to chan18_raw)
                 if channels.get_type() == 'RC_CHANNELS':
-                    self.get_logger().info('Chan1: %d' %channels.chan1_raw)
+                    # self.get_logger().info('Chan1: %d' %channels.chan1_raw)
                     # self.get_logger().info('Chan2: %d' %channels.chan2_raw)
                     # self.get_logger().info('Chan3: %d' %channels.chan3_raw)
                     # self.get_logger().info('Chan4: %d' %channels.chan4_raw)
@@ -211,7 +211,7 @@ class MavlinkControl(Node):
                     time_boot_ms,
                     self.master.target_system, self.master.target_component,
                     1,
-                    0b0000010111000111,
+                    0b0000000111000111,
                     0, 0, 0,
                     vx, vy, vz,
                     0, 0, 0,
@@ -240,18 +240,20 @@ class MavlinkControl(Node):
                 )
             else: #穿门状态
                 if self.if_turning:
-                    self.target_yaw = self.target_yaw + 1.57 / 20
+                    # self.target_yaw = self.target_yaw + 1.57 / 20
+                    # if self.target_yaw >= 1.57:
+                    self.target_yaw = 1.57
                 self.master.mav.set_position_target_local_ned_send(
                     time_boot_ms,
                     self.master.target_system, self.master.target_component,
                     1,
-                    0b0000010111111000,
+                    0b0000100111111000,
                     x, y, z,
                     0.0, 0.0, 0.0,
                     0.0, 0.0, 0.0,
                     -self.target_yaw, 0.0
                 )
-
+            self.get_logger().info('mavlink: send target_yaw: %f' %(-self.target_yaw))
             self.get_logger().info('mavlink: send target pose x y z: %f, %f, %f' %(x, y, z))
 
     def nav_state_callback(self, msg):
