@@ -108,7 +108,7 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     for (long i = 0; i < cloud->points.size(); i++)
     {
-        if(cloud->points[i].z - current_z_ < 0.2 && cloud->points[i].z - current_z_ > -0.5)
+        if(cloud->points[i].z - current_z_ < 0.2 && cloud->points[i].z - current_z_ > -0.39)
             segement_cloud->points.push_back(cloud->points[i]);
     }
 

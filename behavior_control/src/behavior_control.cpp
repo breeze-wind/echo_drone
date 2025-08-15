@@ -110,8 +110,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_step = 0;
     eject_cnt = 0;
     detection_cnt = 0;
-    eject_cnt_threshold_ = 6.0 / 0.25; //等待投掷时间
-    detection_cnt_threshold_ = 5.0 / 0.25; //等待识别时间
+    eject_cnt_threshold_ = 5.0 / 0.25; //等待投掷时间
+    detection_cnt_threshold_ = 2.5 / 0.25; //等待识别时间
 
     servo_index_ = 0;
     last_servo_index_ = 0;
@@ -509,13 +509,13 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        if(current_z_ - eject_height_ >= 0.4)
-            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        if(current_z_ - eject_height_ >= 0.5)
+            current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
             current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
-        if(eject_cnt >= 15)
+        if(eject_cnt >= 16)
         {
             servo_index_ = 1;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -579,13 +579,13 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        if(current_z_ - eject_height_ >= 0.4)
-            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        if(current_z_ - eject_height_ >= 0.5)
+            current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
             current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
-        if(eject_cnt >= 15)
+        if(eject_cnt >= 16)
         {
             servo_index_ = 2;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -649,13 +649,13 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        if(current_z_ - eject_height_ >= 0.4)
-            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        if(current_z_ - eject_height_ >= 0.5)
+            current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
             current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
-        if(eject_cnt >= 15)
+        if(eject_cnt >= 16)
         {
             servo_index_ = 3;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -714,13 +714,13 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        if(current_z_ - eject_height_ >= 0.4)
-            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        if(current_z_ - eject_height_ >= 0.5)
+            current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
             current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
-        if(eject_cnt >= 15)
+        if(eject_cnt >= 16)
         {
             servo_index_ = 3;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -769,13 +769,13 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
         current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        if(current_z_ - eject_height_ >= 0.4)
-            current_target_position_.transform.translation.z = current_z_ - 0.4;
+        if(current_z_ - eject_height_ >= 0.5)
+            current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
             current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
-        if(eject_cnt >= 15)
+        if(eject_cnt >= 16)
         {
             servo_index_ = 3;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
