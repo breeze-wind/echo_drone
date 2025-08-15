@@ -1,12 +1,12 @@
 behavior_control_node: #雷达离地面高度0.4m
     ros__parameters:
         tank_position: [2.0, 0.8]
-        bridge_position: [3.47, 0.6]
-        tent_position: [1.21, -1.51]
-        car_position: [3.38, -1.57]
-        pillbox_position: [5.23, -0.1]
-        passing_door_src: [8.51, -0.65]
-        passing_door_des: [8.54, -3.77]
+        bridge_position: [2.97, -1.91]
+        tent_position: [4.88, -1.55]
+        car_position: [1.42, 0.88]
+        pillbox_position: [4.25, 1.63]
+        passing_door_src: [6.84, -3.3]
+        passing_door_des: [8.18, 2.89]
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]
         cruise_height: 1.2
         detection_height: 1.6
@@ -44,11 +44,11 @@ merge_pcd_node:
 ## PCD转二维栅格地图 map3
 pcd2pgm_node:
     ros__parameters: # map2 修改路径和名称
-        pcd_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge" # 点云路径
-        pcd_name: "2025_08_14_23_19_27_merged.pcd"
+        pcd_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD" # 点云路径
+        pcd_name: "2025_08_15_21_47_03_1.pcd"
         map_path: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps"
-        map_name: "2025_08_14_23_19_27_merged.png"
-        yaml_name: "2025_08_14_23_19_27_merged.yaml"
+        map_name: "2025_08_15_21_47_03_1.png"
+        yaml_name: "2025_08_15_21_47_03_1.yaml"
 
         method: "point" # normal、height或者point，代表不同的转换方法
         thre_x_min: -50.0 # 点云范围
@@ -71,7 +71,8 @@ pcd2pgm_node:
 
 map_server:
     ros__parameters:
-        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_08_14_23_19_27_merged.yaml" #map3 重命名 checklist
+        #yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_08_15_12_24_46_merged.yaml" #map3 重命名 checklist
+        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_08_15_21_47_03_1.yaml" #map3 重命名 checklist
 
 obstacle_segmentation_node:
     ros__parameters:
