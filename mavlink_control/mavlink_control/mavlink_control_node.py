@@ -240,8 +240,6 @@ class MavlinkControl(Node):
                 )
             else: #穿门状态
                 if self.if_turning:
-                    # self.target_yaw = self.target_yaw + 1.57 / 20
-                    # if self.target_yaw >= 1.57:
                     self.target_yaw = 1.57
                 self.master.mav.set_position_target_local_ned_send(
                     time_boot_ms,

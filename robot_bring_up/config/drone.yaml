@@ -10,6 +10,7 @@ behavior_control_node: #雷达离地面高度0.4m
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]
         cruise_height: 1.2
         detection_height: 1.6
+        H_detection_height: 1.2
         passing_door_height: 0.8
         eject_height: 0.7
         if_hit_tank: false

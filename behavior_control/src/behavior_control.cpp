@@ -19,6 +19,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter<std::vector<std::string>>("target_sequence", std::vector<std::string>{"tent", "car", "pillbox", "tank"});
     this->declare_parameter("cruise_height", 0.6);
     this->declare_parameter("detection_height", 1.5);
+    this->declare_parameter("H_detection_height", 1.5);
     this->declare_parameter("passing_door_height", 0.4);
     this->declare_parameter("eject_height", 0.25);
     this->declare_parameter("if_hit_tank", false);
@@ -53,6 +54,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter<std::vector<std::string>>("target_sequence", target_sequence_);
     this->get_parameter("cruise_height", cruise_height_);
     this->get_parameter("detection_height", detection_height_);
+    this->get_parameter("H_detection_height", H_detection_height_);
     this->get_parameter("passing_door_height", passing_door_height_);
     this->get_parameter("eject_height", eject_height_);
     this->get_parameter("if_hit_tank", if_hit_tank_);
@@ -414,22 +416,13 @@ void BehaviorControl::step_timer_callback()
     }
     else if(current_step == 73) //导航至穿门终点
     {
-        if(fabs(current_x_ - passing_door_des_[0]) < 0.15)
-            if(fabs(current_y_ - passing_door_des_[1]) < 0.15)
+        if(fabs(current_x_ - passing_door_des_[0]) < 0.12)
+            if(fabs(current_y_ - passing_door_des_[1]) < 0.12)
             {
-                current_step = 74;
+                current_step = 82;
             }
     }
-    else if(current_step == 74) //终点/起点H识别
-    {
-        detection_cnt++;
-        if(detection_cnt >= detection_cnt_threshold_)
-        {
-            detection_cnt = 0;
-            current_step = 81;
-        }
-    }
-    else if(current_step == 75) //回起点
+    else if(current_step == 75) //直接回起点
     {
         if(fabs(current_x_) < 0.1)
             if(fabs(current_y_) < 0.1)
@@ -437,8 +430,13 @@ void BehaviorControl::step_timer_callback()
                 current_step = 81;
             }
     }
-    //进入降落状态
+    //进入降落起点状态
     else if(current_step == 81)
+    {
+        if_landing = true;
+    }
+    //进入降落穿门后终点状态
+    else if(current_step == 82)
     {
         if_landing = true;
     }
@@ -856,24 +854,6 @@ void BehaviorControl::mission_timer_callback()
         if_turning = false;
         RCLCPP_INFO(this->get_logger(), "穿门终点: %lf, %lf", passing_door_des_[0], passing_door_des_[1]);
     }
-    else if(current_step == 74)
-    {
-        try {
-            map_to_target = tfbuffer_->lookupTransform(map_frame_, target_frame_, rclcpp::Time(),
-                                               rclcpp::Duration::from_seconds(0.5));
-        } catch (tf2::TransformException &ex) {
-            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
-            return;
-        }
-
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
-        current_target_position_.transform.translation.z = passing_door_height_;
-        target_pose_pub_->publish(current_target_position_);
-        if_nav = false;
-        current_passing_door_ = true;
-        if_turning = false;
-    }
     else if(current_step == 75)
     {
         current_target_position_.transform.translation.x = 0.0;
@@ -897,6 +877,20 @@ void BehaviorControl::mission_timer_callback()
         current_passing_door_ = if_passing_door_;
         if_turning = false;
         RCLCPP_INFO(this->get_logger(), "降落中...");
+    }
+    else if(current_step == 82)
+    {
+        current_target_position_.transform.translation.x = passing_door_des_[0];
+        current_target_position_.transform.translation.y = passing_door_des_[1];
+        if(current_z_ + 0.3 >= 0.5)
+            current_target_position_.transform.translation.z = current_z_ - 0.5;
+        else
+            current_target_position_.transform.translation.z = -0.3;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        current_passing_door_ = if_passing_door_;
+        if_turning = false;
+        RCLCPP_INFO(this->get_logger(), "穿门后降落中...");
     }
     std_msgs::msg::Bool nav_state_msg;
     nav_state_msg.data = if_nav;
