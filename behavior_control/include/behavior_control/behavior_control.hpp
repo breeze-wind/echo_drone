@@ -125,8 +125,10 @@ private:
     /* 计时计数及阈值 */
     int eject_cnt;
     int detection_cnt;
+    int turning_cnt;
     int eject_cnt_threshold_;
     int detection_cnt_threshold_;
+    int turning_cnt_threshold_;
 
     /// 舵机投放位置参数控制
     rclcpp::Parameter servo_param;

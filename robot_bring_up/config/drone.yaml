@@ -5,7 +5,7 @@ behavior_control_node: #雷达离地面高度0.4m
         tent_position: [5.26, -0.63]
         car_position: [3.24, 0.67]
         pillbox_position: [1.66, -1.45]
-        passing_door_src: [11.25, -2.5]
+        passing_door_src: [10.5, -1.03]
         passing_door_des: [12.15, 2.21]
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]
         cruise_height: 1.2
@@ -17,7 +17,7 @@ behavior_control_node: #雷达离地面高度0.4m
         if_hit_pillbox: false
         if_hit_tent: true
         if_hit_bridge: true
-        if_passing_door: false
+        if_passing_door: true
         max_vel_x_navigation: 0.6
         max_vel_y_navigation: 0.6
         max_vel_x_backwards_navigation: 0.6

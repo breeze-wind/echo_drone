@@ -107,11 +107,13 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_y_ = 0.0;
     current_z_ = 0.0;
 
-    current_step = 0;
+    current_step = 71;
     eject_cnt = 0;
     detection_cnt = 0;
+    turning_cnt = 0;
     eject_cnt_threshold_ = 5.0 / 0.25; //等待投掷时间
     detection_cnt_threshold_ = 2.5 / 0.25; //等待识别时间
+    turning_cnt_threshold_ = 1000.0 / 0.25; //等待转向时间
 
     servo_index_ = 0;
     last_servo_index_ = 0;
@@ -401,7 +403,12 @@ void BehaviorControl::step_timer_callback()
     }
     else if(current_step == 72) //原地转向90度
     {
-
+        turning_cnt++;
+        if (turning_cnt >= turning_cnt_threshold_)
+        {
+            turning_cnt = 0;
+            current_step = 73;
+        }
     }
     else if(current_step == 73) //导航至穿门终点
     {
@@ -880,7 +887,7 @@ void BehaviorControl::mission_timer_callback()
             current_target_position_.transform.translation.z = -0.3;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
-        current_passing_door_ = false;
+        current_passing_door_ = if_passing_door_;
         RCLCPP_INFO(this->get_logger(), "降落中...");
     }
     std_msgs::msg::Bool nav_state_msg;
