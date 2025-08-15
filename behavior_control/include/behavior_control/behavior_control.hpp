@@ -155,14 +155,14 @@ private:
     double acc_lim_x_navigation;
     double acc_lim_y_navigation;
     double acc_lim_theta_navigation;
-    //识别时teb参数
-    double max_vel_x_detection;
-    double max_vel_y_detection;
-    double max_vel_x_backwards_detection;
-    double max_vel_theta_detection;
-    double acc_lim_x_detection;
-    double acc_lim_y_detection;
-    double acc_lim_theta_detection;
+    //穿门时teb参数
+    double max_vel_x_passing;
+    double max_vel_y_passing;
+    double max_vel_x_backwards_passing;
+    double max_vel_theta_passing;
+    double acc_lim_x_passing;
+    double acc_lim_y_passing;
+    double acc_lim_theta_passing;
     //实际切换参数
     double max_vel_x;
     double max_vel_y;
@@ -172,7 +172,7 @@ private:
     double acc_lim_y;
     double acc_lim_theta;
 
-    //导航模式，0--正常导航，1--识别时导航
+    //导航模式，0--正常导航，1--穿门时导航
     int current_nav_mode;
     int last_nav_mode;
 

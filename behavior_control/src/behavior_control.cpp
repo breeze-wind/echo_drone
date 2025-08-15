@@ -36,13 +36,13 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("acc_lim_x_navigation", 0.3);
     this->declare_parameter("acc_lim_y_navigation", 0.3);
     this->declare_parameter("acc_lim_theta_navigation", 0.2);
-    this->declare_parameter("max_vel_x_detection", 0.6);
-    this->declare_parameter("max_vel_y_detection", 1.5);
-    this->declare_parameter("max_vel_x_backwards_detection", 0.4);
-    this->declare_parameter("max_vel_theta_detection", 0.25);
-    this->declare_parameter("acc_lim_x_detection", 1.5);
-    this->declare_parameter("acc_lim_y_detection", 0.4);
-    this->declare_parameter("acc_lim_theta_detection", 0.25);
+    this->declare_parameter("max_vel_x_passing", 0.6);
+    this->declare_parameter("max_vel_y_passing", 1.5);
+    this->declare_parameter("max_vel_x_backwards_passing", 0.4);
+    this->declare_parameter("max_vel_theta_passing", 0.25);
+    this->declare_parameter("acc_lim_x_passing", 1.5);
+    this->declare_parameter("acc_lim_y_passing", 0.4);
+    this->declare_parameter("acc_lim_theta_passing", 0.25);
 
     this->get_parameter<std::vector<double>>("tank_position", tank_);
     this->get_parameter<std::vector<double>>("tent_position", tent_);
@@ -70,13 +70,13 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter("acc_lim_x_navigation", acc_lim_x_navigation);
     this->get_parameter("acc_lim_y_navigation", acc_lim_y_navigation);
     this->get_parameter("acc_lim_theta_navigation", acc_lim_theta_navigation);
-    this->get_parameter("max_vel_x_detection", max_vel_x_detection);
-    this->get_parameter("max_vel_y_detection", max_vel_y_detection);
-    this->get_parameter("max_vel_x_backwards_detection", max_vel_x_backwards_detection);
-    this->get_parameter("max_vel_theta_detection", max_vel_theta_detection);
-    this->get_parameter("acc_lim_x_detection", acc_lim_x_detection);
-    this->get_parameter("acc_lim_y_detection", acc_lim_y_detection);
-    this->get_parameter("acc_lim_theta_detection", acc_lim_theta_detection);
+    this->get_parameter("max_vel_x_passing", max_vel_x_passing);
+    this->get_parameter("max_vel_y_passing", max_vel_y_passing);
+    this->get_parameter("max_vel_x_backwards_passing", max_vel_x_backwards_passing);
+    this->get_parameter("max_vel_theta_passing", max_vel_theta_passing);
+    this->get_parameter("acc_lim_x_passing", acc_lim_x_passing);
+    this->get_parameter("acc_lim_y_passing", acc_lim_y_passing);
+    this->get_parameter("acc_lim_theta_passing", acc_lim_theta_passing);
 
     if (!if_hit_tank_)
     {
@@ -835,6 +835,13 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         current_passing_door_ = true;
         if_turning = true; //转向状态
+
+        current_nav_mode = 1;
+        if (current_nav_mode != last_nav_mode)
+        {
+            change_mode();
+            last_nav_mode  = current_nav_mode;
+        }
         RCLCPP_INFO(this->get_logger(), "穿门前转向中...");
     }
     else if(current_step == 73)
@@ -977,13 +984,13 @@ void BehaviorControl::change_mode()
     controller_server_param_acc_lim_theta.name = "FollowPath.acc_lim_theta";
     controller_server_param_acc_lim_theta.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
 
-    controller_server_param_max_vel_theta.value.double_value = max_vel_theta;
-    controller_server_param_max_vel_x.value.double_value = max_vel_x;
-    controller_server_param_max_vel_y.value.double_value = max_vel_y;
-    controller_server_param_max_vel_x_backwards.value.double_value = max_vel_x_backwards;
-    controller_server_param_acc_lim_x.value.double_value = acc_lim_x;
-    controller_server_param_acc_lim_y.value.double_value = acc_lim_y;
-    controller_server_param_acc_lim_theta.value.double_value = acc_lim_theta;
+    controller_server_param_max_vel_theta.value.double_value = max_vel_theta_passing;
+    controller_server_param_max_vel_x.value.double_value = max_vel_x_passing;
+    controller_server_param_max_vel_y.value.double_value = max_vel_y_passing;
+    controller_server_param_max_vel_x_backwards.value.double_value = max_vel_x_backwards_passing;
+    controller_server_param_acc_lim_x.value.double_value = acc_lim_x_passing;
+    controller_server_param_acc_lim_y.value.double_value = acc_lim_y_passing;
+    controller_server_param_acc_lim_theta.value.double_value = acc_lim_theta_passing;
 
     // 所有要修改的参数一起push_back
     controller_server_request->parameters.push_back(controller_server_param_max_vel_theta);

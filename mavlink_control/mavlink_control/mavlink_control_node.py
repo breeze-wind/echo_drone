@@ -23,8 +23,10 @@ class MavlinkControl(Node):
         super().__init__('mavlink_control_node')
 
         self.declare_parameter('cruise_height', 0.6)
+        self.declare_parameter('passing_door_height', 0.8)
 
         self.cruise_height = self.get_parameter('cruise_height').get_parameter_value().double_value
+        self.passing_door_height = self.get_parameter('passing_door_height').get_parameter_value().double_value
 
         self.target_frame = "map" #世界系
         self.source_frame = "livox" #雷达系
@@ -205,7 +207,7 @@ class MavlinkControl(Node):
                     0, 0
                 )
             else: #穿门状态
-                vx, vy, vz = -msg.linear.y, -msg.linear.x, -self.pid_height * (self.cruise_height - self.current_z)   # Speed in m/s
+                vx, vy, vz = -msg.linear.y, -msg.linear.x, -self.pid_height * (self.passing_door_height - self.current_z)   # Speed in m/s
 
                 self.master.mav.set_position_target_local_ned_send(
                     time_boot_ms,

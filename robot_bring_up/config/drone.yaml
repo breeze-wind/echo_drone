@@ -5,8 +5,8 @@ behavior_control_node: #雷达离地面高度0.4m
         tent_position: [5.26, -0.63]
         car_position: [3.24, 0.67]
         pillbox_position: [1.66, -1.45]
-        passing_door_src: [10.5, -1.03]
-        passing_door_des: [12.15, 2.21]
+        passing_door_src: [10.14, -2.55]
+        passing_door_des: [10.22, 1.04]
         target_sequence: ["tent", "car", "pillbox", "bridge", "tank"]
         cruise_height: 1.2
         detection_height: 1.6
@@ -26,17 +26,18 @@ behavior_control_node: #雷达离地面高度0.4m
         acc_lim_x_navigation: 0.15
         acc_lim_y_navigation: 0.15
         acc_lim_theta_navigation: 0.15
-        max_vel_x_detection: 1.0
-        max_vel_y_detection: 1.0
-        max_vel_x_backwards_detection: 1.0
-        max_vel_theta_detection: 0.15
-        acc_lim_x_detection: 0.3
-        acc_lim_y_detection: 0.3
-        acc_lim_theta_detection: 0.2
+        max_vel_x_passing: 0.12
+        max_vel_y_passing: 0.12
+        max_vel_x_backwards_passing: 0.1
+        max_vel_theta_passing: 0.1
+        acc_lim_x_passing: 0.1
+        acc_lim_y_passing: 0.1
+        acc_lim_theta_passing: 0.12
 
 mavlink_control_node:
     ros__parameters:
         cruise_height: 1.2
+        passing_door_height: 0.8
 
 merge_pcd_node:
     ros__parameters:
