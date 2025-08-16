@@ -62,6 +62,8 @@ private:
 
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> servo_parameter_client_;
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> controller_server_parameter_client_;
+    std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> local_costmap_parameter_client_;
+    std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> global_costmap_parameter_client_;
 
     /// 执行步骤计时器
     rclcpp::TimerBase::SharedPtr step_timer_;
@@ -163,14 +165,13 @@ private:
     double acc_lim_x_passing;
     double acc_lim_y_passing;
     double acc_lim_theta_passing;
-    //实际切换参数
-    double max_vel_x;
-    double max_vel_y;
-    double max_vel_x_backwards;
-    double max_vel_theta;
-    double acc_lim_x;
-    double acc_lim_y;
-    double acc_lim_theta;
+    double max_global_plan_lookahead_dist;
+    double global_plan_viapoint_sep;
+    double min_obstacle_dist;
+    double inflation_dist;
+    double weight_inflation;
+    double robot_radius;
+    double inflation_radius;
 
     //导航模式，0--正常导航，1--穿门时导航
     int current_nav_mode;

@@ -43,6 +43,13 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("acc_lim_x_passing", 1.5);
     this->declare_parameter("acc_lim_y_passing", 0.4);
     this->declare_parameter("acc_lim_theta_passing", 0.25);
+    this->declare_parameter("max_global_plan_lookahead_dist", 1.25);
+    this->declare_parameter("global_plan_viapoint_sep", 0.1);
+    this->declare_parameter("min_obstacle_dist", 0.1);
+    this->declare_parameter("inflation_dist", 0.18);
+    this->declare_parameter("weight_inflation", 1.0);
+    this->declare_parameter("robot_radius", 0.05);
+    this->declare_parameter("inflation_radius", 0.3);
 
     this->get_parameter<std::vector<double>>("tank_position", tank_);
     this->get_parameter<std::vector<double>>("tent_position", tent_);
@@ -77,6 +84,13 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter("acc_lim_x_passing", acc_lim_x_passing);
     this->get_parameter("acc_lim_y_passing", acc_lim_y_passing);
     this->get_parameter("acc_lim_theta_passing", acc_lim_theta_passing);
+    this->get_parameter("max_global_plan_lookahead_dist", max_global_plan_lookahead_dist);
+    this->get_parameter("global_plan_viapoint_sep", global_plan_viapoint_sep);
+    this->get_parameter("min_obstacle_dist", min_obstacle_dist);
+    this->get_parameter("inflation_dist", inflation_dist);
+    this->get_parameter("weight_inflation", weight_inflation);
+    this->get_parameter("robot_radius", robot_radius);
+    this->get_parameter("inflation_radius", inflation_radius);
 
     if (!if_hit_tank_)
     {
@@ -110,7 +124,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_y_ = 0.0;
     current_z_ = 0.0;
 
-    current_step = 71;
+    current_step = 0;
     eject_cnt = 0;
     detection_cnt = 0;
     turning_cnt = 0;
@@ -176,6 +190,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 
     servo_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/servo_node/set_parameters");
     controller_server_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/controller_server/set_parameters");
+    local_costmap_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/local_costmap/local_costmap/set_parameters");
+    global_costmap_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/global_costmap/global_costmap/set_parameters");
     //等待服务可用
     while (!servo_parameter_client_->wait_for_service(std::chrono::seconds(1)))
     {
@@ -184,6 +200,14 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     while (!controller_server_parameter_client_->wait_for_service(std::chrono::seconds(1)))
     {
         RCLCPP_WARN(this->get_logger(), "controller_server_parameter service not available, waiting...");
+    }
+    while (!local_costmap_parameter_client_->wait_for_service(std::chrono::seconds(1)))
+    {
+        RCLCPP_WARN(this->get_logger(), "local_costmap_parameter service not available, waiting...");
+    }
+    while (!global_costmap_parameter_client_->wait_for_service(std::chrono::seconds(1)))
+    {
+        RCLCPP_WARN(this->get_logger(), "global_costmap_parameter service not available, waiting...");
     }
 
     tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -959,6 +983,7 @@ void BehaviorControl::handle_parameter_response(
 
 void BehaviorControl::change_mode()
 {
+    /* 修改FollowPath中的参数 */
     // 构建请求
     auto controller_server_request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
 
@@ -983,6 +1008,21 @@ void BehaviorControl::change_mode()
     rcl_interfaces::msg::Parameter controller_server_param_acc_lim_theta;
     controller_server_param_acc_lim_theta.name = "FollowPath.acc_lim_theta";
     controller_server_param_acc_lim_theta.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_max_global_plan_lookahead_dist;
+    controller_server_param_max_global_plan_lookahead_dist.name = "FollowPath.max_global_plan_lookahead_dist";
+    controller_server_param_max_global_plan_lookahead_dist.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_global_plan_viapoint_sep;
+    controller_server_param_global_plan_viapoint_sep.name = "FollowPath.global_plan_viapoint_sep";
+    controller_server_param_global_plan_viapoint_sep.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_min_obstacle_dist;
+    controller_server_param_min_obstacle_dist.name = "FollowPath.min_obstacle_dist";
+    controller_server_param_min_obstacle_dist.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_inflation_dist;
+    controller_server_param_inflation_dist.name = "FollowPath.inflation_dist";
+    controller_server_param_inflation_dist.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter controller_server_param_weight_inflation;
+    controller_server_param_weight_inflation.name = "FollowPath.weight_inflation";
+    controller_server_param_weight_inflation.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
 
     controller_server_param_max_vel_theta.value.double_value = max_vel_theta_passing;
     controller_server_param_max_vel_x.value.double_value = max_vel_x_passing;
@@ -991,6 +1031,11 @@ void BehaviorControl::change_mode()
     controller_server_param_acc_lim_x.value.double_value = acc_lim_x_passing;
     controller_server_param_acc_lim_y.value.double_value = acc_lim_y_passing;
     controller_server_param_acc_lim_theta.value.double_value = acc_lim_theta_passing;
+    controller_server_param_max_global_plan_lookahead_dist.value.double_value = max_global_plan_lookahead_dist;
+    controller_server_param_global_plan_viapoint_sep.value.double_value = global_plan_viapoint_sep;
+    controller_server_param_min_obstacle_dist.value.double_value = min_obstacle_dist;
+    controller_server_param_inflation_dist.value.double_value = inflation_dist;
+    controller_server_param_weight_inflation.value.double_value = weight_inflation;
 
     // 所有要修改的参数一起push_back
     controller_server_request->parameters.push_back(controller_server_param_max_vel_theta);
@@ -1000,10 +1045,63 @@ void BehaviorControl::change_mode()
     controller_server_request->parameters.push_back(controller_server_param_acc_lim_x);
     controller_server_request->parameters.push_back(controller_server_param_acc_lim_y);
     controller_server_request->parameters.push_back(controller_server_param_acc_lim_theta);
+    controller_server_request->parameters.push_back(controller_server_param_max_global_plan_lookahead_dist);
+    controller_server_request->parameters.push_back(controller_server_param_global_plan_viapoint_sep);
+    controller_server_request->parameters.push_back(controller_server_param_min_obstacle_dist);
+    controller_server_request->parameters.push_back(controller_server_param_inflation_dist);
+    controller_server_request->parameters.push_back(controller_server_param_weight_inflation);
 
     // 使用回调的异步调用
     auto controller_server_future = controller_server_parameter_client_->async_send_request(
         controller_server_request,
+        [this](rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future) {
+            this->handle_parameter_response(future);
+        });
+
+    /* local_costmap */
+    //构建请求
+    auto local_costmap_request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
+
+    rcl_interfaces::msg::Parameter local_costmap_param_robot_radius;
+    local_costmap_param_robot_radius.name = "robot_radius";
+    local_costmap_param_robot_radius.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter local_costmap_param_inflation_radius;
+    local_costmap_param_inflation_radius.name = "inflation_layer.inflation_radius";
+    local_costmap_param_inflation_radius.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+
+    local_costmap_param_robot_radius.value.double_value = robot_radius;
+    local_costmap_param_inflation_radius.value.double_value = inflation_radius;
+
+    local_costmap_request->parameters.push_back(local_costmap_param_robot_radius);
+    local_costmap_request->parameters.push_back(local_costmap_param_inflation_radius);
+
+    // 使用回调的异步调用
+    auto local_costmap_future = local_costmap_parameter_client_->async_send_request(
+        local_costmap_request,
+        [this](rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future) {
+            this->handle_parameter_response(future);
+        });
+
+    /* global_costmap */
+    // 构建请求
+    auto global_costmap_request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
+
+    rcl_interfaces::msg::Parameter global_costmap_param_robot_radius;
+    global_costmap_param_robot_radius.name = "robot_radius";
+    global_costmap_param_robot_radius.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+    rcl_interfaces::msg::Parameter global_costmap_param_inflation_radius;
+    global_costmap_param_inflation_radius.name = "inflation_layer.inflation_radius";
+    global_costmap_param_inflation_radius.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
+
+    global_costmap_param_robot_radius.value.double_value = robot_radius * 2;
+    global_costmap_param_inflation_radius.value.double_value = inflation_radius;
+
+    global_costmap_request->parameters.push_back(global_costmap_param_robot_radius);
+    global_costmap_request->parameters.push_back(global_costmap_param_inflation_radius);
+
+    // 使用回调的异步调用
+    auto global_costmap_future = global_costmap_parameter_client_->async_send_request(
+        global_costmap_request,
         [this](rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future) {
             this->handle_parameter_response(future);
         });
