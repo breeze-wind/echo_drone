@@ -80,18 +80,22 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromROSMsg(*msg, *cloud);
     // 直通滤波
+/*
     pass_through_filter_x_.setInputCloud(cloud);
     pass_through_filter_x_.filter(*cloud);
     pass_through_filter_y_.setInputCloud(cloud);
-    pass_through_filter_y_.filter(*cloud);
+    pass_through_filter_y_.filter(*cloud);*/
     pass_through_filter_z_.setInputCloud(cloud);
     pass_through_filter_z_.filter(*cloud);
+
     // 创建体素滤波器主要作用是对点云进行降采样，可以在保证点云原有几何结构基本不变的前提下减少点的数量
+/*
     if (use_downsample_)
     {
         voxfilter.setInputCloud(cloud);
         voxfilter.filter(*cloud);
     }
+*/
 //    RCLCPP_INFO(this->get_logger(), "obstacle_segmentation: 滤波后点云数量： %lu", cloud->points.size());
 
     // 创建法向量估计对象
@@ -108,10 +112,12 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     for (long i = 0; i < cloud->points.size(); i++)
     {
-        if(cloud->points[i].z - current_z_ < 0.2 && cloud->points[i].z - current_z_ > -0.39)
+        //if(cloud->points[i].z - current_z_ < 0.2 && cloud->points[i].z - current_z_ > -0.39)
             segement_cloud->points.push_back(cloud->points[i]);
     }
-
+    for(auto& point : segement_cloud->points){
+        point.z = -current_z_;
+}
     segement_cloud->width = segement_cloud->points.size();
     segement_cloud->height = 1;
     segement_cloud->is_dense = true;

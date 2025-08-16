@@ -212,9 +212,9 @@ controller_server:
             min_samples: 3 # 最小采样数,大于2
             global_plan_overwrite_orientation: True # 覆盖全局规划器提供的局部子目标的方向（因为它们通常仅提供 2D 路径）
             allow_init_with_backwards_motion: False
-            max_global_plan_lookahead_dist: 1.45 # 指定考虑优化的全局计划子集的最大长度（累积欧几里得距离）。实际长度由本地成本图大小和该最大界限的逻辑与确定。设置为零或负数以停用此限制。
-            global_plan_viapoint_sep: -0.1 # 如果为正，则从全局计划中提取途经点（路径跟踪模式）。该值确定参考路径的分辨率（沿全局规划的每两个连续经由点之间的最小间隔，如果为负值：禁用）。
-            global_plan_prune_distance: 0.6 #3.17
+            max_global_plan_lookahead_dist: 1.25 # 指定考虑优化的全局计划子集的最大长度（累积欧几里得距离）。实际长度由本地成本图大小和该最大界限的逻辑与确定。设置为零或负数以停用此限制。
+            global_plan_viapoint_sep: 0.1 # 如果为正，则从全局计划中提取途经点（路径跟踪模式）。该值确定参考路径的分辨率（沿全局规划的每两个连续经由点之间的最小间隔，如果为负值：禁用）。
+            global_plan_prune_distance: 0.2 #3.17
             # via_points_ordered: TDOD
             force_reinit_new_goal_dist: 1.0 # 如果之前的目标更新后的间隔超过指定值（以米为单位），则重新初始化轨迹（跳过热启动）
             force_reinit_new_goal_angular: 0.78 #3.17
@@ -283,7 +283,7 @@ controller_server:
             weight_optimaltime: 500.0 # must be > 0 用于收缩相对于转换/执行时间的轨迹的优化权重 2.28
             weight_shortest_path: 10.0
             weight_obstacle: 500.0 # 用于满足与障碍物距离的权重 2.28
-            weight_inflation: 2.0 # 膨胀区域的权重 应该很小
+            weight_inflation: 3.0 # 膨胀区域的权重 应该很小
             weight_dynamic_obstacle: 10.0 # not in use yet
             weight_dynamic_obstacle_inflation: 0.2
             weight_viapoint: 1000.0 # 用于最小化到过点（或参考路径）的距离的优化权重。
@@ -343,7 +343,7 @@ local_costmap:
             width: 8
             height: 8
             resolution: 0.05
-            robot_radius: 0.1
+            robot_radius: 0.05
             plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
             static_layer:
                 plugin: "nav2_costmap_2d::StaticLayer"
@@ -369,7 +369,7 @@ local_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
-                inflation_radius: 0.4
+                inflation_radius: 0.45
             always_send_full_costmap: True # 是否每次更新都发送完整的成本图，而不是更新。
 
 global_costmap:
@@ -379,7 +379,7 @@ global_costmap:
             publish_frequency: 30.0
             global_frame: map
             robot_base_frame: livox
-            robot_radius: 0.2
+            robot_radius: 0.1
 #            footprint: "[ [0.25, 0.13], [-0.25, 0.13], [-0.25, -0.13], [0.25, -0.13] ]"
             resolution: 0.05
             track_unknown_space: true
@@ -408,7 +408,7 @@ global_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
-                inflation_radius: 0.4
+                inflation_radius: 0.45
             always_send_full_costmap: True # 是否每次更新都发送完整的成本图，而不是更新
 
 planner_server:
