@@ -139,10 +139,10 @@ class MavlinkControl(Node):
         msg.pose.position.x = self.current_x
         msg.pose.position.y = self.current_y
         msg.pose.position.z = self.current_z
-        msg.pose.orientation.x = 0.0
-        msg.pose.orientation.y = 0.0
-        msg.pose.orientation.z = 0.0
-        msg.pose.orientation.w = 1.0
+        msg.pose.orientation.x = t.transform.rotation.x
+        msg.pose.orientation.y = t.transform.rotation.y
+        msg.pose.orientation.z = t.transform.rotation.z
+        msg.pose.orientation.w = t.transform.rotation.w
         self.current_pose_pub.publish(msg)
 
     #读取遥控杆位置

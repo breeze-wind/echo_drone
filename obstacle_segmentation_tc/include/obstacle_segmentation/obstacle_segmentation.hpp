@@ -22,6 +22,7 @@
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
+#include <pcl/common/transforms.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/filters/radius_outlier_removal.h>      //半径滤波器头文件
@@ -49,6 +50,8 @@ public:
 
     /// 接收从飞控通信节点传来的当前位姿
     void CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+
+    double odom_array[7];
 
 private:
     // 创建滤波器对象

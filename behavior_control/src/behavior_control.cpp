@@ -618,7 +618,7 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         if(eject_cnt >= 16)
         {
-            servo_index_ = 2;
+            servo_index_ = 1;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
             if (servo_index_ == last_servo_index_)
                 return;
@@ -688,7 +688,7 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         if(eject_cnt >= 16)
         {
-            servo_index_ = 3;
+            servo_index_ = 2;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
             if (servo_index_ == last_servo_index_)
                 return;

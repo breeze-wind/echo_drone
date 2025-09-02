@@ -80,13 +80,19 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromROSMsg(*msg, *cloud);
     // 直通滤波
-/*
+    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+    Eigen::Vector3f translation(odom_array[0], odom_array[1], odom_array[2]);
+    Eigen::Quaternionf rotation(odom_array[3], odom_array[4], odom_array[5], odom_array[6]);
+    transform.translation() = translation;
+    transform.linear() = rotation.toRotationMatrix();
+    //std::cout << odom_array[0] << std::endl;
+    pcl::transformPointCloud(*cloud, *cloud, transform);
+	/*
     pass_through_filter_x_.setInputCloud(cloud);
     pass_through_filter_x_.filter(*cloud);
     pass_through_filter_y_.setInputCloud(cloud);
-    pass_through_filter_y_.filter(*cloud);*/
-    pass_through_filter_z_.setInputCloud(cloud);
-    pass_through_filter_z_.filter(*cloud);
+    pass_through_filter_y_.filter(*cloud);
+	*/
 
     // 创建体素滤波器主要作用是对点云进行降采样，可以在保证点云原有几何结构基本不变的前提下减少点的数量
 /*
@@ -96,34 +102,30 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
         voxfilter.filter(*cloud);
     }
 */
-//    RCLCPP_INFO(this->get_logger(), "obstacle_segmentation: 滤波后点云数量： %lu", cloud->points.size());
-
-    // 创建法向量估计对象
-    //pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-    //ne.setInputCloud(cloud);
-    // 创建一个空的kdtree对象，并把它传递给法向量估计对象
-    //pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>());
-    //ne.setSearchMethod(tree);
-    // 输出数据集
-    //pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
-    //ne.setKSearch(point_num_for_normal_); // 使用最近的point_num_for_normal_个点计算法向量
-    //ne.compute(*cloud_normals); // 计算法向量
-
     pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     for (long i = 0; i < cloud->points.size(); i++)
     {
-        //if(cloud->points[i].z - current_z_ < 0.2 && cloud->points[i].z - current_z_ > -0.39)
-            segement_cloud->points.push_back(cloud->points[i]);
+        if (cloud->points[i].z < 0.1)
+        {
+            continue;
+        }
+        if(cloud->points[i].z - current_z_ < 0.2)
+        {
+            if (cloud->points[i].z - current_z_ > -0.39)
+            {
+                segement_cloud->points.push_back(cloud->points[i]);
+            }
+        }
     }
     for(auto& point : segement_cloud->points){
-        point.z = -current_z_;
+        point.z = 0.0;
 }
     segement_cloud->width = segement_cloud->points.size();
     segement_cloud->height = 1;
     segement_cloud->is_dense = true;
     sensor_msgs::msg::PointCloud2::SharedPtr output_cloud(new sensor_msgs::msg::PointCloud2);
     pcl::toROSMsg(*segement_cloud, *output_cloud);
-    output_cloud->header.frame_id = msg->header.frame_id; // msg->header.frame_id;
+    output_cloud->header.frame_id = "map"; // msg->header.frame_id;
     output_cloud->header.stamp = msg->header.stamp;
     output_cloud_pub_->publish(*output_cloud);
     // RCLCPP_INFO(this->get_logger(), "障碍物点云数据正在发布");
@@ -132,4 +134,11 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
 void ObstacleSegmentationNode::CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
     current_z_ = msg->pose.position.z;
+    odom_array[0] = msg->pose.position.x;
+    odom_array[1] = msg->pose.position.y;
+    odom_array[2] = msg->pose.position.z;
+    odom_array[3] = msg->pose.orientation.w;
+    odom_array[4] = msg->pose.orientation.x;
+    odom_array[5] = msg->pose.orientation.y;
+    odom_array[6] = msg->pose.orientation.z;
 }
