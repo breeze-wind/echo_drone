@@ -111,7 +111,7 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
         }
         if(cloud->points[i].z - current_z_ < 0.2)
         {
-            if (cloud->points[i].z - current_z_ > -0.39)
+            if (cloud->points[i].z - current_z_ > -0.2)
             {
                 segement_cloud->points.push_back(cloud->points[i]);
             }

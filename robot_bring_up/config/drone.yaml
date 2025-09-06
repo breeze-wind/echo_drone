@@ -8,7 +8,7 @@ behavior_control_node: #雷达离地面高度0.4m
         passing_door_src: [8.05, -3.36]
         passing_door_des: [8.27, 2.65]
         target_sequence: ["tent", "car", "bridge", "pillbox", "tank"]
-        cruise_height: 1.2
+        cruise_height: 1.4
         detection_height: 1.6
         H_detection_height: 1.2
         passing_door_height: 0.8
@@ -43,7 +43,7 @@ behavior_control_node: #雷达离地面高度0.4m
 
 mavlink_control_node:
     ros__parameters:
-        cruise_height: 1.2
+        cruise_height: 0.4
         passing_door_height: 0.8
 
 merge_pcd_node:
@@ -54,10 +54,10 @@ merge_pcd_node:
 pcd2pgm_node:
     ros__parameters: # map2 修改路径和名称
         pcd_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD" # 点云路径
-        pcd_name: "2025_09_02_20_12_01_1.pcd"
+        pcd_name: "2025_09_05_21_55_08_1.pcd"
         map_path: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps"
-        map_name: "2025_09_02_20_12_01_1.png"
-        yaml_name: "2025_09_02_20_12_01_1.yaml"
+        map_name: "2025_09_05_21_55_08_1.png"
+        yaml_name: "2025_09_05_21_55_08_1.yaml"
 
         method: "point" # normal、height或者point，代表不同的转换方法
         thre_x_min: -50.0 # 点云范围
@@ -67,7 +67,7 @@ pcd2pgm_node:
         thre_z_min: -0.56 # 点云范围 point方法需要排除地面影响
         thre_z_max: 1.2 # 点云范围 point方法需要排除天花板影响
         thre_radius: 0.05 # 半径阈值，用于排除离群的点
-        map_resolution: 0.05 # 地图分辨率，m
+        map_resolution: 0.02 # 地图分辨率，m
         thre_point_count: 30 # 半径内点的数量阈值，用于排除离群的点
         occupied_thresh: 0.65 # 占据阈值
         free_thresh: 0.196 # 空闲阈值
@@ -80,7 +80,7 @@ pcd2pgm_node:
 
 map_server:
     ros__parameters:
-        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_09_02_20_12_01_1.yaml" #map3 重命名 checklist
+        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_09_05_21_55_08_1.yaml" #map3 重命名 checklist
 
 obstacle_segmentation_node:
     ros__parameters:
@@ -183,8 +183,8 @@ laser_mapping:
 
         pcd_save:
             use_pcd_map_: false
-            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge/2025_08_14_23_19_27_merged.pcd" #map3 重命名和路径 checklist
-            pcd_save_en: false
+            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge/2025_09_05_20_55_53_1.pcd" #map3 重命名和路径 checklist
+            pcd_save_en: false #建图第一步
             interval: 900
         #RMUC
         init_pos:
@@ -236,10 +236,10 @@ controller_server:
             max_vel_x: 0.6 # 机器人最大x轴速度m/s
             max_vel_y: 0.6 # 机器人最大y轴速度m/s
             max_vel_x_backwards: 0.6 # 机器人最大x轴后退速度m/s
-            max_vel_theta: 0.1 # 机器人最大角速度rad/s
-            acc_lim_x: 0.15 # 机器人最大x轴平移加速度m/s^2
-            acc_lim_y: 0.15 # 机器人最大y轴平移加速度m/s^2
-            acc_lim_theta: 0.15 # 机器人最大角加速度rad/s^2
+            max_vel_theta: 0.12 # 机器人最大角速度rad/s
+            acc_lim_x: 0.2 # 机器人最大x轴平移加速度m/s^2
+            acc_lim_y: 0.2 # 机器人最大y轴平移加速度m/s^2
+            acc_lim_theta: 0.12 # 机器人最大角加速度rad/s^2
 
             min_turning_radius: 0.0 # 机器人最小转弯半径
 
@@ -289,7 +289,7 @@ controller_server:
             weight_optimaltime: 500.0 # must be > 0 用于收缩相对于转换/执行时间的轨迹的优化权重 2.28
             weight_shortest_path: 10.0
             weight_obstacle: 500.0 # 用于满足与障碍物距离的权重 2.28
-            weight_inflation: 1.0 # 膨胀区域的权重 应该很小
+            weight_inflation: 2.0 # 膨胀区域的权重 应该很小
             weight_dynamic_obstacle: 10.0 # not in use yet
             weight_dynamic_obstacle_inflation: 0.2
             weight_viapoint: 1000.0 # 用于最小化到过点（或参考路径）的距离的优化权重。
@@ -375,7 +375,7 @@ local_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
-                inflation_radius: 0.8
+                inflation_radius: 0.6
             always_send_full_costmap: True # 是否每次更新都发送完整的成本图，而不是更新。
 
 global_costmap:
@@ -414,7 +414,7 @@ global_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
-                inflation_radius: 0.8
+                inflation_radius: 0.6
             always_send_full_costmap: True # 是否每次更新都发送完整的成本图，而不是更新
 
 planner_server:
