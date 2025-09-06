@@ -78,7 +78,8 @@ private:
     std::vector<double> car_;
     std::vector<double> pillbox_;
     std::vector<double> bridge_;
-    std::vector<double> passing_door_src_;
+    std::vector<double> passing_door_src_1_;
+    std::vector<double> passing_door_src_2_;
     std::vector<double> passing_door_des_;
 
     /// 当前识别到的目标坐标xy

@@ -1,17 +1,18 @@
-behavior_control_node: #雷达离地面高度0.4m
+behavior_control_node: #雷达离地面高度0.27m
     ros__parameters:
         tank_position: [2.0, 0.8]
         bridge_position: [5.75, 2.46]
         tent_position: [2.74, -1.15]
         car_position: [4.96, -1.5]
         pillbox_position: [1.74, 1.71]
-        passing_door_src: [8.05, -3.36]
-        passing_door_des: [8.27, 2.65]
+        passing_door_src_1: [4.86, -0.07]
+        passing_door_src_2: [4.65, 2.92]
+        passing_door_des: [4.88, 4.81]
         target_sequence: ["tent", "car", "bridge", "pillbox", "tank"]
-        cruise_height: 1.4
+        cruise_height: 0.6
         detection_height: 1.6
         H_detection_height: 1.2
-        passing_door_height: 0.8
+        passing_door_height: 0.6
         eject_height: 0.6
         if_hit_tank: false
         if_hit_car: true
@@ -22,29 +23,29 @@ behavior_control_node: #雷达离地面高度0.4m
         max_vel_x_navigation: 0.6
         max_vel_y_navigation: 0.6
         max_vel_x_backwards_navigation: 0.6
-        max_vel_theta_navigation: 0.1
-        acc_lim_x_navigation: 0.15
-        acc_lim_y_navigation: 0.15
-        acc_lim_theta_navigation: 0.15
-        max_vel_x_passing: 0.2
+        max_vel_theta_navigation: 0.12
+        acc_lim_x_navigation: 0.2
+        acc_lim_y_navigation: 0.2
+        acc_lim_theta_navigation: 0.12
+        max_vel_x_passing: 0.2  #穿门参数
         max_vel_y_passing: 0.2
         max_vel_x_backwards_passing: 0.2
-        max_vel_theta_passing: 0.1
-        acc_lim_x_passing: 0.1
-        acc_lim_y_passing: 0.1
-        acc_lim_theta_passing: 0.1
+        max_vel_theta_passing: 0.11
+        acc_lim_x_passing: 0.13
+        acc_lim_y_passing: 0.13
+        acc_lim_theta_passing: 0.11
         max_global_plan_lookahead_dist: 1.25
-        global_plan_viapoint_sep: 0.1
+        global_plan_viapoint_sep: -0.1
         min_obstacle_dist: 0.1
-        inflation_dist: 0.18
-        weight_inflation: 1.0
-        robot_radius: 0.05
-        inflation_radius: 0.3
+        inflation_dist: 0.6
+        weight_inflation: 4.0
+        robot_radius: 0.16
+        inflation_radius: 0.6
 
 mavlink_control_node:
     ros__parameters:
-        cruise_height: 0.4
-        passing_door_height: 0.8
+        cruise_height: 0.6
+        passing_door_height: 0.6
 
 merge_pcd_node:
     ros__parameters:
@@ -218,7 +219,7 @@ controller_server:
             min_samples: 3 # 最小采样数,大于2
             global_plan_overwrite_orientation: True # 覆盖全局规划器提供的局部子目标的方向（因为它们通常仅提供 2D 路径）
             allow_init_with_backwards_motion: False
-            max_global_plan_lookahead_dist: 1.45 # 指定考虑优化的全局计划子集的最大长度（累积欧几里得距离）。实际长度由本地成本图大小和该最大界限的逻辑与确定。设置为零或负数以停用此限制。
+            max_global_plan_lookahead_dist: 1.25 # 指定考虑优化的全局计划子集的最大长度（累积欧几里得距离）。实际长度由本地成本图大小和该最大界限的逻辑与确定。设置为零或负数以停用此限制。
             global_plan_viapoint_sep: -0.1 # 如果为正，则从全局计划中提取途经点（路径跟踪模式）。该值确定参考路径的分辨率（沿全局规划的每两个连续经由点之间的最小间隔，如果为负值：禁用）。
             global_plan_prune_distance: 0.2 #3.17
             # via_points_ordered: TDOD
@@ -233,20 +234,21 @@ controller_server:
 
             # Robot
 
-            max_vel_x: 0.6 # 机器人最大x轴速度m/s
-            max_vel_y: 0.6 # 机器人最大y轴速度m/s
-            max_vel_x_backwards: 0.6 # 机器人最大x轴后退速度m/s
-            max_vel_theta: 0.12 # 机器人最大角速度rad/s
-            acc_lim_x: 0.2 # 机器人最大x轴平移加速度m/s^2
-            acc_lim_y: 0.2 # 机器人最大y轴平移加速度m/s^2
-            acc_lim_theta: 0.12 # 机器人最大角加速度rad/s^2
+            max_vel_x: 0.25 # 机器人最大x轴速度m/s
+            max_vel_y: 0.25 # 机器人最大y轴速度m/s
+            max_vel_x_backwards: 0.25 # 机器人最大x轴后退速度m/s
+            max_vel_theta: 0.11 # 机器人最大角速度rad/s
+            acc_lim_x: 0.13 # 机器人最大x轴平移加速度m/s^2
+            acc_lim_y: 0.13 # 机器人最大y轴平移加速度m/s^2
+            acc_lim_theta: 0.11 # 机器人最大角加速度rad/s^2
 
             min_turning_radius: 0.0 # 机器人最小转弯半径
 
             is_footprint_dynamic: False
             footprint_model: # types: "point", "circular", "two_circles", "line", "polygon"
-                type: "circular"
-                radius: 0.4 # for type "circular"
+                type: "polygon"
+                #radius: 0.22 # for type "circular"
+                vertices: "[ [0.26, 0.22], [-0.26, 0.22], [-0.26, -0.22], [0.26, -0.22] ]"
 
             # GoalTolerance
 
@@ -289,7 +291,7 @@ controller_server:
             weight_optimaltime: 500.0 # must be > 0 用于收缩相对于转换/执行时间的轨迹的优化权重 2.28
             weight_shortest_path: 10.0
             weight_obstacle: 500.0 # 用于满足与障碍物距离的权重 2.28
-            weight_inflation: 2.0 # 膨胀区域的权重 应该很小
+            weight_inflation: 3.5 # 膨胀区域的权重 应该很小
             weight_dynamic_obstacle: 10.0 # not in use yet
             weight_dynamic_obstacle_inflation: 0.2
             weight_viapoint: 1000.0 # 用于最小化到过点（或参考路径）的距离的优化权重。
@@ -349,7 +351,7 @@ local_costmap:
             width: 8
             height: 8
             resolution: 0.02
-            robot_radius: 0.1
+            robot_radius: 0.16
             plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
             static_layer:
                 plugin: "nav2_costmap_2d::StaticLayer"
@@ -385,8 +387,8 @@ global_costmap:
             publish_frequency: 30.0
             global_frame: map
             robot_base_frame: livox
-            robot_radius: 0.2
-#            footprint: "[ [0.25, 0.13], [-0.25, 0.13], [-0.25, -0.13], [0.25, -0.13] ]"
+            #robot_radius: 0.2
+            footprint: "[ [0.26, 0.22], [-0.26, 0.22], [-0.26, -0.22], [0.26, -0.22] ]"
             resolution: 0.02
             track_unknown_space: true
             plugins: ["static_layer", "obstacle_layer", "inflation_layer"]

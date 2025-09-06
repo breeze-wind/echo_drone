@@ -101,7 +101,7 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='map_to_odom_broadcaster',
-        arguments=['0.0', '0.0', '0.43',  '0.0', '0.0', '0.0', '1.0','map', 'odom']
+        arguments=['0.0', '0.0', '0.27',  '0.0', '0.0', '0.0', '1.0','map', 'odom']
     )
     livox_to_mavlink_body = Node(
         package='tf2_ros',

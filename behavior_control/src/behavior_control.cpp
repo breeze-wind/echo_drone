@@ -14,7 +14,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter<std::vector<double>>("car_position", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("pillbox_position", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("bridge_position", std::vector<double>{0.0, 0.0});
-    this->declare_parameter<std::vector<double>>("passing_door_src", std::vector<double>{0.0, 0.0});
+    this->declare_parameter<std::vector<double>>("passing_door_src_1", std::vector<double>{0.0, 0.0});
+    this->declare_parameter<std::vector<double>>("passing_door_src_2", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("passing_door_des", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<std::string>>("target_sequence", std::vector<std::string>{"tent", "car", "pillbox", "tank"});
     this->declare_parameter("cruise_height", 0.6);
@@ -56,7 +57,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter<std::vector<double>>("car_position", car_);
     this->get_parameter<std::vector<double>>("pillbox_position", pillbox_);
     this->get_parameter<std::vector<double>>("bridge_position", bridge_);
-    this->get_parameter<std::vector<double>>("passing_door_src", passing_door_src_);
+    this->get_parameter<std::vector<double>>("passing_door_src_1", passing_door_src_1_);
+    this->get_parameter<std::vector<double>>("passing_door_src_2", passing_door_src_2_);
     this->get_parameter<std::vector<double>>("passing_door_des", passing_door_des_);
     this->get_parameter<std::vector<std::string>>("target_sequence", target_sequence_);
     this->get_parameter("cruise_height", cruise_height_);
@@ -124,7 +126,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_y_ = 0.0;
     current_z_ = 0.0;
 
-    current_step = 0;
+    current_step = 71;
     eject_cnt = 0;
     detection_cnt = 0;
     turning_cnt = 0;
@@ -152,8 +154,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 
     if(!if_passing_door_)
     {
-        passing_door_src_[0] = 0.0;
-        passing_door_src_[1] = 0.0;
+        passing_door_src_1_[0] = 0.0;
+        passing_door_src_1_[1] = 0.0;
         passing_door_des_[0] = 0.0;
         passing_door_des_[1] = 0.0;
         passing_door_height_ = cruise_height_;
@@ -420,8 +422,8 @@ void BehaviorControl::step_timer_callback()
     //进入穿门任务
     else if(current_step == 71) //去穿门起点
     {
-        if(fabs(current_x_ - passing_door_src_[0]) < 0.15)
-            if(fabs(current_y_ - passing_door_src_[1]) < 0.15)
+        if(fabs(current_x_ - passing_door_src_1_[0]) < 0.15)
+            if(fabs(current_y_ - passing_door_src_1_[1]) < 0.15)
             {
                 if(!if_passing_door_) //不穿门回起点
                     current_step = 75;
@@ -438,7 +440,15 @@ void BehaviorControl::step_timer_callback()
             current_step = 73;
         }
     }
-    else if(current_step == 73) //导航至穿门终点
+    else if(current_step == 73) //导航至穿门中间点
+    {
+        if(fabs(current_x_ - passing_door_src_2_[0]) < 0.1)
+            if(fabs(current_y_ - passing_door_src_2_[1]) < 0.1)
+            {
+                current_step = 74;
+            }
+    }
+    else if(current_step == 74) //导航至穿门终点
     {
         if(fabs(current_x_ - passing_door_des_[0]) < 0.12)
             if(fabs(current_y_ - passing_door_des_[1]) < 0.12)
@@ -446,7 +456,8 @@ void BehaviorControl::step_timer_callback()
                 current_step = 82;
             }
     }
-    else if(current_step == 75) //直接回起点
+
+    else if(current_step == 75) //不穿门直接回起点
     {
         if(fabs(current_x_) < 0.1)
             if(fabs(current_y_) < 0.1)
@@ -459,6 +470,7 @@ void BehaviorControl::step_timer_callback()
     {
         if_landing = true;
     }
+
     //进入降落穿门后终点状态
     else if(current_step == 82)
     {
@@ -822,15 +834,15 @@ void BehaviorControl::mission_timer_callback()
         if(if_passing_door_){
             rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
             action_goal.pose.header.frame_id = "map";
-            action_goal.pose.pose.position.x = passing_door_src_[0];
-            action_goal.pose.pose.position.y = passing_door_src_[1];
+            action_goal.pose.pose.position.x = passing_door_src_1_[0];
+            action_goal.pose.pose.position.y = passing_door_src_1_[1];
             action_goal.pose.pose.position.z = passing_door_height_;
             action_goal.pose.pose.orientation.x = 0.0;
             action_goal.pose.pose.orientation.y = 0.0;
             action_goal.pose.pose.orientation.z = 0.0;
             action_goal.pose.pose.orientation.w = 1.0;
             navigate_to_pose_client_->async_send_goal(action_goal);
-            RCLCPP_INFO(this->get_logger(), "穿门起点: %lf, %lf", passing_door_src_[0], passing_door_src_[1]);
+            RCLCPP_INFO(this->get_logger(), "穿门起点: %lf, %lf", passing_door_src_1_[0], passing_door_src_1_[1]);
         }
         else{
 			passing_door_des_[0] = 0.0;
@@ -852,8 +864,8 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 72)
     {
-        current_target_position_.transform.translation.x = passing_door_src_[0];
-        current_target_position_.transform.translation.y = passing_door_src_[1];
+        current_target_position_.transform.translation.x = passing_door_src_1_[0];
+        current_target_position_.transform.translation.y = passing_door_src_1_[1];
         current_target_position_.transform.translation.z = passing_door_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
@@ -869,6 +881,23 @@ void BehaviorControl::mission_timer_callback()
         RCLCPP_INFO(this->get_logger(), "穿门前转向中...");
     }
     else if(current_step == 73)
+    {
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.header.frame_id = "map";
+        action_goal.pose.pose.position.x = passing_door_src_2_[0];
+        action_goal.pose.pose.position.y = passing_door_src_2_[1];
+        action_goal.pose.pose.position.z = passing_door_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
+        if_nav = true;
+        current_passing_door_ = true;
+        if_turning = false;
+        RCLCPP_INFO(this->get_logger(), "穿门中间点: %lf, %lf", passing_door_src_2_[0], passing_door_src_2_[1]);
+    }
+    else if(current_step == 74)
     {
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
         action_goal.pose.header.frame_id = "map";
