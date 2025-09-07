@@ -55,6 +55,7 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
     voxfilter.setLeafSize(leaf_size_, leaf_size_, leaf_size_);
 
     current_z_ = 0.0;
+    obstacle_height_ = 2.0;
 
     tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tfbuffer_);
@@ -64,6 +65,8 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
         input_cloud_topic_, 10, std::bind(&ObstacleSegmentationNode::cloudCallback, this, std::placeholders::_1));
     current_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("/robot/current_pose",
             10, std::bind(&ObstacleSegmentationNode::CurrentPoseCallback, this, std::placeholders::_1));
+    obstacle_height_sub_ = this->create_subscription<std_msgs::msg::Float64>("/robot/obstacle_height", 10,
+        std::bind(&ObstacleSegmentationNode::ObstacleHeightCallback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "点云分割节点初始化完成");
 }
 
@@ -105,7 +108,7 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     for (long i = 0; i < cloud->points.size(); i++)
     {
-        if (cloud->points[i].z < 0.1)
+        if (cloud->points[i].z < 0.1 || cloud->points[i].z > obstacle_height_)
         {
             continue;
         }
@@ -119,7 +122,7 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     }
     for(auto& point : segement_cloud->points){
         point.z = 0.0;
-}
+    }
     segement_cloud->width = segement_cloud->points.size();
     segement_cloud->height = 1;
     segement_cloud->is_dense = true;
@@ -141,4 +144,9 @@ void ObstacleSegmentationNode::CurrentPoseCallback(const geometry_msgs::msg::Pos
     odom_array[4] = msg->pose.orientation.x;
     odom_array[5] = msg->pose.orientation.y;
     odom_array[6] = msg->pose.orientation.z;
+}
+
+void ObstacleSegmentationNode::ObstacleHeightCallback(const std_msgs::msg::Float64::SharedPtr msg)
+{
+    obstacle_height_ = msg->data;
 }
