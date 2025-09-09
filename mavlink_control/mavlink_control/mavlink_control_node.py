@@ -60,8 +60,12 @@ class MavlinkControl(Node):
             1   # start (1 to start, 0 to stop)
         )
 
-        self.current_pose_pub = self.create_publisher(PoseStamped, '/robot/current_pose', 10)
         self.arm_state_pub = self.create_publisher(Bool, '/robot/arm_state', 10)
+        self.current_pose_sub = self.create_subscription(
+            TransformStamped,
+            '/robot/current_pose',
+            self.current_pose_callback,
+            10)
         self.target_pose_sub = self.create_subscription(
             TransformStamped,
             '/robot/target_pose',
@@ -92,6 +96,7 @@ class MavlinkControl(Node):
         self.nav_state_sub
         self.passing_door_state_sub
         self.turning_state_sub
+        self.current_pose_sub
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -103,26 +108,15 @@ class MavlinkControl(Node):
         #监测心跳信号，是否已经解锁
         self.state_timer = self.create_timer(1.0, self.state_timer_callback)
 
-    #发送自身当前测量位置到飞控和决策, 10Hz
-    def vision_pose_timer_callback(self):
-        #获取坐标系变换
-        try:
-            t = self.tf_buffer.lookup_transform(
-                self.target_frame,
-                self.source_frame,
-                rclpy.time.Time())
-        except TransformException as ex:
-            self.get_logger().info(
-                f'Could not transform {self.source_frame} to {self.target_frame}: {ex}')
-            return
-
+    #接收决策传来的自身当前测量位置，并发送到飞控, 10Hz
+    def current_pose_callback(self, msg):
         # Send vision pose estimate
         timestamp_us = int(time.time() * 1e6)
         # Position in meters (NED)
-        self.current_x, self.current_y, self.current_z = (t.transform.translation.x, t.transform.translation.y,
-                                                          t.transform.translation.z)
-        roll, pitch, yaw = tfs.euler.quat2euler([t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y,
-                                                 t.transform.rotation.z], "sxyz")  # Orientation in radians
+        self.current_x, self.current_y, self.current_z = (msg.transform.translation.x, msg.transform.translation.y,
+                                                          msg.transform.translation.z)
+        roll, pitch, yaw = tfs.euler.quat2euler([msg.transform.rotation.w, msg.transform.rotation.x, msg.transform.rotation.y,
+                                                 msg.transform.rotation.z], "sxyz")  # Orientation in radians
 
         self.master.mav.vision_position_estimate_send(
             timestamp_us,
@@ -132,18 +126,6 @@ class MavlinkControl(Node):
         self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f'
                                % (self.current_x, -self.current_y, -(self.current_z - 0.08)))
         self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
-
-        #发送当前位置到决策
-        msg = PoseStamped()
-        msg.header.frame_id = "map"
-        msg.pose.position.x = self.current_x
-        msg.pose.position.y = self.current_y
-        msg.pose.position.z = self.current_z
-        msg.pose.orientation.x = t.transform.rotation.x
-        msg.pose.orientation.y = t.transform.rotation.y
-        msg.pose.orientation.z = t.transform.rotation.z
-        msg.pose.orientation.w = t.transform.rotation.w
-        self.current_pose_pub.publish(msg)
 
     #读取遥控杆位置
     def channel_position_timer_callback(self):

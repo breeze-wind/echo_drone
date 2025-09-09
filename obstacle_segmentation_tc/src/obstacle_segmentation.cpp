@@ -56,14 +56,18 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
 
     current_z_ = 0.0;
 
+    if_need_clear = false;
+
     tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tfbuffer_);
     // 初始化pub和sub
     output_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(output_cloud_topic_, 10);
     input_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         input_cloud_topic_, 10, std::bind(&ObstacleSegmentationNode::cloudCallback, this, std::placeholders::_1));
-    current_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("/robot/current_pose",
+    current_pose_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/robot/current_pose",
             10, std::bind(&ObstacleSegmentationNode::CurrentPoseCallback, this, std::placeholders::_1));
+    clear_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/clear_state",
+            10, std::bind(&ObstacleSegmentationNode::ClearStateCallback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "点云分割节点初始化完成");
 }
 
@@ -94,51 +98,94 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     pass_through_filter_y_.filter(*cloud);
 	*/
 
-    // 创建体素滤波器主要作用是对点云进行降采样，可以在保证点云原有几何结构基本不变的前提下减少点的数量
-/*
-    if (use_downsample_)
+    sensor_msgs::msg::PointCloud2::SharedPtr output_cloud(new sensor_msgs::msg::PointCloud2);
+    //发布一次只有边界的点云来消除其他点云
+    if(if_need_clear)
     {
-        voxfilter.setInputCloud(cloud);
-        voxfilter.filter(*cloud);
-    }
-*/
-    pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    for (long i = 0; i < cloud->points.size(); i++)
-    {
-        if (cloud->points[i].z < 0.1)
+        pcl::PointCloud<pcl::PointXYZ>::Ptr blank_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        for (int j = 0; j < 1000; ++j)
         {
-            continue;
+            pcl::PointXYZ point;
+            point.x = -0.5;
+            point.y = -2.5 / 500 + 5.0 / 1000 * j;
+            point.z = 0.0;
+            blank_cloud->push_back(point);
         }
-        if(cloud->points[i].z - current_z_ < 0.1)
+        for (int j = 0; j < 1000; ++j)
         {
-            if (cloud->points[i].z - current_z_ > -0.2)
+            pcl::PointXYZ point;
+            point.x = 2.5;
+            point.y = -2.5 / 500 + 5.0 / 1000 * j;
+            point.z = 0.0;
+            blank_cloud->push_back(point);
+        }
+        for (int j = 0; j < 1000; ++j)
+        {
+            pcl::PointXYZ point;
+            point.x = -0.5 / 500 + 5.0 / 1000 * j;
+            point.y = 2.5;
+            point.z = 0.0;
+            blank_cloud->push_back(point);
+        }
+        for (int j = 0; j < 1000; ++j)
+        {
+            pcl::PointXYZ point;
+            point.x = -0.5 / 500 + 5.0 / 1000 * j;
+            point.y = -2.5;
+            point.z = 0.0;
+            blank_cloud->push_back(point);
+        }
+        blank_cloud->width = blank_cloud->points.size();
+        blank_cloud->height = 1;
+        blank_cloud->is_dense = true;
+        pcl::toROSMsg(*blank_cloud, *output_cloud);
+    }
+    else //正常分割障碍物
+    {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+        for (long i = 0; i < cloud->points.size(); i++)
+        {
+            if (cloud->points[i].z < 0.1)
             {
-                segement_cloud->points.push_back(cloud->points[i]);
+                continue;
+            }
+            if (cloud->points[i].z - current_z_ < 0.1)
+            {
+                if (cloud->points[i].z - current_z_ > -0.2)
+                {
+                    segement_cloud->points.push_back(cloud->points[i]);
+                }
             }
         }
+        for (auto& point : segement_cloud->points)
+        {
+            point.z = 0.0;
+        }
+        segement_cloud->width = segement_cloud->points.size();
+        segement_cloud->height = 1;
+        segement_cloud->is_dense = true;
+        pcl::toROSMsg(*segement_cloud, *output_cloud);
     }
-    for(auto& point : segement_cloud->points){
-        point.z = 0.0;
-}
-    segement_cloud->width = segement_cloud->points.size();
-    segement_cloud->height = 1;
-    segement_cloud->is_dense = true;
-    sensor_msgs::msg::PointCloud2::SharedPtr output_cloud(new sensor_msgs::msg::PointCloud2);
-    pcl::toROSMsg(*segement_cloud, *output_cloud);
-    output_cloud->header.frame_id = "map"; // msg->header.frame_id;
+
+    output_cloud->header.frame_id = "map";
     output_cloud->header.stamp = msg->header.stamp;
     output_cloud_pub_->publish(*output_cloud);
     // RCLCPP_INFO(this->get_logger(), "障碍物点云数据正在发布");
 }
 
-void ObstacleSegmentationNode::CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+void ObstacleSegmentationNode::CurrentPoseCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg)
 {
-    current_z_ = msg->pose.position.z;
-    odom_array[0] = msg->pose.position.x;
-    odom_array[1] = msg->pose.position.y;
-    odom_array[2] = msg->pose.position.z;
-    odom_array[3] = msg->pose.orientation.w;
-    odom_array[4] = msg->pose.orientation.x;
-    odom_array[5] = msg->pose.orientation.y;
-    odom_array[6] = msg->pose.orientation.z;
+    current_z_ = msg->transform.translation.z;
+    odom_array[0] = msg->transform.translation.x;
+    odom_array[1] = msg->transform.translation.y;
+    odom_array[2] = msg->transform.translation.z;
+    odom_array[3] = msg->transform.rotation.w;
+    odom_array[4] = msg->transform.rotation.x;
+    odom_array[5] = msg->transform.rotation.y;
+    odom_array[6] = msg->transform.rotation.z;
+}
+
+void ObstacleSegmentationNode::ClearStateCallback(const std_msgs::msg::Bool::SharedPtr msg)
+{
+    if_need_clear = msg->data;
 }

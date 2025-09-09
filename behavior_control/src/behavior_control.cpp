@@ -108,9 +108,13 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     eject_cnt = 0;
     detection_cnt = 0;
     turning_cnt = 0;
+    passing_cnt_1_ = 0;
+    passing_cnt_2_ = 0;
     eject_cnt_threshold_ = 5.0 / 0.25; //等待投掷时间
     detection_cnt_threshold_ = 2.5 / 0.25; //等待识别时间
     turning_cnt_threshold_ = 6.0 / 0.25; //等待转向时间
+    passing_threshold_1_ = 30.0 / 0.25;
+    passing_threshold_2_ = 30.0 / 0.25;
 
     servo_index_ = 0;
     last_servo_index_ = 0;
@@ -142,6 +146,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     /* 计时器，pubsub初始化 */
     step_period_ms = std::chrono::milliseconds(static_cast<int64_t>(250));
     mission_period_ms = std::chrono::milliseconds(static_cast<int64_t>(100));
+    current_pose_ms = std::chrono::milliseconds(static_cast<int64_t>(100));
 
     navigate_to_pose_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "navigate_to_pose");
     if (!this->navigate_to_pose_client_->wait_for_action_server()) {
@@ -163,8 +168,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     nav_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/nav_state", 10);
     passing_door_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/passing_door_state", 10);
     turning_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/turning_state", 10);
-    current_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>("/robot/current_pose",
-        10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
+    current_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/current_pose", 10);
+    clear_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/clear_state", 10);
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
         std::bind(&BehaviorControl::ArmStateCallback, this, std::placeholders::_1));
 
@@ -190,13 +195,17 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 
     step_timer_ = this->create_wall_timer(step_period_ms, std::bind(&BehaviorControl::step_timer_callback, this));
     mission_timer_ = this->create_wall_timer(mission_period_ms, std::bind(&BehaviorControl::mission_timer_callback, this));
+    current_pose_timer_ = this->create_wall_timer(current_pose_ms, std::bind(&BehaviorControl::current_pose_timer_callback, this));
 }
 
-void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+void BehaviorControl::current_pose_timer_callback()
 {
-    current_x_ = msg->pose.position.x;
-    current_y_ = msg->pose.position.y;
-    current_z_ = msg->pose.position.z;
+    map_to_livox = tfbuffer_->lookupTransform("map", "livox", rclcpp::Time(),
+                                            rclcpp::Duration::from_seconds(0.5));
+    current_x_ = map_to_livox.transform.translation.x;
+    current_y_ = map_to_livox.transform.translation.y;
+    current_z_ = map_to_livox.transform.translation.z;
+    current_pose_pub_->publish(map_to_livox);
 }
 
 void BehaviorControl::step_timer_callback()
@@ -407,8 +416,18 @@ void BehaviorControl::step_timer_callback()
     else if(current_step == 72) //原地转向90度
     {
         turning_cnt++;
+        if(turning_cnt >= 23)
+        {
+            std_msgs::msg::Bool clear_state_msg;
+            clear_state_msg.data = true;
+            clear_state_pub_->publish(clear_state_msg);
+        }
         if (turning_cnt >= turning_cnt_threshold_)
         {
+            std_msgs::msg::Bool clear_state_msg;
+            clear_state_msg.data = false;
+            clear_state_pub_->publish(clear_state_msg);
+
             turning_cnt = 0;
             current_step = 73;
         }
@@ -426,7 +445,7 @@ void BehaviorControl::step_timer_callback()
         if(fabs(current_x_ - passing_door_des_[0]) < 0.12)
             if(fabs(current_y_ - passing_door_des_[1]) < 0.12)
             {
-                current_step = 82;
+                current_step = 82; //进入降落穿门后终点状态
             }
     }
 
@@ -435,19 +454,8 @@ void BehaviorControl::step_timer_callback()
         if(fabs(current_x_) < 0.1)
             if(fabs(current_y_) < 0.1)
             {
-                current_step = 81;
+                current_step = 81; //进入降落起点状态
             }
-    }
-    //进入降落起点状态
-    else if(current_step == 81)
-    {
-        if_landing = true;
-    }
-
-    //进入降落穿门后终点状态
-    else if(current_step == 82)
-    {
-        if_landing = true;
     }
 }
 

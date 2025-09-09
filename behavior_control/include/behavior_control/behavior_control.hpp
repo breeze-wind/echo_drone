@@ -37,6 +37,7 @@ public:
     void step_timer_callback();
     /// 控制当前步骤执行任务
     void mission_timer_callback();
+    void current_pose_timer_callback();
     void set_parameter();
     void change_mode();
     void handle_parameter_response(rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future);
@@ -55,8 +56,9 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr nav_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr passing_door_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr turning_state_pub_;
-    /// 接收当前位姿
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr current_pose_sub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr clear_state_pub_;
+    /// 发送当前位姿
+    rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr current_pose_pub_;
     /// 接收当前起飞状态
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_state_sub_;
 
@@ -68,8 +70,10 @@ private:
     rclcpp::TimerBase::SharedPtr step_timer_;
     /// 执行任务计时器
     rclcpp::TimerBase::SharedPtr mission_timer_;
+    rclcpp::TimerBase::SharedPtr current_pose_timer_;
     std::chrono::milliseconds step_period_ms;
     std::chrono::milliseconds mission_period_ms;
+    std::chrono::milliseconds current_pose_ms;
 
     /* 标靶坐标以及穿门起点终点坐标 */
     std::vector<double> tank_;
@@ -133,9 +137,13 @@ private:
     int eject_cnt;
     int detection_cnt;
     int turning_cnt;
+    int passing_cnt_1_;
+    int passing_cnt_2_;
     int eject_cnt_threshold_;
     int detection_cnt_threshold_;
     int turning_cnt_threshold_;
+    int passing_threshold_1_;
+    int passing_threshold_2_;
 
     /// 舵机投放位置参数控制
     rclcpp::Parameter servo_param;
@@ -164,6 +172,8 @@ private:
     //导航模式，0--正常导航，1--穿门时导航
     int current_nav_mode;
     int last_nav_mode;
+
+    geometry_msgs::msg::TransformStamped map_to_livox;
 
     /// 当前识别目标的坐标系变换
     nav2_msgs::action::NavigateToPose::Goal navigate_to_pose_action_;
