@@ -55,6 +55,7 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
     voxfilter.setLeafSize(leaf_size_, leaf_size_, leaf_size_);
 
     current_z_ = 0.0;
+    obstacle_height_ = 2.0;
 
     if_need_clear = false;
 
@@ -68,6 +69,8 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
             10, std::bind(&ObstacleSegmentationNode::CurrentPoseCallback, this, std::placeholders::_1));
     clear_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/clear_state",
             10, std::bind(&ObstacleSegmentationNode::ClearStateCallback, this, std::placeholders::_1));
+    obstacle_height_sub_ = this->create_subscription<std_msgs::msg::Float64>("/robot/obstacle_height", 10,
+        std::bind(&ObstacleSegmentationNode::ObstacleHeightCallback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "点云分割节点初始化完成");
 }
 
@@ -145,7 +148,7 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
         pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud(new pcl::PointCloud<pcl::PointXYZ>);
         for (long i = 0; i < cloud->points.size(); i++)
         {
-            if (cloud->points[i].z < 0.1)
+            if (cloud->points[i].z < 0.1 || cloud->points[i].z > obstacle_height_)
             {
                 continue;
             }
@@ -188,4 +191,9 @@ void ObstacleSegmentationNode::CurrentPoseCallback(const geometry_msgs::msg::Tra
 void ObstacleSegmentationNode::ClearStateCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
     if_need_clear = msg->data;
+}
+
+void ObstacleSegmentationNode::ObstacleHeightCallback(const std_msgs::msg::Float64::SharedPtr msg)
+{
+    obstacle_height_ = msg->data;
 }

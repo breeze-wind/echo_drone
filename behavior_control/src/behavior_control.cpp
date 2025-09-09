@@ -116,6 +116,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     passing_threshold_1_ = 30.0 / 0.25;
     passing_threshold_2_ = 30.0 / 0.25;
 
+    obstacle_height_ = 2.0;
+
     servo_index_ = 0;
     last_servo_index_ = 0;
     current_nav_mode = 0;
@@ -168,6 +170,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     nav_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/nav_state", 10);
     passing_door_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/passing_door_state", 10);
     turning_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/turning_state", 10);
+    obstacle_height_pub_ = this->create_publisher<std_msgs::msg::Float64>("/robot/obstacle_height", 10);
     current_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/current_pose", 10);
     clear_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/clear_state", 10);
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
@@ -470,6 +473,7 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         current_passing_door_ = false;
         RCLCPP_INFO(this->get_logger(), "等待飞控解锁...");
+        obstacle_height_ = 2.0;
     }
     else if(current_step == 1)
     {
@@ -845,6 +849,7 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 72)
     {
+        obstacle_height_ = 1.4;
         current_target_position_.transform.translation.x = passing_door_src_1_[0];
         current_target_position_.transform.translation.y = passing_door_src_1_[1];
         current_target_position_.transform.translation.z = passing_door_height_;
@@ -945,6 +950,9 @@ void BehaviorControl::mission_timer_callback()
     turning_state_msg.data = if_turning;
     turning_state_pub_->publish(turning_state_msg);
     RCLCPP_INFO(this->get_logger(), "////////......... if_turning: %d", if_turning);
+    std_msgs::msg::Float64 obstacle_height_msg;
+    obstacle_height_msg.data = obstacle_height_;
+    obstacle_height_pub_->publish(obstacle_height_msg);
 }
 
 void BehaviorControl::ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg)

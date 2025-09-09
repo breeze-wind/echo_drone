@@ -21,6 +21,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float64.hpp"
 
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2_ros/buffer.h>
@@ -56,6 +57,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr nav_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr passing_door_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr turning_state_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr obstacle_height_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr clear_state_pub_;
     /// 发送当前位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr current_pose_pub_;
@@ -105,6 +107,7 @@ private:
     double passing_door_height_;
     /// 投掷高度
     double eject_height_;
+    double obstacle_height_;
 
     /* 是否投掷该目标 */
     bool if_hit_tank_;
