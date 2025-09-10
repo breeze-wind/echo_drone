@@ -20,15 +20,16 @@ behavior_control_node: #雷达离地面高度0.27m
         if_hit_tent: false
         if_hit_bridge: true
         if_passing_door: true
-        max_vel_x_passing: 0.25  #穿门参数
-        max_vel_y_passing: 0.25
-        max_vel_x_backwards_passing: 0.25
-        max_vel_theta_passing: 0.11
-        acc_lim_x_passing: 0.13
+                          #穿门参数
+        max_vel_x_passing: 0.25  # 机器人最大x轴速度m/s
+        max_vel_y_passing: 0.25       # 机器人最大y轴速度m/s
+        max_vel_x_backwards_passing: 0.25          #最大x轴后退速度
+        max_vel_theta_passing: 0.11             #最大角速度
+        acc_lim_x_passing: 0.13    #加速度
         acc_lim_y_passing: 0.13
         acc_lim_theta_passing: 0.11
-        max_global_plan_lookahead_dist: 1.25
-        weight_inflation: 3.5
+        max_global_plan_lookahead_dist: 1.25    # 指定考虑优化的全局计划子集的最大长度（累积欧几里得距离）。实际长度由本地成本图大小和该最大界限的逻辑与确定。设置为零或负数以停用此限制。
+        weight_inflation: 3.5              # 膨胀区域的权重 应该很小（越小表示膨胀区域对规划路径的“推力”越大）
         robot_radius: 0.16
 
 mavlink_control_node:
