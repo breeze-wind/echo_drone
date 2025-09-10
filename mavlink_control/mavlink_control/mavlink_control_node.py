@@ -38,7 +38,7 @@ class MavlinkControl(Node):
 
         self.ready_to_arm = False #是否准备解锁
         self.arming_state = False #飞控解锁状态
-        self.if_nav = False
+        self.if_nav = True
         self.current_passing_door = False
         self.if_turning = False
         self.target_yaw = 0.0 #弧度
@@ -101,8 +101,6 @@ class MavlinkControl(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        #发送自身当前测量位置, 10Hz
-        self.vision_pose_timer = self.create_timer(0.08, self.vision_pose_timer_callback)
         #读取遥控杆位置
         self.channel_position_timer = self.create_timer(0.1, self.channel_position_timer_callback)
         #监测心跳信号，是否已经解锁

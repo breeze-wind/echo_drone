@@ -24,11 +24,11 @@ behavior_control_node: #雷达离地面高度0.27m
         max_vel_y_passing: 0.25
         max_vel_x_backwards_passing: 0.25
         max_vel_theta_passing: 0.11
-        acc_lim_x_passing: 0.13
-        acc_lim_y_passing: 0.13
+        acc_lim_x_passing: 0.35
+        acc_lim_y_passing: 0.35
         acc_lim_theta_passing: 0.11
-        max_global_plan_lookahead_dist: 1.25
-        weight_inflation: 3.5
+        max_global_plan_lookahead_dist: 1.45
+        weight_inflation: 2.0
         robot_radius: 0.16
 
 mavlink_control_node:
@@ -189,7 +189,7 @@ laser_mapping:
 controller_server:
     ros__parameters:
         odom_topic: "/Odometry"
-        controller_frequency: 30.0 # 运行控制器的频率 (赫兹)。
+        controller_frequency: 20.0 # 运行控制器的频率 (赫兹)。
         controller_plugin_types: ["teb_local_planner::TebLocalPlannerROS"]
         goal_checker_plugins: ["general_goal_checker"] # "precise_goal_checker"
         controller_plugins: ["FollowPath"]
@@ -227,17 +227,18 @@ controller_server:
             max_vel_y: 0.6 # 机器人最大y轴速度m/s
             max_vel_x_backwards: 0.6 # 机器人最大x轴后退速度m/s
             max_vel_theta: 0.12 # 机器人最大角速度rad/s
-            acc_lim_x: 0.2 # 机器人最大x轴平移加速度m/s^2
-            acc_lim_y: 0.2 # 机器人最大y轴平移加速度m/s^2
-            acc_lim_theta: 0.12 # 机器人最大角加速度rad/s^2
+            acc_lim_x: 0.4 # 机器人最大x轴平移加速度m/s^2
+            acc_lim_y: 0.4 # 机器人最大y轴平移加速度m/s^2
+            acc_lim_theta: 0.15 # 机器人最大角加速度rad/s^2
 
             min_turning_radius: 0.0 # 机器人最小转弯半径
 
             is_footprint_dynamic: False
             footprint_model: # types: "point", "circular", "two_circles", "line", "polygon"
                 type: "polygon"
-                #radius: 0.22 # for type "circular"
                 vertices: "[ [0.26, 0.22], [-0.26, 0.22], [-0.26, -0.22], [0.26, -0.22] ]"
+               # radius: 0.4 # for type "circular"
+
 
             # GoalTolerance
 
@@ -245,16 +246,16 @@ controller_server:
 
             # Obstacles
 
-            min_obstacle_dist: 0.1 # 机器人与障碍物之间的最小距离（以米为单位）3.17
-            inflation_dist: 0.6 # 非零惩罚成本的障碍物周围的缓冲区（应大于min_obstacle_dist才能生效）。3.17
+            min_obstacle_dist: 0.2 # 机器人与障碍物之间的最小距离（以米为单位）3.17
+            inflation_dist: 0.8 # 非零惩罚成本的障碍物周围的缓冲区（应大于min_obstacle_dist才能生效）。3.17
             include_costmap_obstacles: True # 指定是否应考虑本地成本图的障碍。每个被标记为障碍物的单元格都被视为点障碍物。因此，不要RM选择非常小的代价图分辨率，因为它会增加计算时间。
-            costmap_obstacles_behind_robot_dist: 4.0 # 限制机器人后面规划时考虑的占用的本地成本图障碍（指定距离以米为单位）。
+            costmap_obstacles_behind_robot_dist: 4.0 # 限制机器人后方规划时考虑的占用的本地成本图障碍（指定距离以米为单位）。
             obstacle_poses_affected: 15 # 每个障碍物位置都附加到轨迹上最近的姿势以保持距离。还可以考虑其他邻居。如果legacy_obstacle_association是false，则不启用
             legacy_obstacle_association: false # 如果为 true，则使用旧的障碍物关联方法，该方法将障碍物与轨迹上最近的姿势相关联。如果为 false，则使用新的障碍物关联方法，该方法将障碍物与轨迹上最近的姿势相关联，并考虑其他邻居。
             obstacle_association_force_inclusion_factor: 20.0 # 非传统障碍物关联策略尝试在优化过程中仅将相关障碍物与离散化轨迹连接起来。但指定距离内的所有障碍物都必须包含在内（作为min_obstacle_dist的倍数）。例如，选择 2.0 是为了在 2.0* min_obstacle_dist 的半径内强制考虑障碍物。 [仅当参数legacy_obstacle_association为false时才使用此参数]
             obstacle_association_cutoff_factor: 100.0 # 但超出[value]* min_obstacle_dist的倍数时，所有障碍物在优化期间都会被忽略。首先处理参数barrier_association_force_inclusion_factor 。 [仅当参数legacy_obstacle_association为false时才使用此参数]
 
-            dynamic_obstacle_inflation_dist: 0.3
+            dynamic_obstacle_inflation_dist: 1.4
             include_dynamic_obstacles: True # 如果此参数设置为 true，则在优化过程中通过恒定速度模型来预测和考虑 非零速度障碍物的运动（通过主题~/obstacles上用户提供的障碍物提供或从costmap_converter获得）。
 
             costmap_converter_plugin: "costmap_converter::CostmapToPolygonsDBSMCCH"
@@ -280,7 +281,7 @@ controller_server:
             weight_optimaltime: 500.0 # must be > 0 用于收缩相对于转换/执行时间的轨迹的优化权重 2.28
             weight_shortest_path: 10.0
             weight_obstacle: 500.0 # 用于满足与障碍物距离的权重 2.28
-            weight_inflation: 2.0 # 膨胀区域的权重 应该很小（越小表示膨胀区域对规划路径的“推力”越大）
+            weight_inflation: 2.0 # 膨胀区域的权重 应该很小
             weight_dynamic_obstacle: 10.0 # not in use yet
             weight_dynamic_obstacle_inflation: 0.2
             weight_viapoint: 1000.0 # 用于最小化到过点（或参考路径）的距离的优化权重。
@@ -366,7 +367,7 @@ local_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
-                inflation_radius: 0.6
+                inflation_radius: 0.5
             always_send_full_costmap: True # 是否每次更新都发送完整的成本图，而不是更新。
 
 global_costmap:
@@ -405,7 +406,7 @@ global_costmap:
             inflation_layer:
                 plugin: "nav2_costmap_2d::InflationLayer"
                 cost_scaling_factor: 5.0
-                inflation_radius: 0.6
+                inflation_radius: 0.8
             always_send_full_costmap: True # 是否每次更新都发送完整的成本图，而不是更新
 
 planner_server:
