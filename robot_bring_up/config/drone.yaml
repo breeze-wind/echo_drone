@@ -76,7 +76,7 @@ obstacle_segmentation_node:
     ros__parameters:
         input_cloud_topic: "/cloud_registered_body"
         output_cloud_topic: "/cloud_obstacle"
-        use_downsample: false # 是否使用体素滤波器
+        use_downsample: true # 是否使用体素滤波器
         leaf_size: 0.25 # 体素滤波器的体素大小
         point_num_for_normal: 10 # 用于计算法向量的点的数量
         angle_threshold: 0.785 # 法向量与地面夹角的角度阈值(绝对值、弧度制)

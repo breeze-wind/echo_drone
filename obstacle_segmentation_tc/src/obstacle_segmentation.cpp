@@ -93,13 +93,29 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     transform.translation() = translation;
     transform.linear() = rotation.toRotationMatrix();
     //std::cout << odom_array[0] << std::endl;
-    pcl::transformPointCloud(*cloud, *cloud, transform);
-	/*
-    pass_through_filter_x_.setInputCloud(cloud);
-    pass_through_filter_x_.filter(*cloud);
-    pass_through_filter_y_.setInputCloud(cloud);
-    pass_through_filter_y_.filter(*cloud);
-	*/
+    //pcl::transformPointCloud(*cloud, *cloud, transform);
+    //
+    // pass_through_filter_x_.setInputCloud(cloud);
+    // pass_through_filter_x_.filter(*cloud);
+    // pass_through_filter_y_.setInputCloud(cloud);
+    // pass_through_filter_y_.filter(*cloud);
+    // //降素采样
+    // if (use_downsample_) {  // 根据参数决定是否启用
+    //     std::cout<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<std::endl;
+    //     std::cout<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<std::endl;
+    //     std::cout<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<std::endl;
+    //     pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    //     voxfilter.setInputCloud(cloud);  // 输入变换后的原始点云
+    //     voxfilter.filter(*downsampled_cloud);  // 执行体素滤波，得到降采样后的点云
+    //     cloud = downsampled_cloud;  // 替换原始点云，后续处理用降采样后的点
+    //     for (int i = 0;i<10; ++i)
+    //         // （可选）打印日志，验证降采样效果
+    //         RCLCPP_INFO(this->get_logger(),
+    //         "---------------------降采样前点数: %u → 降采样后点数: %ld------------------------",
+    //         msg->width * msg->height,  // 原始点云数量
+    //         cloud->points.size()       // 降采样后点云数量
+    //         );
+    // }
 
     sensor_msgs::msg::PointCloud2::SharedPtr output_cloud(new sensor_msgs::msg::PointCloud2);
     //发布一次只有边界的点云来消除其他点云
