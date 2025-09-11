@@ -85,6 +85,12 @@ private:
     double current_z_;
     double obstacle_height_;
 
+    int pcl_cnt;
+
+    sensor_msgs::msg::PointCloud2::SharedPtr output_cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr blank_cloud;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud;
+
     std::unique_ptr<tf2_ros::Buffer> tfbuffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     /// 接收当前位姿
