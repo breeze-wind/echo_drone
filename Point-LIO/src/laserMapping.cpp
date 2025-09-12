@@ -78,6 +78,7 @@ LaserMappingNode::LaserMappingNode(const rclcpp::NodeOptions &options) : Node("l
     pubOdomAftMapped = this->create_publisher<nav_msgs::msg::Odometry>(odom_topic, 100000);
     pubPath = this->create_publisher<nav_msgs::msg::Path>("/path", 100000);
     plane_pub = this->create_publisher<visualization_msgs::msg::Marker>("planner_normal", 1000);
+    current_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/current_pose", 10);
     static_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     auto period_ms = std::chrono::milliseconds(static_cast<int64_t>(3000.0 / 100.0)); // 1ms
@@ -893,6 +894,7 @@ void LaserMappingNode::publish_odometry(const rclcpp::Publisher<nav_msgs::msg::O
     transformStamped.header.frame_id = map_frame;
     transformStamped.child_frame_id = odom_frame;
     tf_br->sendTransform(transformStamped);
+    current_pose_pub_->publish(transformStamped);
 }
 void LaserMappingNode::publish_path(rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubPath)
 {

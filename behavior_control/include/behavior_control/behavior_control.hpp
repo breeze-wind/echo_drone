@@ -38,16 +38,15 @@ public:
     void step_timer_callback();
     /// 控制当前步骤执行任务
     void mission_timer_callback();
-    void current_pose_timer_callback();
     void set_parameter();
     void change_mode();
     void handle_parameter_response(rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture future);
 
 private:
-    /// 接收从飞控通信节点传来的当前位姿
-    void CurrentPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
     /// 接收从飞控通信节点传来的起飞状态消息
     void ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg);
+    /// 接收从point-lio节点传来的当前位姿
+    void CurrentPoseCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg);
 
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
@@ -59,10 +58,10 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr turning_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr obstacle_height_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr clear_state_pub_;
-    /// 发送当前位姿
-    rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr current_pose_pub_;
     /// 接收当前起飞状态
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_state_sub_;
+    /// 接收当前位姿
+    rclcpp::Subscription<geometry_msgs::msg::TransformStamped>::SharedPtr current_pose_sub_;
 
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> servo_parameter_client_;
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> controller_server_parameter_client_;
@@ -72,10 +71,8 @@ private:
     rclcpp::TimerBase::SharedPtr step_timer_;
     /// 执行任务计时器
     rclcpp::TimerBase::SharedPtr mission_timer_;
-    rclcpp::TimerBase::SharedPtr current_pose_timer_;
     std::chrono::milliseconds step_period_ms;
     std::chrono::milliseconds mission_period_ms;
-    std::chrono::milliseconds current_pose_ms;
 
     /* 标靶坐标以及穿门起点终点坐标 */
     std::vector<double> tank_;

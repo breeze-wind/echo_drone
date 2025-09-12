@@ -148,7 +148,6 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     /* 计时器，pubsub初始化 */
     step_period_ms = std::chrono::milliseconds(static_cast<int64_t>(250));
     mission_period_ms = std::chrono::milliseconds(static_cast<int64_t>(100));
-    current_pose_ms = std::chrono::milliseconds(static_cast<int64_t>(100));
 
     navigate_to_pose_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "navigate_to_pose");
     if (!this->navigate_to_pose_client_->wait_for_action_server()) {
@@ -171,10 +170,11 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     passing_door_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/passing_door_state", 10);
     turning_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/turning_state", 10);
     obstacle_height_pub_ = this->create_publisher<std_msgs::msg::Float64>("/robot/obstacle_height", 10);
-    current_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/current_pose", 10);
     clear_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/clear_state", 10);
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
         std::bind(&BehaviorControl::ArmStateCallback, this, std::placeholders::_1));
+    current_pose_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/robot/current_pose",
+            10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
 
     servo_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/servo_node/set_parameters");
     controller_server_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/controller_server/set_parameters");
@@ -198,17 +198,13 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 
     step_timer_ = this->create_wall_timer(step_period_ms, std::bind(&BehaviorControl::step_timer_callback, this));
     mission_timer_ = this->create_wall_timer(mission_period_ms, std::bind(&BehaviorControl::mission_timer_callback, this));
-    current_pose_timer_ = this->create_wall_timer(current_pose_ms, std::bind(&BehaviorControl::current_pose_timer_callback, this));
 }
 
-void BehaviorControl::current_pose_timer_callback()
+void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg)
 {
-    map_to_livox = tfbuffer_->lookupTransform("map", "livox", rclcpp::Time(),
-                                            rclcpp::Duration::from_seconds(0.5));
-    current_x_ = map_to_livox.transform.translation.x;
-    current_y_ = map_to_livox.transform.translation.y;
-    current_z_ = map_to_livox.transform.translation.z;
-    current_pose_pub_->publish(map_to_livox);
+    current_x_ = msg->transform.translation.x;
+    current_y_ = msg->transform.translation.y;
+    current_z_ = msg->transform.translation.z;
 }
 
 void BehaviorControl::step_timer_callback()

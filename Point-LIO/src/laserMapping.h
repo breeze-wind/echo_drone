@@ -226,6 +226,8 @@ private:
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdomAftMapped; //发布odomAftMapped到odom_topic
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubPath;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr plane_pub;
+    /// 发送当前位姿
+    rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr current_pose_pub_;
     rclcpp::TimerBase::SharedPtr map_pub_timer_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
     std::unique_ptr<tf2_ros::TransformBroadcaster> static_broadcaster_;

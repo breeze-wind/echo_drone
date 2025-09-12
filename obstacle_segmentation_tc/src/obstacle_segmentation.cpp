@@ -178,10 +178,10 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
 
 void ObstacleSegmentationNode::CurrentPoseCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg)
 {
-    current_z_ = msg->transform.translation.z;
+    current_z_ = msg->transform.translation.z + 0.27;
     odom_array[0] = msg->transform.translation.x;
     odom_array[1] = msg->transform.translation.y;
-    odom_array[2] = msg->transform.translation.z;
+    odom_array[2] = msg->transform.translation.z + 0.27;
     odom_array[3] = msg->transform.rotation.w;
     odom_array[4] = msg->transform.rotation.x;
     odom_array[5] = msg->transform.rotation.y;

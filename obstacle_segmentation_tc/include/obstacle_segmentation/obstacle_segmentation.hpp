@@ -49,7 +49,7 @@ public:
 
     void cloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
-    /// 接收从飞控通信节点传来的当前位姿
+    /// 接收从point-lio节点传来的当前位姿
     void CurrentPoseCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg);
 
     void ClearStateCallback(const std_msgs::msg::Bool::SharedPtr msg);
