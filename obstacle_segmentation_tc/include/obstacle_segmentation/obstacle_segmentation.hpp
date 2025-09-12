@@ -63,10 +63,14 @@ private:
     pcl::PassThrough<pcl::PointXYZ> pass_through_filter_x_;
     pcl::PassThrough<pcl::PointXYZ> pass_through_filter_y_;
     pcl::PassThrough<pcl::PointXYZ> pass_through_filter_z_;
+
     pcl::VoxelGrid<pcl::PointXYZ> voxfilter;
+
     std::string input_cloud_topic_;
     std::string output_cloud_topic_;
+
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+
     float leaf_size_;          // 体素滤波器的体素大小
     int point_num_for_normal_; // 用于计算法向量的点数
     float angle_threshold_;    // 法向量与地面的夹角阈值
@@ -88,6 +92,7 @@ private:
     int pcl_cnt;
 
     sensor_msgs::msg::PointCloud2::SharedPtr output_cloud;
+    
     pcl::PointCloud<pcl::PointXYZ>::Ptr blank_cloud;
     pcl::PointCloud<pcl::PointXYZ>::Ptr segement_cloud;
 
