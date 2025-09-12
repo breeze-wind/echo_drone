@@ -124,36 +124,36 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
 
     if (pcl_cnt > 2)
     {
-        if(if_need_clear)
+        if(1)
         {
             for (int j = 0; j < 1000; ++j)
             {
                 pcl::PointXYZ point;
-                point.x = -0.5;
-                point.y = -2.5 / 500 + 5.0 / 1000 * j;
+                point.x = -1.0;
+                point.y = -2.5 / 500 + 8.0 / 1000 * j;
                 point.z = 0.0;
                 segement_cloud->points.push_back(point);
             }
             for (int j = 0; j < 1000; ++j)
             {
                 pcl::PointXYZ point;
-                point.x = 2.5;
-                point.y = -2.5 / 500 + 5.0 / 1000 * j;
+                point.x = 6.7;
+                point.y = -2.5 / 500 + 8.0 / 1000 * j;
                 point.z = 0.0;
                 segement_cloud->points.push_back(point);
             }
             for (int j = 0; j < 1000; ++j)
             {
                 pcl::PointXYZ point;
-                point.x = -0.5 / 500 + 5.0 / 1000 * j;
-                point.y = 2.5;
+                point.x = -1.0 / 500 + 6.7 / 1000 * j;
+                point.y = 8.0;
                 point.z = 0.0;
                 segement_cloud->points.push_back(point);
             }
             for (int j = 0; j < 1000; ++j)
             {
                 pcl::PointXYZ point;
-                point.x = -0.5 / 500 + 5.0 / 1000 * j;
+                point.x = -1.0 / 500 + 6.7 / 1000 * j;
                 point.y = -2.5;
                 point.z = 0.0;
                 segement_cloud->points.push_back(point);
