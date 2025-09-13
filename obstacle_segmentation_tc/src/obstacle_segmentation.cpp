@@ -92,14 +92,14 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
     // 将点云转换为pcl格式
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::fromROSMsg(*msg, *cloud);
-    // 直通滤波
 
-    Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+    Eigen::Affine3f map_to_livox = Eigen::Affine3f::Identity();
     Eigen::Vector3f translation(odom_array[0], odom_array[1], odom_array[2]);
     Eigen::Quaternionf rotation(odom_array[3], odom_array[4], odom_array[5], odom_array[6]);
-    transform.translation() = translation;
-    transform.linear() = rotation.toRotationMatrix();
-    pcl::transformPointCloud(*cloud, *cloud, transform);    
+    map_to_livox.translation() = translation;
+    map_to_livox.linear() = rotation.toRotationMatrix();
+    Eigen::Affine3f livox_to_map = map_to_livox.inverse();
+    pcl::transformPointCloud(*cloud, *cloud, map_to_livox); //点云转到map世界系进行处理
 
     pcl_cnt++;
 
@@ -160,13 +160,14 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
             }
         }
 
+        pcl::transformPointCloud(*segement_cloud, *segement_cloud, livox_to_map); //点云转回livox系发布
         segement_cloud->width = segement_cloud->points.size();
         segement_cloud->height = 1;
         segement_cloud->is_dense = true;
 
         pcl::toROSMsg(*segement_cloud, *output_cloud);
 
-        output_cloud->header.frame_id = "map";
+        output_cloud->header.frame_id = "livox";
         output_cloud->header.stamp = msg->header.stamp;
         output_cloud_pub_->publish(*output_cloud);
         segement_cloud->points.clear();
