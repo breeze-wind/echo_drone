@@ -105,7 +105,7 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
 
     for (long i = 0; i < cloud->points.size(); i++)
     {
-        if (cloud->points[i].z < 0.1 || cloud->points[i].z > obstacle_height_)
+        if (cloud->points[i].z < 0.2 || cloud->points[i].z > obstacle_height_)
         {
             continue;
         }
@@ -117,6 +117,7 @@ void ObstacleSegmentationNode::cloudCallback(const sensor_msgs::msg::PointCloud2
             }
         }
     }
+
     for (auto& point : segement_cloud->points)
     {
         point.z = 0.0;

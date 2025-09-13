@@ -101,7 +101,7 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='map_to_odom_broadcaster',
-        arguments=['0.0', '0.0', '0.27',  '0.0', '0.0', '0.0', '1.0','map', 'odom']
+        arguments=['0.0', '0.0', '0.39',  '0.0', '0.0', '0.0', '1.0','map', 'odom']
     )
     livox_to_mavlink_body = Node(
         package='tf2_ros',
@@ -113,7 +113,7 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='livox_to_camera_broadcaster',
-        arguments=['-0.03', '0.0', '-0.4',  '0.707', '0.707', '0.0', '0.0','livox', 'camera_link']
+        arguments=['-0.03', '0.0', '-0.26',  '0.707', '0.707', '0.0', '0.0','livox', 'camera_link']
     )
 
     # 创建LaunchDescription对象launch_description,用于描述launch文件
