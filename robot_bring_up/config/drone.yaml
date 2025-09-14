@@ -8,6 +8,10 @@ behavior_control_node: #雷达离地面高度0.27m
         passing_door_src_1: [4.86, -0.07]
         passing_door_src_2: [4.65, 2.92]
         passing_door_des: [4.88, 4.81]
+        random_target_search_1: [0.0, 0.0]
+        random_target_search_2: [0.0, 0.0]
+        random_target_search_3: [0.0, 0.0]
+        prev_random_target: [0.0, 0.0]
         target_sequence: ["tent", "car", "bridge", "pillbox", "tank"]
         cruise_height: 0.6
         detection_height: 1.6
@@ -20,6 +24,7 @@ behavior_control_node: #雷达离地面高度0.27m
         if_hit_tent: false
         if_hit_bridge: true
         if_passing_door: true
+        if_need_passing_all: false
         max_vel_x_passing: 0.25  #穿门参数
         max_vel_y_passing: 0.25
         max_vel_x_backwards_passing: 0.25
