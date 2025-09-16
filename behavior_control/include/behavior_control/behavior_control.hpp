@@ -84,6 +84,17 @@ private:
     std::vector<double> passing_door_src_2_;
     std::vector<double> passing_door_des_;
 
+    ///随机靶搜索坐标
+    std::vector<double> random_target_search_1_;
+    std::vector<double> random_target_search_2_;
+    std::vector<double> random_target_search_3_;
+    ///预设随机靶坐标
+    std::vector<double> prev_random_target_;
+    ///随机靶坐标
+    std::vector<double> random_target_;
+    ///是否找到随机靶
+    bool if_find_random_target_;
+
     /// 当前识别到的目标坐标xy
     std::vector<double> detected_target;
 
@@ -112,6 +123,8 @@ private:
     bool if_hit_pillbox_;
     bool if_hit_tent_;
     bool if_hit_bridge_;
+    ///是否需要经过所有的靶子
+    bool if_need_passing_all_;
     /// 是否穿门
     bool if_passing_door_;
     /// 当前是否在穿门状态
