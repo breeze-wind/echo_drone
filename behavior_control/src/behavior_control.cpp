@@ -87,6 +87,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
         tank_[0] = 0.0;
         tank_[1] = 0.0;
     }
+
+    random_target_.resize(2);
     random_target_[0] = 0.0;
     random_target_[1] = 0.0;
 

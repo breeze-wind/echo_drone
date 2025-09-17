@@ -38,7 +38,7 @@ class MavlinkControl(Node):
 
         self.ready_to_arm = False #是否准备解锁
         self.arming_state = False #飞控解锁状态
-        self.if_nav = True
+        self.if_nav = False
         self.current_passing_door = False
         self.if_turning = False
         self.target_yaw = 0.0 #弧度

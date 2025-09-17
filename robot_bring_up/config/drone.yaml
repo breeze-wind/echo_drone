@@ -5,18 +5,18 @@ behavior_control_node: #雷达离地面高度带货0.39m
         tent_position: [2.74, -1.15]
         car_position: [4.96, -1.5]
         pillbox_position: [1.74, 1.71]
-        passing_door_src_1: [4.24, -0.01]
-        passing_door_src_2: [4.53, 2.63]
-        passing_door_des: [4.87, 3.97]
+        passing_door_src_1: [ 3.68, 0.095 ]
+        passing_door_src_2: [ 4.53, 2.63 ]
+        passing_door_des: [ 4.53, 4.42 ]
         random_target_search_1: [0.0, 0.0]
         random_target_search_2: [0.0, 0.0]
         random_target_search_3: [0.0, 0.0]
         prev_random_target: [0.0, 0.0]
         target_sequence: ["tent", "car", "bridge", "pillbox", "tank"]
-        cruise_height: 0.35
+        cruise_height: 0.4
         detection_height: 1.6
         H_detection_height: 1.2
-        passing_door_height: 0.35
+        passing_door_height: 0.4
         eject_height: 0.6
         if_hit_tank: false
         if_hit_car: true
@@ -25,21 +25,21 @@ behavior_control_node: #雷达离地面高度带货0.39m
         if_hit_bridge: true
         if_passing_door: true
         if_need_passing_all: false
-        max_vel_x_passing: 0.25  #穿门参数
-        max_vel_y_passing: 0.25
-        max_vel_x_backwards_passing: 0.25
+        max_vel_x_passing: 0.28  #穿门参数
+        max_vel_y_passing: 0.28
+        max_vel_x_backwards_passing: 0.28
         max_vel_theta_passing: 0.11
-        acc_lim_x_passing: 0.35
-        acc_lim_y_passing: 0.35
+        acc_lim_x_passing: 0.25
+        acc_lim_y_passing: 0.25
         acc_lim_theta_passing: 0.11
-        max_global_plan_lookahead_dist: 1.45
+        max_global_plan_lookahead_dist: 1.0
         weight_inflation: 2.0
         robot_radius: 0.16   #111
 
 mavlink_control_node:
     ros__parameters:
-        cruise_height: 0.35
-        passing_door_height: 0.35
+        cruise_height: 0.4
+        passing_door_height: 0.4
 
 merge_pcd_node:
     ros__parameters:
@@ -207,7 +207,7 @@ controller_server:
             plugin: teb_local_planner::TebLocalPlannerROS
 
             teb_autosize: 1.0
-            dt_ref: 0.3 # 所需的轨迹时间分辨率#3.17
+            dt_ref: 0.155 # 所需的轨迹时间分辨率#3.17
             dt_hysteresis: 0.02 # 根据当前时间分辨率自动调整大小的滞后，建议使用dt_ref的 10%#3.17
             max_samples: 500
             min_samples: 3 # 最小采样数,大于2
@@ -241,7 +241,7 @@ controller_server:
             is_footprint_dynamic: False
             footprint_model: # types: "point", "circular", "two_circles", "line", "polygon"
                 type: "polygon"
-                vertices: "[ [0.26, 0.22], [-0.26, 0.22], [-0.26, -0.22], [0.26, -0.22] ]"
+                vertices: "[ [0.3, 0.22], [-0.3, 0.22], [-0.3, -0.22], [0.3, -0.22] ]"
                # radius: 0.4 # for type "circular"
 
 
@@ -383,7 +383,7 @@ global_costmap:
             global_frame: map
             robot_base_frame: livox
             #robot_radius: 0.2
-            footprint: "[ [0.26, 0.22], [-0.26, 0.22], [-0.26, -0.22], [0.26, -0.22] ]"
+            footprint: "[ [0.3, 0.22], [-0.3, 0.22], [-0.3, -0.22], [0.3, -0.22] ]"
             resolution: 0.02
             track_unknown_space: true
             plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
