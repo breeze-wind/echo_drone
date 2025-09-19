@@ -1,4 +1,4 @@
-behavior_control_node: #雷达离地面高度带货0.39m
+behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
     ros__parameters:
         tank_position: [2.0, 0.8]
         bridge_position: [5.75, 2.46]
@@ -8,9 +8,9 @@ behavior_control_node: #雷达离地面高度带货0.39m
         passing_door_src_1: [ 3.68, 0.095 ]
         passing_door_src_2: [ 4.53, 2.63 ]
         passing_door_des: [ 4.53, 4.42 ]
-        random_target_search_1: [0.0, 0.0]
-        random_target_search_2: [0.0, 0.0]
-        random_target_search_3: [0.0, 0.0]
+        random_target_search_1: [1.0, 0.0]
+        random_target_search_2: [1.0, 1.0]
+        random_target_search_3: [3.0, -0.5]
         prev_random_target: [0.0, 0.0]
         target_sequence: ["tent", "car", "bridge", "pillbox", "tank"]
         cruise_height: 0.4
@@ -45,15 +45,14 @@ merge_pcd_node:
     ros__parameters:
         pcd_folder: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge"
 
-## PCD转二维栅格地图 map3
+## PCD转二维栅格地图 map
 pcd2pgm_node:
     ros__parameters: # map2 修改路径和名称
         pcd_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD" # 点云路径
-        pcd_name: "2025_09_05_21_55_08_1.pcd"
+        pcd_name: "2025_09_19_11_51_41_1.pcd"
         map_path: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps"
-        map_name: "2025_09_05_21_55_08_1.png"
-        yaml_name: "2025_09_05_21_55_08_1.yaml"
-
+        map_name: "2025_09_19_11_51_41_1.png"
+        yaml_name: "2025_09_19_11_51_41_1.yaml"
         method: "point" # normal、height或者point，代表不同的转换方法
         thre_x_min: -50.0 # 点云范围
         thre_x_max: 50.0 # 点云范围
@@ -75,7 +74,7 @@ pcd2pgm_node:
 
 map_server:
     ros__parameters:
-        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_09_05_21_55_08_1.yaml" #map3 重命名 checklist
+        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_09_19_11_51_41_1.yaml" #map3 重命名 checklist
 
 obstacle_segmentation_node:
     ros__parameters:
@@ -177,8 +176,8 @@ laser_mapping:
             scan_bodyframe_pub_en: true
 
         pcd_save:
-            use_pcd_map_: false
-            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge/2025_09_05_20_55_53_1.pcd" #map3 重命名和路径 checklist
+            use_pcd_map_: true
+            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/2025_09_19_11_51_41_1.pcd" #map3 重命名和路径 checklist
             pcd_save_en: false #建图第一步
             interval: 900
         #RMUC

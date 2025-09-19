@@ -119,7 +119,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_y_ = 0.0;
     current_z_ = 0.0;
 
-    current_step = 71;
+    current_step = 0;
     eject_cnt = 0;
     detection_cnt = 0;
     turning_cnt = 0;
@@ -219,7 +219,7 @@ void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformSta
 {
     current_x_ = msg->transform.translation.x;
     current_y_ = msg->transform.translation.y;
-    current_z_ = msg->transform.translation.z;
+    current_z_ = msg->transform.translation.z + 0.39;
 }
 
 void BehaviorControl::step_timer_callback()

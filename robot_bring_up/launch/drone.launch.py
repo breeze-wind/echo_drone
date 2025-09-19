@@ -16,7 +16,7 @@ def generate_launch_description():
 
     if_rviz = True
     if_sim = False
-    if_map = False # 只启动robot_description、雷达驱动、point-lio #map1前True map3 False
+    if_map = False   # 只启动robot_description、雷达驱动、point-lio #map1前True map3 False
 
     point_lio_path = get_package_share_directory("point_lio")
     robot_bringup_path = get_package_share_directory("robot_bring_up")
@@ -101,7 +101,7 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='map_to_odom_broadcaster',
-        arguments=['0.0', '0.0', '0.27',  '0.0', '0.0', '0.0', '1.0','map', 'odom']
+        arguments=['0.0', '0.0', '0.39',  '0.0', '0.0', '0.0', '1.0','map', 'odom']
     )
     livox_to_mavlink_body = Node(
         package='tf2_ros',

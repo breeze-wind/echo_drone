@@ -112,7 +112,7 @@ class MavlinkControl(Node):
         timestamp_us = int(time.time() * 1e6)
         # Position in meters (NED)
         self.current_x, self.current_y, self.current_z = (msg.transform.translation.x, msg.transform.translation.y,
-                                                          msg.transform.translation.z + 0.27)
+                                                          msg.transform.translation.z + 0.39)
         roll, pitch, yaw = tfs.euler.quat2euler([msg.transform.rotation.w, msg.transform.rotation.x, msg.transform.rotation.y,
                                                  msg.transform.rotation.z], "sxyz")  # Orientation in radians
 
