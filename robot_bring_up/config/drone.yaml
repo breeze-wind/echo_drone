@@ -1,22 +1,22 @@
 behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
     ros__parameters:
         tank_position: [2.0, 0.8]
-        bridge_position: [5.75, 2.46]
-        tent_position: [2.74, -1.15]
-        car_position: [4.96, -1.5]
-        pillbox_position: [1.74, 1.71]
+        bridge_position: [3.26, 0.85]
+        tent_position: [1.41,1.61]
+        car_position: [2.08, -1.25]
+        pillbox_position: [1.41,1.61]
         passing_door_src_1: [ 3.68, 0.095 ]
         passing_door_src_2: [ 4.53, 2.63 ]
         passing_door_des: [ 4.53, 4.42 ]
-        random_target_search_1: [1.0, 0.0]
-        random_target_search_2: [1.0, 1.0]
-        random_target_search_3: [3.0, -0.5]
+        random_target_search_1: [2.43, 1.1]
+        random_target_search_2: [1.43, 1.0]
+        random_target_search_3: [1.98, -1.53]
         prev_random_target: [0.0, 0.0]
         target_sequence: ["tent", "car", "bridge", "pillbox", "tank"]
-        cruise_height: 0.4
+        cruise_height: 1.0
         detection_height: 1.6
         H_detection_height: 1.2
-        passing_door_height: 0.4
+        passing_door_height: 0.6
         eject_height: 0.6
         if_hit_tank: false
         if_hit_car: true
@@ -38,8 +38,8 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
 
 mavlink_control_node:
     ros__parameters:
-        cruise_height: 0.4
-        passing_door_height: 0.4
+        cruise_height: 1.0
+        passing_door_height: 0.6
 
 merge_pcd_node:
     ros__parameters:
