@@ -12,8 +12,8 @@ find_package(geometry_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-        "msg/Transmit/Velocity.msg"
         "msg/Transmit/ServoPos.msg"
+        "msg/Receive/Imagelocation.msg"
         DEPENDENCIES std_msgs geometry_msgs
 )
 
