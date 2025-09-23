@@ -11,7 +11,7 @@ class OpenmvSerial : public rclcpp::Node {
 private:
     openmv::OpenmvcamSerial openmvSerial;
 
-    rclcpp::Publisher<robot_interfaces::msg::Imagelocation>::SharedPtr ImagelocationPublisher;
+    rclcpp::Publisher<robot_interfaces::msg::OpenmvInfo>::SharedPtr ImagelocationPublisher;
 
 public:
     OpenmvSerial() : Node("openmv_serial_node") {
@@ -21,16 +21,17 @@ public:
 
         RCLCPP_INFO(this->get_logger(),"openmv_serial init success");
 
-        openmvSerial.registerCallback(0xaa, [this](const image_location_t& msg){
-            robot_interfaces::msg::Imagelocation _Imagelocation;
-            _Imagelocation.image_x = msg.image_x;
-            _Imagelocation.image_y = msg.image_y;
-            //std::cout << "Image x: " << (int)_Imagelocation.image_x << " Image y: " << (int)_Imagelocation.image_y << std::endl;
-            RCLCPP_INFO(get_logger(), "image location: X: %d Y: %d", msg.image_x, msg.image_y);
-            ImagelocationPublisher->publish(_Imagelocation);
+        openmvSerial.registerCallback(0xaa, [this](const openmv_info_t& msg){
+            robot_interfaces::msg::OpenmvInfo _OpenmvInfo;
+            _OpenmvInfo.accurate = msg.accurate;
+            _OpenmvInfo.image_x = msg.image_x;
+            _OpenmvInfo.image_y = msg.image_y;
+            //std::cout << "Image x: " << (int)_OpenmvInfo.image_x << " Image y: " << (int)_OpenmvInfo.image_y << std::endl;
+            RCLCPP_INFO(get_logger(), "image location: X: %f Y: %f", msg.image_x, msg.image_y);
+            ImagelocationPublisher->publish(_OpenmvInfo);
         });
 
-        ImagelocationPublisher = create_publisher<robot_interfaces::msg::Imagelocation>("/robot/image_location", 1);
+        ImagelocationPublisher = create_publisher<robot_interfaces::msg::OpenmvInfo>("/robot/openmv_info", 1);
 
         openmvSerial.spin(true);
     }

@@ -7,9 +7,10 @@
 
 #include "msg_serialize.h"
 
-message_data image_location_t{
-    uint8_t image_x;
-    uint8_t image_y;
+message_data openmv_info_t{
+    uint8_t accurate;
+    float image_x;
+    float image_y;
 };
 
 #endif //ROBOT_SERIAL_ROBOT_MESSAGE_H

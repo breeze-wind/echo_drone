@@ -89,8 +89,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     }
 
     random_target_.resize(2);
-    random_target_[0] = 0.0;
-    random_target_[1] = 0.0;
+    openmv_detected_random_target_.reserve(2);
+    detected_target_.reserve(2);
 
     RCLCPP_INFO(this->get_logger(), "tank_position: %lf, %lf", tank_[0], tank_[1]);
     RCLCPP_INFO(this->get_logger(), "tent_position: %lf, %lf", tent_[0], tent_[1]);
@@ -112,8 +112,6 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_passing_door_ = false;
     if_turning = false;
     if_find_random_target_ = false;
-
-    detected_target.reserve(2);
 
     current_x_ = 0.0;
     current_y_ = 0.0;
@@ -190,6 +188,10 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
         std::bind(&BehaviorControl::ArmStateCallback, this, std::placeholders::_1));
     current_pose_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/robot/current_pose",
             10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
+    image_location_sub_ = this->create_subscription<robot_interfaces::msg::ImageLocation>("/robot/image_location",
+            10, std::bind(&BehaviorControl::ImageLocationCallback, this, std::placeholders::_1));
+    openmv_info_sub_ = this->create_subscription<robot_interfaces::msg::OpenmvInfo>("/robot/openmv_info",
+            10, std::bind(&BehaviorControl::OpenmvInfoCallback, this, std::placeholders::_1));
 
     servo_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/servo_node/set_parameters");
     controller_server_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/controller_server/set_parameters");
@@ -208,9 +210,6 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
         RCLCPP_WARN(this->get_logger(), "local_costmap_parameter service not available, waiting...");
     }
 
-    tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tfbuffer_);
-
     step_timer_ = this->create_wall_timer(step_period_ms, std::bind(&BehaviorControl::step_timer_callback, this));
     mission_timer_ = this->create_wall_timer(mission_period_ms, std::bind(&BehaviorControl::mission_timer_callback, this));
 }
@@ -220,6 +219,43 @@ void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformSta
     current_x_ = msg->transform.translation.x;
     current_y_ = msg->transform.translation.y;
     current_z_ = msg->transform.translation.z + 0.39;
+}
+
+void BehaviorControl::OpenmvInfoCallback(const robot_interfaces::msg::OpenmvInfo::SharedPtr msg)
+{
+    if(!if_find_random_target_) //还没找到随机靶
+    {
+        if_openmv_accurate_ = msg->accurate;
+        if_openmv_find_ = true;
+        if(if_openmv_accurate_)
+        {
+            if_find_random_target_ = true;
+            random_target_[0] = msg->image_x;
+            random_target_[1] = msg->image_y;
+        }
+        else
+        {
+            if_find_random_target_ = false;
+            openmv_detected_random_target_[0] = msg->image_x;
+            openmv_detected_random_target_[0] = msg->image_y;
+        }
+    }
+}
+
+void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg)
+{
+    detected_target_id_ = msg->id;
+    if(detected_target_id_ == 6)
+    {
+        if_find_random_target_ = true;
+        random_target_[0] = msg->image_x;
+        random_target_[1] = msg->image_y;
+    }
+    else
+    {
+        detected_target_[0] = msg->image_x;
+        detected_target_[1] = msg->image_y;
+    }
 }
 
 void BehaviorControl::step_timer_callback()
@@ -451,10 +487,18 @@ void BehaviorControl::step_timer_callback()
             if(fabs(current_y_ - random_target_search_3_[1]) < 0.15)
             {
                 current_step = 101;
-                if(!if_find_random_target_) //没找到随机靶，用预设目标点
+                if(!if_find_random_target_) //没找到随机靶
                 {
-                    random_target_[0] = prev_random_target_[0];
-                    random_target_[1] = prev_random_target_[1];
+                    if(if_openmv_find_) //用不准的openmv点
+                    {
+                        random_target_[0] = openmv_detected_random_target_[0];
+                        random_target_[1] = openmv_detected_random_target_[1];
+                    }
+                    else //用预设目标点
+                    {
+                        random_target_[0] = prev_random_target_[0];
+                        random_target_[1] = prev_random_target_[1];
+                    }
                 }
                 RCLCPP_INFO(this->get_logger(), "random_target: %lf, %lf", random_target_[0], random_target_[1]);
             }
@@ -600,27 +644,19 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 23)
     {
-        try {
-            map_to_target = tfbuffer_->lookupTransform(map_frame_, target_frame_, rclcpp::Time(),
-                                               rclcpp::Duration::from_seconds(0.5));
-        } catch (tf2::TransformException &ex) {
-            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
-            return;
-        }
-
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
 		RCLCPP_INFO(this->get_logger(), "识别中...");
         RCLCPP_INFO(this->get_logger(), "detection position: %lf, %lf",
-            map_to_target.transform.translation.x, map_to_target.transform.translation.y);
+            current_target_position_.transform.translation.x, current_target_position_.transform.translation.y);
     }
     else if(current_step == 24)
     {
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         if(current_z_ - eject_height_ >= 0.5)
             current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
@@ -665,27 +701,19 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 33)
     {
-        try {
-            map_to_target = tfbuffer_->lookupTransform(map_frame_, target_frame_, rclcpp::Time(),
-                                               rclcpp::Duration::from_seconds(0.5));
-        } catch (tf2::TransformException &ex) {
-            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
-            return;
-        }
-
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
 		RCLCPP_INFO(this->get_logger(), "识别中...");
         RCLCPP_INFO(this->get_logger(), "detection position: %lf, %lf",
-            map_to_target.transform.translation.x, map_to_target.transform.translation.y);
+            current_target_position_.transform.translation.x, current_target_position_.transform.translation.y);
     }
     else if(current_step == 34)
     {
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         if(current_z_ - eject_height_ >= 0.5)
             current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
@@ -730,27 +758,19 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 43)
     {
-        try {
-            map_to_target = tfbuffer_->lookupTransform(map_frame_, target_frame_, rclcpp::Time(),
-                                               rclcpp::Duration::from_seconds(0.5));
-        } catch (tf2::TransformException &ex) {
-            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
-            return;
-        }
-
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
 		RCLCPP_INFO(this->get_logger(), "识别中...");
         RCLCPP_INFO(this->get_logger(), "detection position: %lf, %lf",
-            map_to_target.transform.translation.x, map_to_target.transform.translation.y);
+            current_target_position_.transform.translation.x, current_target_position_.transform.translation.y);
     }
     else if(current_step == 44)
     {
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         if(current_z_ - eject_height_ >= 0.5)
             current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
@@ -795,27 +815,19 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 53)
     {
-        try {
-            map_to_target = tfbuffer_->lookupTransform(map_frame_, target_frame_, rclcpp::Time(),
-                                               rclcpp::Duration::from_seconds(0.5));
-        } catch (tf2::TransformException &ex) {
-            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
-            return;
-        }
-
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
 		RCLCPP_INFO(this->get_logger(), "识别中...");
         RCLCPP_INFO(this->get_logger(), "detection position: %lf, %lf",
-            map_to_target.transform.translation.x, map_to_target.transform.translation.y);
+            current_target_position_.transform.translation.x, current_target_position_.transform.translation.y);
     }
     else if(current_step == 54)
     {
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         if(current_z_ - eject_height_ >= 0.5)
             current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
@@ -850,18 +862,8 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 62) //识别投掷策略待修改
     {
-        /*try {
-            map_to_target = tfbuffer_->lookupTransform(map_frame_, target_frame_, rclcpp::Time(),
-                                               rclcpp::Duration::from_seconds(0.5));
-        } catch (tf2::TransformException &ex) {
-            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
-            return;
-        }
-        RCLCPP_INFO(this->get_logger(), "detected id: ");
-        RCLCPP_INFO(this->get_logger(), "detection position: ");*/
-
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
@@ -869,8 +871,8 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 63)
     {
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         if(current_z_ - eject_height_ >= 0.5)
             current_target_position_.transform.translation.z = current_z_ - 0.5;
         else
@@ -960,27 +962,19 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 103)
     {
-        try {
-            map_to_target = tfbuffer_->lookupTransform(map_frame_, target_frame_, rclcpp::Time(),
-                                               rclcpp::Duration::from_seconds(0.5));
-        } catch (tf2::TransformException &ex) {
-            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
-            return;
-        }
-
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
 		RCLCPP_INFO(this->get_logger(), "识别中...");
         RCLCPP_INFO(this->get_logger(), "detection position: %lf, %lf",
-            map_to_target.transform.translation.x, map_to_target.transform.translation.y);
+            current_target_position_.transform.translation.x, current_target_position_.transform.translation.y);
     }
     else if(current_step == 104)
     {
-        current_target_position_.transform.translation.x = map_to_target.transform.translation.x;
-        current_target_position_.transform.translation.y = map_to_target.transform.translation.y;
+        current_target_position_.transform.translation.x = detected_target_[0];
+        current_target_position_.transform.translation.y = detected_target_[1];
         if(current_z_ - eject_height_ >= 0.5)
             current_target_position_.transform.translation.z = current_z_ - 0.5;
         else

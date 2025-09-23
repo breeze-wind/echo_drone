@@ -30,6 +30,9 @@
 
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 
+#include "robot_interfaces/msg/image_location.hpp"
+#include "robot_interfaces/msg/openmv_info.hpp"
+
 class BehaviorControl : public rclcpp::Node
 {
 public:
@@ -47,6 +50,10 @@ private:
     void ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg);
     /// 接收从point-lio节点传来的当前位姿
     void CurrentPoseCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg);
+    /// 接收从相机传来的图像位置信息
+    void ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg);
+    /// 接收openmv的图像位置信息
+    void OpenmvInfoCallback(const robot_interfaces::msg::OpenmvInfo::SharedPtr msg);
 
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
@@ -62,6 +69,10 @@ private:
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_state_sub_;
     /// 接收当前位姿
     rclcpp::Subscription<geometry_msgs::msg::TransformStamped>::SharedPtr current_pose_sub_;
+    /// 接收相机传来的图像位置信息
+    rclcpp::Subscription<robot_interfaces::msg::ImageLocation>::SharedPtr image_location_sub_;
+    /// 接收openmv的图像位置信息
+    rclcpp::Subscription<robot_interfaces::msg::OpenmvInfo>::SharedPtr openmv_info_sub_;
 
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> servo_parameter_client_;
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> controller_server_parameter_client_;
@@ -84,25 +95,32 @@ private:
     std::vector<double> passing_door_src_2_;
     std::vector<double> passing_door_des_;
 
-    ///随机靶搜索坐标
+    /// 随机靶搜索坐标
     std::vector<double> random_target_search_1_;
     std::vector<double> random_target_search_2_;
     std::vector<double> random_target_search_3_;
-    ///预设随机靶坐标
+    /// 预设随机靶坐标为其中一个定靶点，找不到随机靶时投这个
     std::vector<double> prev_random_target_;
-    ///随机靶坐标
+    /// 最终确定的随机靶坐标
     std::vector<double> random_target_;
-    ///是否找到随机靶
+    /// openmv识别到的不准的随机靶坐标
+    std::vector<double> openmv_detected_random_target_;
+    /// 是否找到随机靶，只有不准的openmv坐标时不算找到
     bool if_find_random_target_;
+    /// openmv的坐标是否准确
+    bool if_openmv_accurate_;
+    /// openmv是否找到
+    bool if_openmv_find_;
 
     /// 当前识别到的目标坐标xy
-    std::vector<double> detected_target;
+    std::vector<double> detected_target_;
+    /// 当前识别到的目标id
+    uint8_t detected_target_id_;
 
     /// 靶子id对应的坐标
     std::map<std::string, std::vector<double>> target_positions_;
     /// 靶子id对应的是否投掷
     std::map<std::string, bool> if_hit_target_;
-
     /// 目标点顺序
     std::vector<std::string> target_sequence_;
 
@@ -188,13 +206,9 @@ private:
 
     geometry_msgs::msg::TransformStamped map_to_livox;
 
-    /// 当前识别目标的坐标系变换
     nav2_msgs::action::NavigateToPose::Goal navigate_to_pose_action_;
-    geometry_msgs::msg::TransformStamped current_target_position_;
-    geometry_msgs::msg::TransformStamped map_to_target;
 
-    std::unique_ptr<tf2_ros::Buffer> tfbuffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+    geometry_msgs::msg::TransformStamped current_target_position_;
 };
 
 #endif //BEHAVIOR_CONTROL_HPP
