@@ -398,7 +398,7 @@ void BehaviorControl::step_timer_callback()
                     current_step = 62;
         }
         else //不投掷
-            current_step = 71;
+            current_step = 91;
     }
     else if(current_step == 62) //进行识别
     {
@@ -456,6 +456,7 @@ void BehaviorControl::step_timer_callback()
                     random_target_[0] = prev_random_target_[0];
                     random_target_[1] = prev_random_target_[1];
                 }
+                RCLCPP_INFO(this->get_logger(), "random_target: %lf, %lf", random_target_[0], random_target_[1]);
             }
     }
     //进入随机靶投掷任务
@@ -878,7 +879,7 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         if(eject_cnt >= 16)
         {
-            servo_index_ = 3;
+            servo_index_ = 2;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
             if (servo_index_ == last_servo_index_)
                 return;

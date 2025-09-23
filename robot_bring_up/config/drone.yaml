@@ -1,6 +1,6 @@
 behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
     ros__parameters:
-        tank_position: [2.0, 0.8]
+        tank_position: [3.5, -0.5]
         bridge_position: [3.26, 0.85]
         tent_position: [1.41,1.61]
         car_position: [2.08, -1.25]
@@ -11,19 +11,19 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
         random_target_search_1: [2.43, 1.1]
         random_target_search_2: [1.43, 1.0]
         random_target_search_3: [1.98, -1.53]
-        prev_random_target: [0.0, 0.0]
+        prev_random_target: [2.98, 0.0]
         target_sequence: ["tent", "car", "bridge", "pillbox", "tank"]
         cruise_height: 1.0
-        detection_height: 1.6
-        H_detection_height: 1.2
+        detection_height: 1.4
+        H_detection_height: 1.4
         passing_door_height: 0.6
-        eject_height: 0.6
-        if_hit_tank: false
+        eject_height: 0.5
+        if_hit_tank: true
         if_hit_car: true
         if_hit_pillbox: true
-        if_hit_tent: false
+        if_hit_tent: true
         if_hit_bridge: true
-        if_passing_door: true
+        if_passing_door: false
         if_need_passing_all: false
         max_vel_x_passing: 0.28  #穿门参数
         max_vel_y_passing: 0.28
