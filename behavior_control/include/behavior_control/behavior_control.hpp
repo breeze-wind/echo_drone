@@ -132,6 +132,7 @@ private:
     /// 识别高度
     double detection_height_;
     double H_detection_height_;
+    double dynamic_detection_height_;
     /// 穿门高度
     double passing_door_height_;
     /// 投掷高度

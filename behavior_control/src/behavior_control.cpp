@@ -122,6 +122,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_x_ = 0.0;
     current_y_ = 0.0;
     current_z_ = 0.0;
+    dynamic_detection_height_ = detection_height_;
 
     current_step = 0;
 
@@ -277,7 +278,7 @@ void BehaviorControl::step_timer_callback()
     {
         if(fabs(current_z_ - cruise_height_) <= 0.05)
         {
-            current_step = 21;
+            current_step = 111;
         }
     }
     //在起飞点左右两侧移动，寻找随机靶
@@ -490,7 +491,7 @@ void BehaviorControl::step_timer_callback()
     }
     else if(current_step == 62) //进行跟随识别，并不断下降高度
     {
-        if(abs(current_z_ - dynamic_eject_height_) <= 0.2)
+        if(abs(current_z_ - dynamic_eject_height_) <= 0.15)
         {
             current_step = 63;
         }
@@ -669,17 +670,22 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 111)
     {
-        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
-        action_goal.pose.header.frame_id = "map";
-        action_goal.pose.pose.position.x = random_target_init_search_1_[0];
-        action_goal.pose.pose.position.y = random_target_init_search_1_[1];
-        action_goal.pose.pose.position.z = cruise_height_;
-        action_goal.pose.pose.orientation.x = 0.0;
-        action_goal.pose.pose.orientation.y = 0.0;
-        action_goal.pose.pose.orientation.z = 0.0;
-        action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
-        if_nav = true;
+        current_target_position_.transform.translation.x = random_target_init_search_1_[0];
+        current_target_position_.transform.translation.y = random_target_init_search_1_[1];
+        current_target_position_.transform.translation.z = cruise_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        // rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        // action_goal.pose.header.frame_id = "map";
+        // action_goal.pose.pose.position.x = random_target_init_search_1_[0];
+        // action_goal.pose.pose.position.y = random_target_init_search_1_[1];
+        // action_goal.pose.pose.position.z = cruise_height_;
+        // action_goal.pose.pose.orientation.x = 0.0;
+        // action_goal.pose.pose.orientation.y = 0.0;
+        // action_goal.pose.pose.orientation.z = 0.0;
+        // action_goal.pose.pose.orientation.w = 1.0;
+        // navigate_to_pose_client_->async_send_goal(action_goal);
+        // if_nav = true;
     }
     else if(current_step == 112)
     {
@@ -692,17 +698,22 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 113)
     {
-        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
-        action_goal.pose.header.frame_id = "map";
-        action_goal.pose.pose.position.x = random_target_init_search_2_[0];
-        action_goal.pose.pose.position.y = random_target_init_search_2_[1];
-        action_goal.pose.pose.position.z = cruise_height_;
-        action_goal.pose.pose.orientation.x = 0.0;
-        action_goal.pose.pose.orientation.y = 0.0;
-        action_goal.pose.pose.orientation.z = 0.0;
-        action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
-        if_nav = true;
+        current_target_position_.transform.translation.x = random_target_init_search_2_[0];
+        current_target_position_.transform.translation.y = random_target_init_search_2_[1];
+        current_target_position_.transform.translation.z = cruise_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        // rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        // action_goal.pose.header.frame_id = "map";
+        // action_goal.pose.pose.position.x = random_target_init_search_2_[0];
+        // action_goal.pose.pose.position.y = random_target_init_search_2_[1];
+        // action_goal.pose.pose.position.z = cruise_height_;
+        // action_goal.pose.pose.orientation.x = 0.0;
+        // action_goal.pose.pose.orientation.y = 0.0;
+        // action_goal.pose.pose.orientation.z = 0.0;
+        // action_goal.pose.pose.orientation.w = 1.0;
+        // navigate_to_pose_client_->async_send_goal(action_goal);
+        // if_nav = true;
     }
     else if(current_step == 114)
     {
@@ -740,8 +751,8 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == 23)
     {
-        current_target_position_.transform.translation.x = detected_target_[0];
-        current_target_position_.transform.translation.y = detected_target_[1];
+        current_target_position_.transform.translation.x = target_positions_[target_sequence_[0]][0]; //detected_target_[0];
+        current_target_position_.transform.translation.y = target_positions_[target_sequence_[0]][1]; //detected_target_[1];
         current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
@@ -947,7 +958,7 @@ void BehaviorControl::mission_timer_callback()
 		action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = target_positions_[target_sequence_[4]][0];
         action_goal.pose.pose.position.y = target_positions_[target_sequence_[4]][1];
-        action_goal.pose.pose.position.z = cruise_height_;
+        action_goal.pose.pose.position.z = dynamic_detection_height_;
         action_goal.pose.pose.orientation.x = 0.0;
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
@@ -960,16 +971,16 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = detected_target_[0];
         current_target_position_.transform.translation.y = detected_target_[1];
-        current_target_position_.transform.translation.z = std::max(detection_height_, dynamic_eject_height_);
+        current_target_position_.transform.translation.z = dynamic_detection_height_;
         target_pose_pub_->publish(current_target_position_);
-        detection_height_ -= 0.1;
+        dynamic_detection_height_ = std::max(dynamic_detection_height_-0.1, dynamic_eject_height_);
         if_nav = false;
 		RCLCPP_INFO(this->get_logger(), "跟随识别中...");
     }
     else if(current_step == 63)
     {
-        current_target_position_.transform.translation.x = detected_target_[0];
-        current_target_position_.transform.translation.y = detected_target_[1];
+        current_target_position_.transform.translation.x = target_positions_[target_sequence_[4]][0]; //detected_target_[0];
+        current_target_position_.transform.translation.y = target_positions_[target_sequence_[4]][1]; //detected_target_[1];
         current_target_position_.transform.translation.z = dynamic_eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
