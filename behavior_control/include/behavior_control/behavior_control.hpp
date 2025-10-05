@@ -99,6 +99,9 @@ private:
     std::vector<double> random_target_search_1_;
     std::vector<double> random_target_search_2_;
     std::vector<double> random_target_search_3_;
+    /// 起飞点附近随机靶搜索坐标
+    std::vector<double> random_target_init_search_1_;
+    std::vector<double> random_target_init_search_2_;
     /// 预设随机靶坐标为其中一个定靶点，找不到随机靶时投这个
     std::vector<double> prev_random_target_;
     /// 最终确定的随机靶坐标
@@ -133,6 +136,8 @@ private:
     double passing_door_height_;
     /// 投掷高度
     double eject_height_;
+    /// 动态靶投掷高度
+    double dynamic_eject_height_;
     double obstacle_height_;
 
     /* 是否投掷该目标 */
@@ -171,10 +176,10 @@ private:
     int passing_cnt_1_;
     int passing_cnt_2_;
     int eject_cnt_threshold_;
+    int dynamic_eject_cnt_threshold_;
     int detection_cnt_threshold_;
+    int dynamic_detection_cnt_threshold_;
     int turning_cnt_threshold_;
-    int passing_threshold_1_;
-    int passing_threshold_2_;
 
     /// 舵机投放位置参数控制
     rclcpp::Parameter servo_param;

@@ -20,6 +20,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter<std::vector<double>>("random_target_search_1", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("random_target_search_2", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("random_target_search_3", std::vector<double>{0.0, 0.0});
+    this->declare_parameter<std::vector<double>>("random_target_init_search_1", std::vector<double>{0.0, 0.0});
+    this->declare_parameter<std::vector<double>>("random_target_init_search_2", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("prev_random_target", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<std::string>>("target_sequence", std::vector<std::string>{"tent", "car", "pillbox", "tank"});
     this->declare_parameter("cruise_height", 0.6);
@@ -27,6 +29,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("H_detection_height", 1.5);
     this->declare_parameter("passing_door_height", 0.4);
     this->declare_parameter("eject_height", 0.25);
+    this->declare_parameter("dynamic_eject_height", 0.5);
     this->declare_parameter("if_hit_tank", false);
     this->declare_parameter("if_hit_car", false);
     this->declare_parameter("if_hit_pillbox", false);
@@ -58,12 +61,15 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter<std::vector<double>>("random_target_search_1", random_target_search_1_);
     this->get_parameter<std::vector<double>>("random_target_search_2", random_target_search_2_);
     this->get_parameter<std::vector<double>>("random_target_search_3", random_target_search_3_);
+    this->get_parameter<std::vector<double>>("random_target_init_search_1", random_target_init_search_1_);
+    this->get_parameter<std::vector<double>>("random_target_init_search_2", random_target_init_search_2_);
     this->get_parameter<std::vector<double>>("prev_random_target", prev_random_target_);
     this->get_parameter("cruise_height", cruise_height_);
     this->get_parameter("detection_height", detection_height_);
     this->get_parameter("H_detection_height", H_detection_height_);
     this->get_parameter("passing_door_height", passing_door_height_);
     this->get_parameter("eject_height", eject_height_);
+    this->get_parameter("dynamic_eject_height", dynamic_eject_height_);
     this->get_parameter("if_hit_tank", if_hit_tank_);
     this->get_parameter("if_hit_car", if_hit_car_);
     this->get_parameter("if_hit_pillbox", if_hit_pillbox_);
@@ -118,16 +124,17 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_z_ = 0.0;
 
     current_step = 0;
+
     eject_cnt = 0;
     detection_cnt = 0;
     turning_cnt = 0;
     passing_cnt_1_ = 0;
     passing_cnt_2_ = 0;
-    eject_cnt_threshold_ = 5.0 / 0.25; //等待投掷时间
+    eject_cnt_threshold_ = 4.5 / 0.25; //等待投掷时间
+    dynamic_eject_cnt_threshold_ = 2.0 / 0.25; //动态靶等待投掷时间
     detection_cnt_threshold_ = 2.5 / 0.25; //等待识别时间
-    turning_cnt_threshold_ = 6.0 / 0.25; //等待转向时间
-    passing_threshold_1_ = 30.0 / 0.25;
-    passing_threshold_2_ = 30.0 / 0.25;
+    dynamic_detection_cnt_threshold_ = 2.0 / 0.25; //在初始起飞后寻找随机靶的等待时间
+    turning_cnt_threshold_ = 5.5 / 0.25; //等待转向时间
 
     obstacle_height_ = 2.0;
 
@@ -270,6 +277,51 @@ void BehaviorControl::step_timer_callback()
     {
         if(fabs(current_z_ - cruise_height_) <= 0.05)
         {
+            current_step = 21;
+        }
+    }
+    //在起飞点左右两侧移动，寻找随机靶
+    else if(current_step == 111)
+    {
+        if(fabs(current_x_ - random_target_init_search_1_[0]) <= 0.2)
+            if(fabs(current_y_ - random_target_init_search_1_[1]) <= 0.2)
+            {
+                current_step = 112;
+            }
+    }
+    else if(current_step == 112)
+    {
+        if(if_find_random_target_) //找到随机靶
+        {
+            detection_cnt = 0;
+            current_step = 21;
+        }
+        detection_cnt++;
+        if(detection_cnt >= dynamic_detection_cnt_threshold_)
+        {
+            detection_cnt = 0;
+            current_step = 113;
+        }
+    }
+    else if(current_step == 113)
+    {
+        if(fabs(current_x_ - random_target_init_search_2_[0]) <= 0.2)
+            if(fabs(current_y_ - random_target_init_search_2_[1]) <= 0.2)
+            {
+                current_step = 114;
+            }
+    }
+    else if(current_step == 114)
+    {
+        if(if_find_random_target_) //找到随机靶
+        {
+            detection_cnt = 0;
+            current_step = 21;
+        }
+        detection_cnt++;
+        if(detection_cnt >= dynamic_detection_cnt_threshold_)
+        {
+            detection_cnt = 0;
             current_step = 21;
         }
     }
@@ -436,19 +488,17 @@ void BehaviorControl::step_timer_callback()
         else //不投掷
             current_step = 91;
     }
-    else if(current_step == 62) //进行识别
+    else if(current_step == 62) //进行跟随识别，并不断下降高度
     {
-        detection_cnt++;
-        if(detection_cnt >= detection_cnt_threshold_)
+        if(abs(current_z_ - dynamic_eject_height_) <= 0.2)
         {
-            detection_cnt = 0;
             current_step = 63;
         }
     }
-    else if(current_step == 63) //下降投掷
+    else if(current_step == 63) //下降到动态靶投掷高度时直接投掷
     {
         eject_cnt++;
-        if(eject_cnt >= eject_cnt_threshold_) //计时
+        if(eject_cnt >= dynamic_eject_cnt_threshold_) //计时
         {
             eject_cnt = 0;
             current_step = 91;
@@ -616,6 +666,52 @@ void BehaviorControl::mission_timer_callback()
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         RCLCPP_INFO(this->get_logger(), "等待起飞至巡航高度...");
+    }
+    else if(current_step == 111)
+    {
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.header.frame_id = "map";
+        action_goal.pose.pose.position.x = random_target_init_search_1_[0];
+        action_goal.pose.pose.position.y = random_target_init_search_1_[1];
+        action_goal.pose.pose.position.z = cruise_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
+        if_nav = true;
+    }
+    else if(current_step == 112)
+    {
+        current_target_position_.transform.translation.x = random_target_init_search_1_[0];
+        current_target_position_.transform.translation.y = random_target_init_search_1_[1];
+        current_target_position_.transform.translation.z = cruise_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        RCLCPP_INFO(this->get_logger(), "第一个随机靶搜索点");
+    }
+    else if(current_step == 113)
+    {
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+        action_goal.pose.header.frame_id = "map";
+        action_goal.pose.pose.position.x = random_target_init_search_2_[0];
+        action_goal.pose.pose.position.y = random_target_init_search_2_[1];
+        action_goal.pose.pose.position.z = cruise_height_;
+        action_goal.pose.pose.orientation.x = 0.0;
+        action_goal.pose.pose.orientation.y = 0.0;
+        action_goal.pose.pose.orientation.z = 0.0;
+        action_goal.pose.pose.orientation.w = 1.0;
+        navigate_to_pose_client_->async_send_goal(action_goal);
+        if_nav = true;
+    }
+    else if(current_step == 114)
+    {
+        current_target_position_.transform.translation.x = random_target_init_search_2_[0];
+        current_target_position_.transform.translation.y = random_target_init_search_2_[1];
+        current_target_position_.transform.translation.z = cruise_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        RCLCPP_INFO(this->get_logger(), "第二个随机靶搜索点");
     }
     else if(current_step == 21)
     {
@@ -860,34 +956,29 @@ void BehaviorControl::mission_timer_callback()
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "动态目标点，current x y: %lf, %lf", current_x_, current_y_);
     }
-    else if(current_step == 62) //识别投掷策略待修改
+    else if(current_step == 62)
     {
         current_target_position_.transform.translation.x = detected_target_[0];
         current_target_position_.transform.translation.y = detected_target_[1];
-        current_target_position_.transform.translation.z = detection_height_;
+        current_target_position_.transform.translation.z = std::max(detection_height_, dynamic_eject_height_);
         target_pose_pub_->publish(current_target_position_);
+        detection_height_ -= 0.1;
         if_nav = false;
-		RCLCPP_INFO(this->get_logger(), "识别中...");
+		RCLCPP_INFO(this->get_logger(), "跟随识别中...");
     }
     else if(current_step == 63)
     {
         current_target_position_.transform.translation.x = detected_target_[0];
         current_target_position_.transform.translation.y = detected_target_[1];
-        if(current_z_ - eject_height_ >= 0.5)
-            current_target_position_.transform.translation.z = current_z_ - 0.5;
-        else
-            current_target_position_.transform.translation.z = eject_height_;
+        current_target_position_.transform.translation.z = dynamic_eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
-        if(eject_cnt >= 16)
-        {
-            servo_index_ = 2;
-            RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
-            if (servo_index_ == last_servo_index_)
-                return;
-            last_servo_index_ = servo_index_;
-            set_parameter();
-        }
+        servo_index_ = 2;
+        RCLCPP_INFO(this->get_logger(), "动态靶投掷，第 %d 个投放位", servo_index_);
+        if (servo_index_ == last_servo_index_)
+            return;
+        last_servo_index_ = servo_index_;
+        set_parameter();
     }
 
     else if(current_step == 91)
@@ -949,7 +1040,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.w = 1.0;
         navigate_to_pose_client_->async_send_goal(action_goal);
         if_nav = true;
-        RCLCPP_INFO(this->get_logger(), "------随机靶: %lf, %lf", random_target_[0], random_target_[1]);
+        RCLCPP_INFO(this->get_logger(), "---------随机靶: %lf, %lf", random_target_[0], random_target_[1]);
     }
     else if(current_step == 102)
     {
@@ -1119,15 +1210,15 @@ void BehaviorControl::mission_timer_callback()
     std_msgs::msg::Bool nav_state_msg;
     nav_state_msg.data = if_nav;
     nav_state_pub_->publish(nav_state_msg);
-    RCLCPP_INFO(this->get_logger(), "<<<<<<<<<<<<<<<<<<<<<<< if_nav: %d", if_nav);
+    // RCLCPP_INFO(this->get_logger(), "<<<<<<<<<<<<<<<<<<<<<<< if_nav: %d", if_nav);
     std_msgs::msg::Bool passing_door_state_msg;
     passing_door_state_msg.data = current_passing_door_;
     passing_door_state_pub_->publish(passing_door_state_msg);
-    RCLCPP_INFO(this->get_logger(), "/////////////////////// current_passing_door_: %d", current_passing_door_);
+    // RCLCPP_INFO(this->get_logger(), "/////////////////////// current_passing_door_: %d", current_passing_door_);
     std_msgs::msg::Bool turning_state_msg;
     turning_state_msg.data = if_turning;
     turning_state_pub_->publish(turning_state_msg);
-    RCLCPP_INFO(this->get_logger(), "////////......... if_turning: %d", if_turning);
+    // RCLCPP_INFO(this->get_logger(), "////////......... if_turning: %d", if_turning);
     std_msgs::msg::Float64 obstacle_height_msg;
     obstacle_height_msg.data = obstacle_height_;
     obstacle_height_pub_->publish(obstacle_height_msg);
@@ -1166,7 +1257,7 @@ void BehaviorControl::handle_parameter_response(
         auto response = future.get();
         for (const auto& result : response->results) {
             if (result.successful) {
-                RCLCPP_INFO(this->get_logger(), "Parameter set successfully");
+                RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Parameter set successfully");
             } else {
                 RCLCPP_ERROR(this->get_logger(), "Failed to set parameter: %s",
                             result.reason.c_str());
