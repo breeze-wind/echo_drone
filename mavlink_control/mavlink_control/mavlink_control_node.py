@@ -105,6 +105,7 @@ class MavlinkControl(Node):
         self.channel_position_timer = self.create_timer(0.1, self.channel_position_timer_callback)
         #监测心跳信号，是否已经解锁
         self.state_timer = self.create_timer(1.0, self.state_timer_callback)
+        self.curr_vel_timer = self.create_timer(0.1, self.curr_vel_timer_callback)
 
     #接收决策传来的自身当前测量位置，并发送到飞控, 10Hz
     def current_pose_callback(self, msg):
@@ -123,7 +124,7 @@ class MavlinkControl(Node):
         )
         self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f'
                                % (self.current_x, -self.current_y, -(self.current_z - 0.08)))
-        self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
+        # self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
 
     #读取遥控杆位置
     def channel_position_timer_callback(self):
@@ -167,6 +168,14 @@ class MavlinkControl(Node):
 
             msg.data = self.arming_state
             self.arm_state_pub.publish(msg)
+
+    def curr_vel_timer_callback(self):
+        cv = self.master.recv_match(type='LOCAL_POSITION_NED', blocking=False)
+        if cv:
+            curr_vx = cv.vx  # 北向速度 (单位: 米/秒)
+            curr_vy = cv.vy  # 东向速度 (单位: 米/秒)
+            curr_vz = cv.vz  # 下向速度 (单位: 米/秒)
+            print(f"速度 (NED): curr_vx={curr_vx:.2f}, curr_vy={curr_vy:.2f}, curr_vz={curr_vz:.2f}")
 
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):
