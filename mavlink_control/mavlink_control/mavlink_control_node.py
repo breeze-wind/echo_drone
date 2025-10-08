@@ -38,7 +38,7 @@ class MavlinkControl(Node):
 
         self.ready_to_arm = False #是否准备解锁
         self.arming_state = False #飞控解锁状态
-        self.if_nav = False
+        self.if_nav = True
         self.current_passing_door = False
         self.if_turning = False
         self.target_yaw = 0.0 #弧度
@@ -61,6 +61,8 @@ class MavlinkControl(Node):
         )
 
         self.arm_state_pub = self.create_publisher(Bool, '/robot/arm_state', 10)
+        self.v_pub = self.create_publisher(Twist, '/robot/v', 10)
+
         self.current_pose_sub = self.create_subscription(
             TransformStamped,
             '/robot/current_pose',
@@ -175,7 +177,17 @@ class MavlinkControl(Node):
             curr_vx = cv.vx  # 北向速度 (单位: 米/秒)
             curr_vy = cv.vy  # 东向速度 (单位: 米/秒)
             curr_vz = cv.vz  # 下向速度 (单位: 米/秒)
-            print(f"速度 (NED): curr_vx={curr_vx:.2f}, curr_vy={curr_vy:.2f}, curr_vz={curr_vz:.2f}")
+
+            msg = Twist()
+            msg.linear.x = curr_vx
+            msg.linear.y = curr_vy
+            msg.linear.z = curr_vz
+            msg.angular.x = 0.0
+            msg.angular.y = 0.0
+            msg.angular.z = 0.0
+            self.v_pub.publish(msg)
+
+            self.get_logger().info("mavlink: curr_vx=%f, curr_vy=%f, curr_vz=%f" %(curr_vx, curr_vy, curr_vz))
 
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):
