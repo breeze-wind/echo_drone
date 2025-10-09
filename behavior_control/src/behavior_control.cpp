@@ -126,7 +126,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_z_ = 0.0;
     dynamic_detection_height_ = detection_height_;
 
-    current_step = 0;
+    current_step = 21;
 
     eject_cnt = 0;
     detection_cnt = 0;

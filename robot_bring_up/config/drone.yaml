@@ -2,7 +2,7 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
     ros__parameters:
         tank_position: [3.5, -0.5]
         bridge_position: [3.26, 0.85]
-        tent_position: [1.41,1.61]
+        tent_position: [2.08,-1.25]
         car_position: [2.08, -1.25]
         pillbox_position: [1.41,1.61]
         passing_door_src_1: [ 3.68, 0.095 ]
