@@ -210,6 +210,10 @@ private:
     int current_nav_mode;
     int last_nav_mode;
 
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+
+
     geometry_msgs::msg::TransformStamped map_to_livox;
 
     nav2_msgs::action::NavigateToPose::Goal navigate_to_pose_action_;

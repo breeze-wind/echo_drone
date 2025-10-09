@@ -7,6 +7,8 @@
 BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 {
     RCLCPP_INFO(this->get_logger(), "%s node create", name.c_str());
+    tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     /* 读yaml文件参数 */
     this->declare_parameter<std::vector<double>>("tank_position", std::vector<double>{0.0, 0.0});
@@ -763,7 +765,7 @@ void BehaviorControl::mission_timer_callback()
     try
     {
 
-        tf_buffer_.transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
