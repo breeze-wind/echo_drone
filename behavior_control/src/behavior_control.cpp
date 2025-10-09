@@ -772,8 +772,10 @@ void BehaviorControl::mission_timer_callback()
         current_target_position_.transform.translation.z = world_pt.point.z;
 
         target_pose_pub_->publish(current_target_position_);
-        RCLCPP_INFO(this->get_logger(), "识别中... (map坐标: %.2f, %.2f, %.2f)",
+        RCLCPP_INFO(this->get_logger(), "识别中... (相机发来map坐标: %.2f, %.2f, %.2f)",
                     world_pt.point.x, world_pt.point.y, world_pt.point.z);
+        RCLCPP_INFO(this->get_logger(), "识别中... (预设map坐标: %.2f, %.2f, %.2f)",
+                    target_positions_[target_sequence_[0]][0], target_positions_[target_sequence_[0]][1], detection_height_);
     }
     catch (const tf2::TransformException &ex)
     {
