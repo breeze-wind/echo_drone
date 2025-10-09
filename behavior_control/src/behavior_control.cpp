@@ -792,7 +792,7 @@ else if(current_step == 24)  // 下降投掷
 
     try
     {
-        tf_buffer_.transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -854,7 +854,7 @@ else if(current_step == 24)  // 下降投掷
     try
     {
 
-        tf_buffer_.transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -883,7 +883,7 @@ else if(current_step == 34)  // 下降投掷
 
     try
     {
-        tf_buffer_.transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -944,7 +944,7 @@ else if(current_step == 34)  // 下降投掷
     try
     {
 
-        tf_buffer_.transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -973,7 +973,7 @@ else if(current_step == 44)  // 下降投掷
 
     try
     {
-        tf_buffer_.transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1034,7 +1034,7 @@ else if(current_step == 44)  // 下降投掷
     try
     {
 
-        tf_buffer_.transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1063,7 +1063,7 @@ else if(current_step == 54)  // 下降投掷
 
     try
     {
-        tf_buffer_.transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
