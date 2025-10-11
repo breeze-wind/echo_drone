@@ -850,12 +850,10 @@ void BehaviorControl::mission_timer_callback()
         camera_pt.header.stamp = this->now();
         if (eject_cnt==1)
         {
-             eject_last_x = detected_target_[0];
-             eject_last_y = detected_target_[1];
+            camera_pt.point.x = detected_target_[0];
+            camera_pt.point.y = detected_target_[1];
+            camera_pt.point.z = 0.0;  // 起始高度
         }
-         camera_pt.point.x = eject_last_x;
-         camera_pt.point.y = eject_last_y;
-        camera_pt.point.z = 0.0; // 起始高度
         try
         {
             tf2::doTransform(camera_pt, world_pt, map_to_camera);
@@ -950,14 +948,12 @@ void BehaviorControl::mission_timer_callback()
         camera_pt.header.frame_id = "camera_link";
         camera_pt.header.stamp = this->now();
 
-      if (eject_cnt==1)
+        if (eject_cnt==1)
         {
-            eject_last_x = detected_target_[0];
-            eject_last_y = detected_target_[1];
+            camera_pt.point.x = detected_target_[0];
+            camera_pt.point.y = detected_target_[1];
+            camera_pt.point.z = 0.0;  // 起始高度
         }
-        camera_pt.point.x = eject_last_x;
-        camera_pt.point.y = eject_last_y;
-        camera_pt.point.z = 0.0; // 起始高度
 
         try
         {
@@ -1055,12 +1051,10 @@ void BehaviorControl::mission_timer_callback()
 
         if (eject_cnt==1)
         {
-            eject_last_x = detected_target_[0];
-            eject_last_y = detected_target_[1];
+            camera_pt.point.x = detected_target_[0];
+            camera_pt.point.y = detected_target_[1];
+            camera_pt.point.z = 0.0;  // 起始高度
         }
-        camera_pt.point.x = eject_last_x;
-        camera_pt.point.y = eject_last_y;
-        camera_pt.point.z = 0.0; // 起始高度
         try
         {
             tf2::doTransform(camera_pt, world_pt, map_to_camera);
@@ -1157,12 +1151,10 @@ void BehaviorControl::mission_timer_callback()
         camera_pt.header.stamp = this->now();
         if (eject_cnt==1)
         {
-            eject_last_x = detected_target_[0];
-            eject_last_y = detected_target_[1];
+            camera_pt.point.x = detected_target_[0];
+            camera_pt.point.y = detected_target_[1];
+            camera_pt.point.z = 0.0;  // 起始高度
         }
-        camera_pt.point.x = eject_last_x;
-        camera_pt.point.y = eject_last_y;
-        camera_pt.point.z = 0.0; // 起始高度
         try
         {
             tf2::doTransform(camera_pt, world_pt, map_to_camera);
@@ -1253,12 +1245,10 @@ void BehaviorControl::mission_timer_callback()
 
         if (eject_cnt==1)
         {
-            eject_last_x = detected_target_[0];
-            eject_last_y = detected_target_[1];
+            camera_pt.point.x = detected_target_[0];
+            camera_pt.point.y = detected_target_[1];
+            camera_pt.point.z = 0.0;  // 起始高度
         }
-        camera_pt.point.x = eject_last_x;
-        camera_pt.point.y = eject_last_y;
-        camera_pt.point.z = 0.0; // 起始高度
         try
         {
             tf2::doTransform(camera_pt, world_pt, map_to_camera);
@@ -1391,12 +1381,10 @@ void BehaviorControl::mission_timer_callback()
 
         if (eject_cnt==1)
         {
-            eject_last_x = detected_target_[0];
-            eject_last_y = detected_target_[1];
+            camera_pt.point.x = detected_target_[0];
+            camera_pt.point.y = detected_target_[1];
+            camera_pt.point.z = 0.0;  // 起始高度
         }
-        camera_pt.point.x = eject_last_x;
-        camera_pt.point.y = eject_last_y;
-        camera_pt.point.z = 0.0; // 起始高度
         try
         {
             tf2::doTransform(camera_pt, world_pt, map_to_camera);
