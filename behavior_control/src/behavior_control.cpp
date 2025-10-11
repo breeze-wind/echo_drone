@@ -125,7 +125,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_x_ = 0.0;
     current_y_ = 0.0;
     current_z_ = 0.0;
-    dynamic_detection_height_ = detection_height_ + 0.15;
+    dynamic_detection_height_ = detection_height_ + 0.35;
 
     eject_cnt = 0;
     detection_cnt = 0;
@@ -583,10 +583,10 @@ void BehaviorControl::step_timer_callback()
         if(fabs(current_x_ - random_target_search_3_[0]) < 0.15)
             if(fabs(current_y_ - random_target_search_3_[1]) < 0.15)
             {
-                current_step = 101;
+
                 if(!if_find_random_target_) //没找到随机靶
                 {
-                    if(if_openmv_find_) //用不准的openmv点
+                    if(0) //用不准的openmv点 if_openmv_find_
                     {
                         random_target_[0] = openmv_detected_random_target_[0];
                         random_target_[1] = openmv_detected_random_target_[1];
@@ -598,6 +598,8 @@ void BehaviorControl::step_timer_callback()
                     }
                 }
                 RCLCPP_INFO(this->get_logger(), "random_target: %lf, %lf", random_target_[0], random_target_[1]);
+                current_step = 101;
+
             }
     }
     //进入随机靶投掷任务
