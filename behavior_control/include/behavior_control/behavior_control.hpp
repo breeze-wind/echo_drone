@@ -170,6 +170,8 @@ private:
     /// 当前步骤
     int current_step;
 
+    float eject_last_x;
+    float eject_last_y;
     /* 计时计数及阈值 */
     int eject_cnt;
     int detection_cnt;
@@ -181,7 +183,6 @@ private:
     int detection_cnt_threshold_;
     int dynamic_detection_cnt_threshold_;
     int turning_cnt_threshold_;
-
     /// 舵机投放位置参数控制
     rclcpp::Parameter servo_param;
     /// 舵机投放位置序号
