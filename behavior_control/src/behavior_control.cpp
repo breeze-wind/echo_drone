@@ -6,7 +6,7 @@
 
 BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 {
-    current_step = 62;
+    current_step = 0;
     RCLCPP_INFO(this->get_logger(), "%s node create", name.c_str());
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -324,7 +324,7 @@ void BehaviorControl::step_timer_callback()
     {
         if(fabs(current_z_ - cruise_height_) <= 0.05)
         {
-            current_step =61;//current_step=111;
+            current_step =111;//current_step=61;
         }
     }
     //在起飞点左右两侧移动，寻找随机靶
@@ -539,7 +539,7 @@ void BehaviorControl::step_timer_callback()
     {
         if(abs(current_z_ - dynamic_eject_height_) <= 0.15)
         {
-         //   current_step = 63;
+            current_step = 63;
         }
     }
     else if(current_step == 63) //下降到动态靶投掷高度时直接投掷
@@ -853,7 +853,8 @@ else if(current_step == 24)  // 下降投掷
 
     try
     {
-        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf2::doTransform(camera_pt, world_pt, map_to_camera);
+       // tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -914,8 +915,8 @@ else if(current_step == 24)  // 下降投掷
 
     try
     {
-
-        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf2::doTransform(camera_pt, world_pt, map_to_camera);
+        //tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -946,7 +947,7 @@ else if(current_step == 34)  // 下降投掷
 
     try
     {
-        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf2::doTransform(camera_pt, world_pt, map_to_camera);
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1006,8 +1007,8 @@ else if(current_step == 34)  // 下降投掷
 
     try
     {
-
-        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf2::doTransform(camera_pt, world_pt, map_to_camera);
+        //tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1038,7 +1039,8 @@ else if(current_step == 44)  // 下降投掷
 
     try
     {
-        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf2::doTransform(camera_pt, world_pt, map_to_camera);
+       // tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1098,8 +1100,8 @@ else if(current_step == 44)  // 下降投掷
 
     try
     {
-
-        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf2::doTransform(camera_pt, world_pt, map_to_camera);
+        //tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1128,7 +1130,8 @@ else if(current_step == 54)  // 下降投掷
 }
     try
     {
-        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf2::doTransform(camera_pt, world_pt, map_to_camera);
+        //tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1195,7 +1198,7 @@ else if(current_step == 54)  // 下降投掷
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
         }
 
-     //   dynamic_detection_height_ = std::max(dynamic_detection_height_-0.005, dynamic_eject_height_);
+       dynamic_detection_height_ = std::max(dynamic_detection_height_-0.005, dynamic_eject_height_);
         if_nav = false;
 		RCLCPP_INFO(this->get_logger(), "跟随识别中...");
     }
@@ -1212,8 +1215,8 @@ else if(current_step == 54)  // 下降投掷
         }
         try
         {
-
-            tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+            tf2::doTransform(camera_pt, world_pt, map_to_camera);
+            //tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
             current_target_position_.transform.translation.x = world_pt.point.x;
             current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1313,8 +1316,8 @@ else if(current_step == 54)  // 下降投掷
 
             try
             {
-
-                tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+                tf2::doTransform(camera_pt, world_pt, map_to_camera);
+                //tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
                 current_target_position_.transform.translation.x = world_pt.point.x;
                 current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1345,8 +1348,8 @@ else if(current_step == 54)  // 下降投掷
         }
         try
         {
-
-            tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+            tf2::doTransform(camera_pt, world_pt, map_to_camera);
+            //tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
             current_target_position_.transform.translation.x = world_pt.point.x;
             current_target_position_.transform.translation.y = world_pt.point.y;
