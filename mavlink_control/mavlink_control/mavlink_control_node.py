@@ -127,7 +127,7 @@ class MavlinkControl(Node):
             self.current_x, -self.current_y, -(self.current_z-0.08),
             roll, -pitch, -yaw
         )
-        self.get_logger().info('mavlink: send vision estimate pose x y z: %f, %f, %f'
+        self.get_logger().info(f'{YELLOW}mavlink: send vision estimate pose x y z: %f, %f, %f{RESET}'
                                % (self.current_x, -self.current_y, -(self.current_z - 0.08)))
         # self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
 
@@ -160,11 +160,11 @@ class MavlinkControl(Node):
     #监测心跳信号，是否已经解锁
     def state_timer_callback(self):
         hb = self.master.recv_match(type='HEARTBEAT', blocking=False)
-        self.get_logger().info('！！！！！！！！！！！！！！！！！！！检查解锁！！!!!!!!!!!!!!!')
+        #self.get_logger().info('！！！！！！！！！！！！！！！！！！！检查解锁！！!!!!!!!!!!!!!')
         if hb:
             armed = (hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
-            for _ in range(5):
-                self.get_logger().info(f'{YELLOW}????????Vehicle armed?  %d{RESET}' %armed)
+            #for _ in range(5):
+                #self.get_logger().info(f'{YELLOW}????????Vehicle armed?  %d{RESET}' %armed)
             msg = Bool() #给决策发送是否解锁
             if armed: #飞控实际状态解锁
                 self.arming_state = True
@@ -226,7 +226,7 @@ class MavlinkControl(Node):
                     -1.57, 0
                 )
 
-            # self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %(vx, vy, vz))
+            self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %(vx, vy, vz))
 
     #发送目标点位置到飞控
     def target_pose_callback(self, msg):
@@ -260,7 +260,7 @@ class MavlinkControl(Node):
                     -self.target_yaw, 0.0
                 )
             # self.get_logger().info('mavlink: send target_yaw: %f' %(-self.target_yaw))
-            self.get_logger().info('mavlink: send target pose x y z: %f, %f, %f' %(x, y, z))
+            self.get_logger().info(f'{YELLOW}mavlink: send target pose x y z: %f, %f, %f{RESET}' %(x, y, z))
 
     def nav_state_callback(self, msg):
         self.if_nav = msg.data

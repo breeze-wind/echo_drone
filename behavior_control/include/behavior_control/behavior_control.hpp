@@ -215,6 +215,12 @@ private:
 
 
     geometry_msgs::msg::TransformStamped map_to_livox;
+    geometry_msgs::msg::TransformStamped livox_to_camera;
+    geometry_msgs::msg::TransformStamped map_to_camera;
+
+    Eigen::Affine3d map_to_livox_affine;
+    Eigen::Affine3d livox_to_camera_affine;
+    Eigen::Affine3d map_to_camera_affine;
 
     nav2_msgs::action::NavigateToPose::Goal navigate_to_pose_action_;
 

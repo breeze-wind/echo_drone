@@ -6,6 +6,7 @@
 
 BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 {
+    current_step = 62;
     RCLCPP_INFO(this->get_logger(), "%s node create", name.c_str());
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -124,9 +125,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_x_ = 0.0;
     current_y_ = 0.0;
     current_z_ = 0.0;
-    dynamic_detection_height_ = detection_height_+0.35;
+    dynamic_detection_height_ = detection_height_ + 0.15;
 
-    current_step = 21;
     eject_cnt = 0;
     detection_cnt = 0;
     turning_cnt = 0;
@@ -157,6 +157,14 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     map_frame_ = "map";
     camera_frame_ = "camera_link";
     target_frame_ = "target_position";
+
+    livox_to_camera = tf_buffer_->lookupTransform("livox", "camera_link", rclcpp::Time(),
+                                    rclcpp::Duration::from_seconds(0.5));
+    RCLCPP_INFO(this->get_logger(), "-----------------+++++++++++++++livox_to_camera x y z: %lf, %lf, %lf",
+        livox_to_camera.transform.translation.x, livox_to_camera.transform.translation.y, livox_to_camera.transform.translation.z);
+    livox_to_camera_affine = tf2::transformToEigen(livox_to_camera);
+    Eigen::Affine3d map_to_livox_affine = Eigen::Affine3d::Identity(); //map->雷达
+    Eigen::Affine3d map_to_camera_affine = Eigen::Affine3d::Identity();
 
     if(!if_passing_door_)
     {
@@ -228,6 +236,33 @@ void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformSta
     current_x_ = msg->transform.translation.x;
     current_y_ = msg->transform.translation.y;
     current_z_ = msg->transform.translation.z + 0.39;
+
+    map_to_livox.header.stamp = msg->header.stamp;
+    map_to_livox.header.frame_id = "map";
+    map_to_livox.child_frame_id = "livox";
+    map_to_livox.transform.translation.x = current_x_;
+    map_to_livox.transform.translation.y = current_y_;
+    map_to_livox.transform.translation.z = current_z_;
+    map_to_livox.transform.rotation.x = msg->transform.rotation.x;
+    map_to_livox.transform.rotation.y = msg->transform.rotation.y;
+    map_to_livox.transform.rotation.z = msg->transform.rotation.z;
+    map_to_livox.transform.rotation.w = msg->transform.rotation.w;
+
+    map_to_livox_affine = tf2::transformToEigen(map_to_livox);
+    map_to_camera_affine = map_to_livox_affine * livox_to_camera_affine;
+
+    map_to_camera.header.stamp = msg->header.stamp;
+    map_to_camera.header.frame_id = "map";
+    map_to_camera.child_frame_id = "camera_link";
+    map_to_camera.transform.translation.x = map_to_camera_affine.translation().x();
+    map_to_camera.transform.translation.y = map_to_camera_affine.translation().y();
+    map_to_camera.transform.translation.z = map_to_camera_affine.translation().z();
+    Eigen::Matrix3d rotation_matrix = map_to_camera_affine.rotation();
+    Eigen::Quaterniond base_quat_result(rotation_matrix);
+    map_to_camera.transform.rotation.x = base_quat_result.x();
+    map_to_camera.transform.rotation.y = base_quat_result.y();
+    map_to_camera.transform.rotation.z = base_quat_result.z();
+    map_to_camera.transform.rotation.w = base_quat_result.w();
 }
 
 void BehaviorControl::OpenmvInfoCallback(const robot_interfaces::msg::OpenmvInfo::SharedPtr msg)
@@ -254,7 +289,7 @@ void BehaviorControl::OpenmvInfoCallback(const robot_interfaces::msg::OpenmvInfo
 void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg)
 {
     detected_target_id_ = msg->id;
-    if(detected_target_id_ == 6)
+    if(0)//detected_target_id_ == 6
     {
         if_find_random_target_ = true;
         random_target_[0] = msg->image_x;
@@ -266,7 +301,7 @@ void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLo
         detected_target_[1] = msg->image_y;
     }
     //for(int i=0;i<6;i++)
-     //RCLCPP_INFO(this->get_logger(), "----Detected target detected received: x:%f,y:%f-----",msg->image_x,msg->image_y);
+    //RCLCPP_INFO(this->get_logger(), "----Detected target detected received: x:%f,y:%f-----",random_target_[0],random_target_[1]);
    }
 
 void BehaviorControl::step_timer_callback()
@@ -695,6 +730,7 @@ void BehaviorControl::mission_timer_callback()
         current_target_position_.transform.translation.z = cruise_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
+
         // rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
         // action_goal.pose.header.frame_id = "map";
         // action_goal.pose.pose.position.x = random_target_init_search_1_[0];
@@ -769,21 +805,19 @@ void BehaviorControl::mission_timer_callback()
         if_nav = false;
         RCLCPP_INFO(this->get_logger(), "拉高中...current_target_z: %f", current_target_position_.transform.translation.z);
     }
-   else if(current_step == 23)  // 进行识别
-{
-    geometry_msgs::msg::PointStamped camera_pt, world_pt;
-    camera_pt.header.frame_id = "livox";
-    camera_pt.header.stamp = this->now();
-
-
-    camera_pt.point.x = detected_target_[0];
-    camera_pt.point.y = detected_target_[1];
-    camera_pt.point.z = detection_height_;
+    else if(current_step == 23)  // 进行识别
+	{
+        geometry_msgs::msg::PointStamped camera_pt, world_pt;
+        camera_pt.header.frame_id = "camera_link";
+        camera_pt.header.stamp = this->now();
+        camera_pt.point.x = detected_target_[0];
+        camera_pt.point.y = detected_target_[1];
+        camera_pt.point.z = 0.0;
 
     try
     {
-
-        tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+        tf2::doTransform(camera_pt, world_pt, map_to_camera);
+        // tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
         current_target_position_.transform.translation.x = world_pt.point.x;
         current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1134,17 +1168,16 @@ else if(current_step == 54)  // 下降投掷
     else if(current_step == 62)
     {
         geometry_msgs::msg::PointStamped camera_pt, world_pt;
-        camera_pt.header.frame_id = "livox";
+        camera_pt.header.frame_id = "camera_link";
         camera_pt.header.stamp = this->now();
-
         camera_pt.point.x = detected_target_[0];
         camera_pt.point.y = detected_target_[1];
-        camera_pt.point.z = detection_height_;
+        camera_pt.point.z = 0.0;
 
         try
         {
-
-            tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
+            tf2::doTransform(camera_pt, world_pt, map_to_camera);
+            // tf_buffer_->transform(camera_pt, world_pt, "map", tf2::durationFromSec(0.1));
 
             current_target_position_.transform.translation.x = world_pt.point.x;
             current_target_position_.transform.translation.y = world_pt.point.y;
@@ -1152,6 +1185,8 @@ else if(current_step == 54)  // 下降投掷
             target_pose_pub_->publish(current_target_position_);
             RCLCPP_INFO(this->get_logger(), "识别中... (相机发来map坐标: %.2f, %.2f)",
                                 world_pt.point.x, world_pt.point.y);
+            RCLCPP_INFO(this->get_logger(), "识别中... (飞机自身坐标: %.2f, %.2f)",
+                            current_x_, current_y_);
             RCLCPP_INFO(this->get_logger(), "识别中... (转换前坐标: %.2f, %.2f)",
                         camera_pt.point.x, camera_pt.point.y);
         }
