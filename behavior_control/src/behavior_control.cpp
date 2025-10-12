@@ -531,11 +531,20 @@ void BehaviorControl::step_timer_callback()
         {
             if (fabs(current_x_ - target_positions_[target_sequence_[4]][0]) < 0.15) //是否到目标点附近
                 if (fabs(current_y_ - target_positions_[target_sequence_[4]][1]) < 0.15)
-                    current_step = 62;
+                    current_step = 611;
         }
         else //不投掷
             current_step = 91;
     }
+else if(current_step == 611)
+	{
+
+        if (fabs(current_z_ - dynamic_detection_height_) < 0.2)
+        {
+            current_step = 62;
+        }
+
+	}
     else if(current_step == 62) //进行跟随识别，并不断下降高度
     {
         if(abs(current_z_ - dynamic_eject_height_) <= 0.15)
@@ -875,7 +884,7 @@ void BehaviorControl::mission_timer_callback()
         {
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 24: %s", ex.what());
         }
-        if(eject_cnt >= 16)
+        if(eject_cnt >= 15)
         {
             servo_index_ = 1;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -1203,6 +1212,15 @@ void BehaviorControl::mission_timer_callback()
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "动态目标点，current x y: %lf, %lf", current_x_, current_y_);
     }
+else if(current_step == 611)
+  	{
+  	    current_target_position_.transform.translation.x = target_positions_[target_sequence_[4]][0];
+        current_target_position_.transform.translation.y = target_positions_[target_sequence_[4]][1];
+        current_target_position_.transform.translation.z = dynamic_detection_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        RCLCPP_INFO(this->get_logger(), "拉高中...");
+ 	}
     else if(current_step == 62)
     {
         geometry_msgs::msg::PointStamped camera_pt, world_pt;
