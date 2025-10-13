@@ -214,7 +214,6 @@ private:
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-
     geometry_msgs::msg::TransformStamped map_to_livox;
     geometry_msgs::msg::TransformStamped livox_to_camera;
     geometry_msgs::msg::TransformStamped map_to_camera;
@@ -226,6 +225,8 @@ private:
     nav2_msgs::action::NavigateToPose::Goal navigate_to_pose_action_;
 
     geometry_msgs::msg::TransformStamped current_target_position_;
+
+    geometry_msgs::msg::PointStamped camera_pt_, world_pt_;
 };
 
 #endif //BEHAVIOR_CONTROL_HPP
