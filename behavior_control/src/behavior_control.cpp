@@ -667,7 +667,7 @@ void BehaviorControl::step_timer_callback()
             clear_state_pub_->publish(clear_state_msg);
 
             turning_cnt = 0;
-            current_step = 73;
+            current_step = 74;
         }
     }
     else if(current_step == 73) //导航至穿门中间点
@@ -1182,7 +1182,7 @@ void BehaviorControl::mission_timer_callback()
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
         }
 
-        dynamic_detection_height_ = std::max(dynamic_detection_height_-0.001, dynamic_eject_height_);
+        dynamic_detection_height_ = std::max(dynamic_detection_height_-0.003, dynamic_eject_height_);
         if_nav = false;
 	    RCLCPP_INFO(this->get_logger(), "跟随识别中...");
     }

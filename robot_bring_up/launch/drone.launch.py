@@ -128,14 +128,14 @@ def generate_launch_description():
         declare_rviz_config_dir,
         livox_to_mavlink_body,
         livox_to_camera,
-        navigation_launch,
-        rviz_node,
         TimerAction(
-            period=5.0,
+            period=8.0,
             actions=[
                 point_lio_launch
             ],
         ),
+        navigation_launch,
+        rviz_node,
         obstacle_segmentation_launch
     ]
 
