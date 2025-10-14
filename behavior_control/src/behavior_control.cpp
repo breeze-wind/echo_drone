@@ -132,11 +132,11 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     turning_cnt = 0;
     passing_cnt_1_ = 0;
     passing_cnt_2_ = 0;
-    eject_cnt_threshold_ = 4.5 / 0.25; //等待投掷时间
-    dynamic_eject_cnt_threshold_ = 1.0 / 0.25; //动态靶等待投掷时间
+    eject_cnt_threshold_ = 4.0 / 0.25; //等待投掷时间
+    dynamic_eject_cnt_threshold_ = 1.5 / 0.25; //动态靶等待投掷时间
     detection_cnt_threshold_ = 2.5 / 0.25; //等待识别时间
-    dynamic_detection_cnt_threshold_ = 2.0 / 0.25; //在初始起飞后寻找随机靶的等待时间
-    turning_cnt_threshold_ = 5.5 / 0.25; //等待转向时间
+    dynamic_detection_cnt_threshold_ = 2.5 / 0.25; //在初始起飞后寻找随机靶的等待时间
+    turning_cnt_threshold_ = 5.0 / 0.25; //等待转向时间
 
     obstacle_height_ = 2.0;
 
@@ -211,8 +211,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
             10, std::bind(&BehaviorControl::CurrentPoseCallback, this, std::placeholders::_1));
     image_location_sub_ = this->create_subscription<robot_interfaces::msg::ImageLocation>("/robot/image_location",
             10, std::bind(&BehaviorControl::ImageLocationCallback, this, std::placeholders::_1));
-    openmv_info_sub_ = this->create_subscription<robot_interfaces::msg::OpenmvInfo>("/robot/openmv_info",
-            10, std::bind(&BehaviorControl::OpenmvInfoCallback, this, std::placeholders::_1));
+    usbcamera_info_sub_ = this->create_subscription<robot_interfaces::msg::ImageLocation>("/robot/usb_camera",
+            10, std::bind(&BehaviorControl::USBCameraInfoCallback, this, std::placeholders::_1));
 
     servo_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/servo_node/set_parameters");
     controller_server_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/controller_server/set_parameters");
@@ -269,23 +269,15 @@ void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformSta
     map_to_camera.transform.rotation.w = base_quat_result.w();
 }
 
-void BehaviorControl::OpenmvInfoCallback(const robot_interfaces::msg::OpenmvInfo::SharedPtr msg)
+void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg)
 {
-    if(!if_find_random_target_) //还没找到随机靶
+    if(current_step == 112 || current_step == 114)
     {
-        if_openmv_accurate_ = msg->accurate;
-        if_openmv_find_ = true;
-        if(if_openmv_accurate_)
+        if(msg->id == 6)
         {
             if_find_random_target_ = true;
             random_target_[0] = msg->image_x;
             random_target_[1] = msg->image_y;
-        }
-        else
-        {
-            if_find_random_target_ = false;
-            openmv_detected_random_target_[0] = msg->image_x;
-            openmv_detected_random_target_[0] = msg->image_y;
         }
     }
 }
@@ -304,8 +296,6 @@ void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLo
         detected_target_[0] = msg->image_x;
         detected_target_[1] = msg->image_y;
     }
-    //for(int i=0;i<6;i++)
-    //RCLCPP_INFO(this->get_logger(), "----Detected target detected received: x:%f,y:%f-----",random_target_[0],random_target_[1]);
    }
 
 void BehaviorControl::step_timer_callback()
@@ -604,23 +594,13 @@ void BehaviorControl::step_timer_callback()
         if(fabs(current_x_ - random_target_search_3_[0]) < 0.15)
             if(fabs(current_y_ - random_target_search_3_[1]) < 0.15)
             {
-
-                if(!if_find_random_target_) //没找到随机靶
+                if(!if_find_random_target_) //没找到随机靶，用预设目标点
                 {
-                    if(0) //用不准的openmv点 if_openmv_find_
-                    {
-                        random_target_[0] = openmv_detected_random_target_[0];
-                        random_target_[1] = openmv_detected_random_target_[1];
-                    }
-                    else //用预设目标点
-                    {
-                        random_target_[0] = prev_random_target_[0];
-                        random_target_[1] = prev_random_target_[1];
-                    }
+                    random_target_[0] = prev_random_target_[0];
+                    random_target_[1] = prev_random_target_[1];
                 }
                 RCLCPP_INFO(this->get_logger(), "random_target: %lf, %lf", random_target_[0], random_target_[1]);
                 current_step = 101;
-
             }
     }
     //进入随机靶投掷任务
@@ -871,8 +851,8 @@ void BehaviorControl::mission_timer_callback()
             current_target_position_.transform.translation.x = world_pt_.point.x;
             current_target_position_.transform.translation.y = world_pt_.point.y;
 
-            if (current_z_ - eject_height_ >= 0.5)
-                current_target_position_.transform.translation.z = current_z_ - 0.5;
+            if (current_z_ - eject_height_ >= 0.6)
+                current_target_position_.transform.translation.z = current_z_ - 0.6;
             else
                 current_target_position_.transform.translation.z = eject_height_;
 
@@ -884,7 +864,7 @@ void BehaviorControl::mission_timer_callback()
         {
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 24: %s", ex.what());
         }
-        if(eject_cnt >= 15)
+        if(eject_cnt >= 13)
         {
             servo_index_ = 1;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -956,8 +936,8 @@ void BehaviorControl::mission_timer_callback()
             current_target_position_.transform.translation.x = world_pt_.point.x;
             current_target_position_.transform.translation.y = world_pt_.point.y;
 
-            if (current_z_ - eject_height_ >= 0.5)
-                current_target_position_.transform.translation.z = current_z_ - 0.5;
+            if (current_z_ - eject_height_ >= 0.6)
+                current_target_position_.transform.translation.z = current_z_ - 0.6;
             else
                 current_target_position_.transform.translation.z = eject_height_;
 
@@ -969,7 +949,7 @@ void BehaviorControl::mission_timer_callback()
         {
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 34: %s", ex.what());
         }
-        if(eject_cnt >= 16)
+        if(eject_cnt >= 13)
         {
             servo_index_ = 1;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -1042,8 +1022,8 @@ void BehaviorControl::mission_timer_callback()
             current_target_position_.transform.translation.x = world_pt_.point.x;
             current_target_position_.transform.translation.y = world_pt_.point.y;
 
-            if (current_z_ - eject_height_ >= 0.5)
-                current_target_position_.transform.translation.z = current_z_ - 0.5;
+            if (current_z_ - eject_height_ >= 0.6)
+                current_target_position_.transform.translation.z = current_z_ - 0.6;
             else
                 current_target_position_.transform.translation.z = eject_height_;
 
@@ -1055,7 +1035,7 @@ void BehaviorControl::mission_timer_callback()
         {
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 44: %s", ex.what());
         }
-        if(eject_cnt >= 16)
+        if(eject_cnt >= 13)
         {
             servo_index_ = 1;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -1128,8 +1108,8 @@ void BehaviorControl::mission_timer_callback()
             current_target_position_.transform.translation.x = world_pt_.point.x;
             current_target_position_.transform.translation.y = world_pt_.point.y;
 
-            if (current_z_ - eject_height_ >= 0.5)
-                current_target_position_.transform.translation.z = current_z_ - 0.5;
+            if (current_z_ - eject_height_ >= 0.6)
+                current_target_position_.transform.translation.z = current_z_ - 0.6;
             else
                 current_target_position_.transform.translation.z = eject_height_;
 
@@ -1141,7 +1121,7 @@ void BehaviorControl::mission_timer_callback()
         {
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 54: %s", ex.what());
         }
-        if(eject_cnt >= 16)
+        if(eject_cnt >= 13)
         {
             servo_index_ = 1;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
@@ -1341,13 +1321,13 @@ void BehaviorControl::mission_timer_callback()
         {
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 104: %s", ex.what());
         }
-        if(current_z_ - eject_height_ >= 0.5)
-            current_target_position_.transform.translation.z = current_z_ - 0.5;
+        if(current_z_ - eject_height_ >= 0.6)
+            current_target_position_.transform.translation.z = current_z_ - 0.6;
         else
             current_target_position_.transform.translation.z = eject_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
-        if(eject_cnt >= 16)
+        if(eject_cnt >= 13)
         {
             servo_index_ = 3;
             RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);

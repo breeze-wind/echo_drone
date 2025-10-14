@@ -31,7 +31,6 @@
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 
 #include "robot_interfaces/msg/image_location.hpp"
-#include "robot_interfaces/msg/openmv_info.hpp"
 
 class BehaviorControl : public rclcpp::Node
 {
@@ -52,8 +51,8 @@ private:
     void CurrentPoseCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg);
     /// 接收从相机传来的图像位置信息
     void ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg);
-    /// 接收openmv的图像位置信息
-    void OpenmvInfoCallback(const robot_interfaces::msg::OpenmvInfo::SharedPtr msg);
+    /// 接收usb相机传来的随机靶信息
+    void USBCameraInfoCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg);
 
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
@@ -71,8 +70,8 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::TransformStamped>::SharedPtr current_pose_sub_;
     /// 接收相机传来的图像位置信息
     rclcpp::Subscription<robot_interfaces::msg::ImageLocation>::SharedPtr image_location_sub_;
-    /// 接收openmv的图像位置信息
-    rclcpp::Subscription<robot_interfaces::msg::OpenmvInfo>::SharedPtr openmv_info_sub_;
+    /// 接收usb相机传来的随机靶信息
+    rclcpp::Subscription<robot_interfaces::msg::ImageLocation>::SharedPtr usbcamera_info_sub_;
 
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> servo_parameter_client_;
     std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParameters>> controller_server_parameter_client_;
