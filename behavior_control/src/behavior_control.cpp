@@ -1182,7 +1182,7 @@ void BehaviorControl::mission_timer_callback()
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
         }
 
-        dynamic_detection_height_ = std::max(dynamic_detection_height_-0.003, dynamic_eject_height_);
+        dynamic_detection_height_ = std::max(dynamic_detection_height_-0.01, dynamic_eject_height_);
         if_nav = false;
 	    RCLCPP_INFO(this->get_logger(), "跟随识别中...");
     }

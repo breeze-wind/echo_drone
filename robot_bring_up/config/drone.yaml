@@ -20,7 +20,7 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
         H_detection_height: 1.4
         passing_door_height: 0.6
         eject_height: 0.5
-        dynamic_eject_height: 1.0
+        dynamic_eject_height: 0.86
         if_hit_tank: true
         if_hit_car: true
         if_hit_pillbox: true
@@ -28,9 +28,9 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
         if_hit_bridge: true
         if_passing_door: true
         if_need_passing_all: false
-        max_vel_x_passing: 0.28  #穿门参数
-        max_vel_y_passing: 0.28
-        max_vel_x_backwards_passing: 0.35
+        max_vel_x_passing: 0.35  #穿门参数
+        max_vel_y_passing: 0.35
+        max_vel_x_backwards_passing: 0.4
         max_vel_theta_passing: 0.11
         acc_lim_x_passing: 0.25
         acc_lim_y_passing: 0.25
@@ -230,12 +230,12 @@ controller_server:
 
             # Robot
 
-            max_vel_x: 0.6 # 机器人最大x轴速度m/s
-            max_vel_y: 0.6 # 机器人最大y轴速度m/s
+            max_vel_x: 0.7 # 机器人最大x轴速度m/s
+            max_vel_y: 0.7 # 机器人最大y轴速度m/s
             max_vel_x_backwards: 0.8 # 机器人最大x轴后退速度m/s
             max_vel_theta: 0.12 # 机器人最大角速度rad/s
-            acc_lim_x: 0.4 # 机器人最大x轴平移加速度m/s^2
-            acc_lim_y: 0.4 # 机器人最大y轴平移加速度m/s^2
+            acc_lim_x: 0.25 # 机器人最大x轴平移加速度m/s^2
+            acc_lim_y: 0.25 # 机器人最大y轴平移加速度m/s^2
             acc_lim_theta: 0.15 # 机器人最大角加速度rad/s^2
 
             min_turning_radius: 0.0 # 机器人最小转弯半径
