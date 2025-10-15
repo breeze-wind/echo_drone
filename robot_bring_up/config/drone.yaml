@@ -28,6 +28,12 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
         if_hit_bridge: true
         if_passing_door: true
         if_need_passing_all: false
+        offset_x_1: 0.0
+        offset_y_1: 0.0
+        offset_x_2: 0.0
+        offset_y_2: 0.0
+        offset_x_3: 0.0
+        offset_y_3: 0.0
         max_vel_x_passing: 0.35  #穿门参数
         max_vel_y_passing: 0.35
         max_vel_x_backwards_passing: 0.4

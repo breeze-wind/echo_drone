@@ -206,6 +206,14 @@ private:
     double weight_inflation;
     double robot_radius;
 
+    //投掷偏置
+    double offset_x_1_;
+    double offset_y_1_;
+    double offset_x_2_;
+    double offset_y_2_;
+    double offset_x_3_;
+    double offset_y_3_;
+
     //导航模式，0--正常导航，1--穿门时导航
     int current_nav_mode;
     int last_nav_mode;

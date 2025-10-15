@@ -40,6 +40,12 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("if_hit_bridge", false);
     this->declare_parameter("if_passing_door", false);
     this->declare_parameter("if_need_passing_all", false);
+    this->declare_parameter("offset_x_1", 0.1);
+    this->declare_parameter("offset_y_1", 0.1);
+    this->declare_parameter("offset_x_2", 0.1);
+    this->declare_parameter("offset_y_2", 0.1);
+    this->declare_parameter("offset_x_3", 0.1);
+    this->declare_parameter("offset_y_4", 0.1);
     this->declare_parameter<int>("/servo/servo", 0);
     this->declare_parameter("max_vel_x_passing", 0.6);
     this->declare_parameter("max_vel_y_passing", 1.5);
@@ -80,6 +86,12 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter("if_hit_bridge", if_hit_bridge_);
     this->get_parameter("if_passing_door", if_passing_door_);
     this->get_parameter("if_need_passing_all", if_need_passing_all_);
+    this->get_parameter("offset_x_1", offset_x_1_);
+    this->get_parameter("offset_y_1", offset_y_1_);
+    this->get_parameter("offset_x_2", offset_x_2_);
+    this->get_parameter("offset_y_2", offset_y_2_);
+    this->get_parameter("offset_x_3", offset_x_3_);
+    this->get_parameter("offset_y_3", offset_y_3_);
     this->get_parameter("max_vel_x_passing", max_vel_x_passing);
     this->get_parameter("max_vel_y_passing", max_vel_y_passing);
     this->get_parameter("max_vel_x_backwards_passing", max_vel_x_backwards_passing);
@@ -820,8 +832,8 @@ void BehaviorControl::mission_timer_callback()
         {
             tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
 
-            current_target_position_.transform.translation.x = world_pt_.point.x;
-            current_target_position_.transform.translation.y = world_pt_.point.y;
+            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_1_;
+            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_1_;
             current_target_position_.transform.translation.z = detection_height_;
 
             target_pose_pub_->publish(current_target_position_);
@@ -848,8 +860,8 @@ void BehaviorControl::mission_timer_callback()
         {
             tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
 
-            current_target_position_.transform.translation.x = world_pt_.point.x;
-            current_target_position_.transform.translation.y = world_pt_.point.y;
+            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_1_;
+            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_1_;
 
             if (current_z_ - eject_height_ >= 0.6)
                 current_target_position_.transform.translation.z = current_z_ - 0.6;
@@ -1166,8 +1178,8 @@ void BehaviorControl::mission_timer_callback()
         {
             tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
 
-            current_target_position_.transform.translation.x = world_pt_.point.x;
-            current_target_position_.transform.translation.y = world_pt_.point.y;
+            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
+            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
             current_target_position_.transform.translation.z = dynamic_detection_height_;
             target_pose_pub_->publish(current_target_position_);
             RCLCPP_INFO(this->get_logger(), "识别中... (相机发来map坐标: %.2f, %.2f)",
@@ -1193,8 +1205,8 @@ void BehaviorControl::mission_timer_callback()
         {
             tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
 
-            current_target_position_.transform.translation.x = world_pt_.point.x;
-            current_target_position_.transform.translation.y = world_pt_.point.y;
+            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
+            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
             current_target_position_.transform.translation.z = dynamic_eject_height_;
             target_pose_pub_->publish(current_target_position_);
             if_nav = false;
@@ -1291,8 +1303,8 @@ void BehaviorControl::mission_timer_callback()
         {
             tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
 
-            current_target_position_.transform.translation.x = world_pt_.point.x;
-            current_target_position_.transform.translation.y = world_pt_.point.y;
+            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_3_;
+            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_3_;
             current_target_position_.transform.translation.z = detection_height_;
 
             target_pose_pub_->publish(current_target_position_);
@@ -1314,8 +1326,8 @@ void BehaviorControl::mission_timer_callback()
         {
             tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
 
-            current_target_position_.transform.translation.x = world_pt_.point.x;
-            current_target_position_.transform.translation.y = world_pt_.point.y;
+            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_3_;
+            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_3_;
         }
         catch (const tf2::TransformException &ex)
         {
