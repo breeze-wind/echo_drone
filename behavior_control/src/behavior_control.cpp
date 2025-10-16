@@ -110,7 +110,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     }
 
     random_target_.resize(2);
-    openmv_detected_random_target_.reserve(2);
+    random_tank_target_.reserve(2);
     detected_target_.reserve(2);
 
     RCLCPP_INFO(this->get_logger(), "tank_position: %lf, %lf", tank_[0], tank_[1]);
@@ -133,6 +133,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_passing_door_ = false;
     if_turning = false;
     if_find_random_target_ = false;
+    if_find_random_tank_target_ = false;
 
     current_x_ = 0.0;
     current_y_ = 0.0;
@@ -217,6 +218,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     turning_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/turning_state", 10);
     obstacle_height_pub_ = this->create_publisher<std_msgs::msg::Float64>("/robot/obstacle_height", 10);
     clear_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/clear_state", 10);
+    camera_choose_pub_ = this->create_publisher<std_msgs::msg::Bool>("/camera/choose", 10);
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
         std::bind(&BehaviorControl::ArmStateCallback, this, std::placeholders::_1));
     current_pose_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/robot/current_pose",
@@ -291,17 +293,29 @@ void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLo
             random_target_[0] = msg->image_x;
             random_target_[1] = msg->image_y;
         }
+        if(msg->id == 5)
+        {
+            if_find_random_tank_target_ = true;
+            random_tank_target_[0] = msg->image_x;
+            random_tank_target_[1] = msg->image_y;
+        }
     }
 }
 
 void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg)
 {
     detected_target_id_ = msg->id;
-    if(0)//detected_target_id_ == 6
+    if(detected_target_id_ == 6)
     {
         if_find_random_target_ = true;
         random_target_[0] = msg->image_x;
         random_target_[1] = msg->image_y;
+    }
+    else if(detected_target_id_ == 5)
+    {
+        if_find_random_tank_target_ = true;
+        random_tank_target_[0] = msg->image_x;
+        random_tank_target_[1] = msg->image_y;
     }
     else
     {
@@ -330,7 +344,7 @@ void BehaviorControl::step_timer_callback()
     {
         if(fabs(current_z_ - cruise_height_) <= 0.05)
         {
-            current_step =111;//current_step=61;
+            current_step = 111;  //current_step=61;
         }
     }
     //在起飞点左右两侧移动，寻找随机靶
@@ -344,10 +358,16 @@ void BehaviorControl::step_timer_callback()
     }
     else if(current_step == 112)
     {
-        if(if_find_random_target_) //找到随机靶
+        if(if_find_random_target_ && if_find_random_tank_target_) //找到随机靶
         {
             detection_cnt = 0;
             current_step = 21;
+            for(int i = 0; i < 3; i++)
+            {
+                std_msgs::msg::Bool camera_choose_msg;
+                camera_choose_msg.data = true;
+                camera_choose_pub_->publish(camera_choose_msg);
+            }
         }
         detection_cnt++;
         if(detection_cnt >= dynamic_detection_cnt_threshold_)
@@ -366,16 +386,28 @@ void BehaviorControl::step_timer_callback()
     }
     else if(current_step == 114)
     {
-        if(if_find_random_target_) //找到随机靶
+        if(if_find_random_target_ && if_find_random_tank_target_) //找到随机靶
         {
             detection_cnt = 0;
             current_step = 21;
+            for(int i = 0; i < 3; i++)
+            {
+                std_msgs::msg::Bool camera_choose_msg;
+                camera_choose_msg.data = true;
+                camera_choose_pub_->publish(camera_choose_msg);
+            }
         }
         detection_cnt++;
         if(detection_cnt >= dynamic_detection_cnt_threshold_)
         {
             detection_cnt = 0;
             current_step = 21;
+            for(int i = 0; i < 3; i++)
+            {
+                std_msgs::msg::Bool camera_choose_msg;
+                camera_choose_msg.data = true;
+                camera_choose_pub_->publish(camera_choose_msg);
+            }
         }
     }
     //进入第一个目标点循环
@@ -534,52 +566,15 @@ void BehaviorControl::step_timer_callback()
         if(eject_cnt >= eject_cnt_threshold_) //计时
         {
             eject_cnt = 0;
-            current_step = 61;
-        }
-    }
-    //进入动态目标点循环（逻辑待改）
-    else if(current_step == 61)
-    {
-        if (if_hit_target_[target_sequence_[4]]) //进行投掷
-        {
-            if (fabs(current_x_ - target_positions_[target_sequence_[4]][0]) < 0.15) //是否到目标点附近
-                if (fabs(current_y_ - target_positions_[target_sequence_[4]][1]) < 0.15)
-                    current_step = 611;
-        }
-        else //不投掷
-            current_step = 91;
-    }
-    else if(current_step == 611)  //拉高
-	{
-        if (fabs(current_z_ - dynamic_detection_height_) <= 0.15)
-        {
-            current_step = 62;
-        }
-	}
-    else if(current_step == 62) //进行跟随识别，并不断下降高度
-    {
-        if(abs(current_z_ - dynamic_eject_height_) <= 0.15)
-        {
-            current_step = 63;
-            camera_pt_.point.x = detected_target_[0];
-            camera_pt_.point.y = detected_target_[1];
-        }
-    }
-    else if(current_step == 63) //下降到动态靶投掷高度时直接投掷
-    {
-        eject_cnt++;
-        if(eject_cnt >= dynamic_eject_cnt_threshold_) //计时
-        {
-            eject_cnt = 0;
             current_step = 91;
         }
     }
     //进入搜索随机靶任务
     else if(current_step == 91) //搜索第一个点
     {
-        if(if_find_random_target_)
+        if(if_find_random_target_ && if_find_random_tank_target_)
         {
-            current_step = 101; //找到随机靶
+            current_step = 61; //找到2个随机靶
             return;
         }
         if(fabs(current_x_ - random_target_search_1_[0]) < 0.15)
@@ -590,9 +585,9 @@ void BehaviorControl::step_timer_callback()
     }
     else if(current_step == 92) //搜索第二个点
     {
-        if(if_find_random_target_)
+        if(if_find_random_target_ && if_find_random_tank_target_)
         {
-            current_step = 101; //找到随机靶
+            current_step = 61; //找到2个随机靶
             return;
         }
         if(fabs(current_x_ - random_target_search_2_[0]) < 0.15)
@@ -606,18 +601,63 @@ void BehaviorControl::step_timer_callback()
         if(fabs(current_x_ - random_target_search_3_[0]) < 0.15)
             if(fabs(current_y_ - random_target_search_3_[1]) < 0.15)
             {
-                if(!if_find_random_target_) //没找到随机靶，用预设目标点
+                if(!if_find_random_tank_target_)
                 {
-                    random_target_[0] = prev_random_target_[0];
-                    random_target_[1] = prev_random_target_[1];
+                    random_tank_target_[0] = prev_random_tank_target_[0];
+                    random_tank_target_[1] = prev_random_tank_target_[1];
+                    current_step = 61;
                 }
                 RCLCPP_INFO(this->get_logger(), "random_target: %lf, %lf", random_target_[0], random_target_[1]);
-                current_step = 101;
+                RCLCPP_INFO(this->get_logger(), "random_tank_target: %lf, %lf", random_tank_target_[0], random_tank_target_[1]);
             }
+    }
+    //进入动态目标点循环（逻辑待改）
+    else if (current_step == 61)
+    {
+        if(!if_find_random_tank_target_)
+        {
+            random_tank_target_[0] = prev_random_tank_target_[0];
+            random_tank_target_[1] = prev_random_tank_target_[1];
+        }
+        if (fabs(current_x_ - random_tank_target_[0]) < 0.15) //是否到目标点附近
+            if (fabs(current_y_ - random_tank_target_[1]) < 0.15)
+                current_step = 62;
+    }
+    else if(current_step == 62)  //拉高
+    {
+        if (fabs(current_z_ - detection_height_) < 0.2)
+        {
+            current_step = 63;
+        }
+    }
+    else if(current_step == 63) //进行识别
+    {
+        detection_cnt++;
+        if(detection_cnt >= detection_cnt_threshold_)
+        {
+            detection_cnt = 0;
+            current_step = 64;
+            camera_pt_.point.x = detected_target_[0];
+            camera_pt_.point.y = detected_target_[1];
+        }
+    }
+    else if(current_step == 64) //下降投掷
+    {
+        eject_cnt++;
+        if(eject_cnt >= eject_cnt_threshold_) //计时
+        {
+            eject_cnt = 0;
+            current_step = 101; //进入随机靶投掷任务
+        }
     }
     //进入随机靶投掷任务
     else if(current_step == 101) //是否到目标点附近
     {
+        if(!if_find_random_tank_target_)
+        {
+            random_target_[0] = prev_random_target_[0];
+            random_target_[1] = prev_random_target_[1];
+        }
         if(fabs(current_x_ - random_target_[0]) < 0.25)
             if(fabs(current_y_ - random_target_[1]) < 0.25)
             {
@@ -744,7 +784,7 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = random_target_init_search_1_[0];
         current_target_position_.transform.translation.y = random_target_init_search_1_[1];
-        current_target_position_.transform.translation.z = cruise_height_;
+        current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
 
@@ -764,7 +804,7 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = random_target_init_search_1_[0];
         current_target_position_.transform.translation.y = random_target_init_search_1_[1];
-        current_target_position_.transform.translation.z = cruise_height_;
+        current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         RCLCPP_INFO(this->get_logger(), "第一个随机靶搜索点");
@@ -773,7 +813,7 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = random_target_init_search_2_[0];
         current_target_position_.transform.translation.y = random_target_init_search_2_[1];
-        current_target_position_.transform.translation.z = cruise_height_;
+        current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         // rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
@@ -792,7 +832,7 @@ void BehaviorControl::mission_timer_callback()
     {
         current_target_position_.transform.translation.x = random_target_init_search_2_[0];
         current_target_position_.transform.translation.y = random_target_init_search_2_[1];
-        current_target_position_.transform.translation.z = cruise_height_;
+        current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         RCLCPP_INFO(this->get_logger(), "第二个随机靶搜索点");
@@ -1147,40 +1187,45 @@ void BehaviorControl::mission_timer_callback()
 //----------------------动态靶妹写完----------------------
     else if(current_step == 61)
     {
+        if(!if_find_random_tank_target_)
+        {
+            random_tank_target_[0] = prev_random_tank_target_[0];
+            random_tank_target_[1] = prev_random_tank_target_[1];
+        }
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
 		action_goal.pose.header.frame_id = "map";
-        action_goal.pose.pose.position.x = target_positions_[target_sequence_[4]][0];
-        action_goal.pose.pose.position.y = target_positions_[target_sequence_[4]][1];
-        action_goal.pose.pose.position.z = dynamic_detection_height_;
+        action_goal.pose.pose.position.x = random_tank_target_[0];
+        action_goal.pose.pose.position.y = random_tank_target_[1];
+        action_goal.pose.pose.position.z = detection_height_;
         action_goal.pose.pose.orientation.x = 0.0;
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         navigate_to_pose_client_->async_send_goal(action_goal);
         if_nav = true;
-        RCLCPP_INFO(this->get_logger(), "动态目标点，current x y: %lf, %lf", current_x_, current_y_);
+        RCLCPP_INFO(this->get_logger(), "tank目标点，current x y: %lf, %lf", current_x_, current_y_);
     }
-    else if(current_step == 611)
+    else if(current_step == 62)
   	{
-  	    current_target_position_.transform.translation.x = target_positions_[target_sequence_[4]][0];
-        current_target_position_.transform.translation.y = target_positions_[target_sequence_[4]][1];
-        current_target_position_.transform.translation.z = dynamic_detection_height_;
+  	    current_target_position_.transform.translation.x = random_tank_target_[0];
+        current_target_position_.transform.translation.y = random_tank_target_[1];
+        current_target_position_.transform.translation.z = detection_height_;
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         RCLCPP_INFO(this->get_logger(), "拉高中...");
  	}
-    else if(current_step == 62)
+    else if(current_step == 63)
     {
         camera_pt_.header.stamp = this->now();
-        camera_pt_.point.x = detected_target_[0];
-        camera_pt_.point.y = detected_target_[1];
+        camera_pt_.point.x = random_tank_target_[0];
+        camera_pt_.point.y = random_tank_target_[1];
         try
         {
             tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
 
             current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
             current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
-            current_target_position_.transform.translation.z = dynamic_detection_height_;
+            current_target_position_.transform.translation.z = detection_height_;
             target_pose_pub_->publish(current_target_position_);
             RCLCPP_INFO(this->get_logger(), "识别中... (相机发来map坐标: %.2f, %.2f)",
                                 world_pt_.point.x, world_pt_.point.y);
@@ -1193,12 +1238,9 @@ void BehaviorControl::mission_timer_callback()
         {
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
         }
-
-        dynamic_detection_height_ = std::max(dynamic_detection_height_-0.01, dynamic_eject_height_);
         if_nav = false;
-	    RCLCPP_INFO(this->get_logger(), "跟随识别中...");
     }
-    else if(current_step == 63)
+    else if(current_step == 64) //下降投掷
     {
         camera_pt_.header.stamp = this->now();
         try
@@ -1207,20 +1249,28 @@ void BehaviorControl::mission_timer_callback()
 
             current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
             current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
-            current_target_position_.transform.translation.z = dynamic_eject_height_;
+            if (current_z_ - eject_height_ >= 0.6)
+                current_target_position_.transform.translation.z = current_z_ - 0.6;
+            else
+                current_target_position_.transform.translation.z = eject_height_;
+
             target_pose_pub_->publish(current_target_position_);
-            if_nav = false;
-            servo_index_ = 2;
-            RCLCPP_INFO(this->get_logger(), "动态靶投掷，第 %d 个投放位", servo_index_);
+            RCLCPP_INFO(this->get_logger(), "tank投掷，第 %d 个投放位", servo_index_);
         }
         catch (const tf2::TransformException &ex)
         {
             RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
         }
-        if (servo_index_ == last_servo_index_)
-            return;
-        last_servo_index_ = servo_index_;
-        set_parameter();
+        if(eject_cnt >= 13)
+        {
+            servo_index_ = 2;
+            RCLCPP_INFO(this->get_logger(), "下降投掷，第 %d 个投放位", servo_index_);
+            if (servo_index_ == last_servo_index_)
+                return;
+            last_servo_index_ = servo_index_;
+            set_parameter();
+        }
+        if_nav = false;
     }
 
     else if(current_step == 91)
@@ -1271,6 +1321,11 @@ void BehaviorControl::mission_timer_callback()
 
     else if(current_step == 101)
     {
+        if(!if_find_random_tank_target_)
+        {
+            random_target_[0] = prev_random_target_[0];
+            random_target_[1] = prev_random_target_[1];
+        }
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
         action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = random_target_[0];

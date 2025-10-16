@@ -64,6 +64,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr turning_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr obstacle_height_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr clear_state_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr camera_choose_pub_;
     /// 接收当前起飞状态
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_state_sub_;
     /// 接收当前位姿
@@ -94,25 +95,31 @@ private:
     std::vector<double> passing_door_src_2_;
     std::vector<double> passing_door_des_;
 
+    bool camera_choose_; //True -- d435
+
+    /// 起飞点附近随机靶搜索坐标
+    std::vector<double> random_target_init_search_1_;
+    std::vector<double> random_target_init_search_2_;
+
     /// 随机靶搜索坐标
     std::vector<double> random_target_search_1_;
     std::vector<double> random_target_search_2_;
     std::vector<double> random_target_search_3_;
-    /// 起飞点附近随机靶搜索坐标
-    std::vector<double> random_target_init_search_1_;
-    std::vector<double> random_target_init_search_2_;
+
     /// 预设随机靶坐标为其中一个定靶点，找不到随机靶时投这个
     std::vector<double> prev_random_target_;
     /// 最终确定的随机靶坐标
     std::vector<double> random_target_;
-    /// openmv识别到的不准的随机靶坐标
-    std::vector<double> openmv_detected_random_target_;
-    /// 是否找到随机靶，只有不准的openmv坐标时不算找到
+    /// 是否找到随机靶
     bool if_find_random_target_;
-    /// openmv的坐标是否准确
-    bool if_openmv_accurate_;
-    /// openmv是否找到
-    bool if_openmv_find_;
+
+    // ******************* tank ********************
+    /// 预设随机靶坐标为其中一个定靶点，找不到随机靶时投这个
+    std::vector<double> prev_random_tank_target_;
+    /// 最终确定的随机靶坐标
+    std::vector<double> random_tank_target_;
+    /// 是否找到随机靶
+    bool if_find_random_tank_target_;
 
     /// 当前识别到的目标坐标xy
     std::vector<double> detected_target_;

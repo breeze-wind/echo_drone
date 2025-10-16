@@ -213,7 +213,7 @@ class MavlinkControl(Node):
                     0, 0
                 )
             else: #穿门状态
-                vx, vy, vz = -msg.linear.y, -msg.linear.x, -self.pid_height * (self.passing_door_height - self.current_z)   # Speed in m/s
+                vx, vy, vz = msg.linear.y, msg.linear.x, -self.pid_height * (self.passing_door_height - self.current_z)   # Speed in m/s
 
                 self.master.mav.set_position_target_local_ned_send(
                     time_boot_ms,
@@ -223,7 +223,7 @@ class MavlinkControl(Node):
                     0, 0, 0,
                     vx, vy, vz,
                     0, 0, 0,
-                    -1.57, 0
+                    1.57, 0
                 )
 
             self.get_logger().info('mavlink: send vision speed vx vy vz: %f, %f, %f' %(vx, vy, vz))
@@ -248,7 +248,7 @@ class MavlinkControl(Node):
                 )
             else: #穿门状态
                 if self.if_turning:
-                    self.target_yaw = 1.57
+                    self.target_yaw = -1.57
                 self.master.mav.set_position_target_local_ned_send(
                     time_boot_ms,
                     self.master.target_system, self.master.target_component,

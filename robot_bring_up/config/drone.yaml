@@ -14,6 +14,7 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
         random_target_init_search_1: [0.2, 2.0]
         random_target_init_search_2: [0.2, -0.1]
         prev_random_target: [3.17, 0.78]
+        prev_random_tank_target: [0.0, 0.0]
         target_sequence: ["tent", "car", "bridge", "pillbox", "tank"]
         cruise_height: 1.2
         detection_height: 1.5
