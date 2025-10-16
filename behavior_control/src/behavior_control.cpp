@@ -449,7 +449,7 @@ void BehaviorControl::step_timer_callback()
             if(if_need_passing_all_) //需要遍历静态靶
                 current_step = 31;
             else
-                current_step = 61; //不需要遍历静态靶，直接去动靶点
+                current_step = 91; //不需要遍历静态靶
         }
     }
     //进入第二个目标点循环
@@ -605,8 +605,8 @@ void BehaviorControl::step_timer_callback()
                 {
                     random_tank_target_[0] = prev_random_tank_target_[0];
                     random_tank_target_[1] = prev_random_tank_target_[1];
-                    current_step = 61;
                 }
+                current_step = 61;
                 RCLCPP_INFO(this->get_logger(), "random_target: %lf, %lf", random_target_[0], random_target_[1]);
                 RCLCPP_INFO(this->get_logger(), "random_tank_target: %lf, %lf", random_tank_target_[0], random_tank_target_[1]);
             }
@@ -619,8 +619,8 @@ void BehaviorControl::step_timer_callback()
             random_tank_target_[0] = prev_random_tank_target_[0];
             random_tank_target_[1] = prev_random_tank_target_[1];
         }
-        if (fabs(current_x_ - random_tank_target_[0]) < 0.15) //是否到目标点附近
-            if (fabs(current_y_ - random_tank_target_[1]) < 0.15)
+        if (fabs(current_x_ - random_tank_target_[0]) < 0.2) //是否到目标点附近
+            if (fabs(current_y_ - random_tank_target_[1]) < 0.2)
                 current_step = 62;
     }
     else if(current_step == 62)  //拉高
@@ -637,8 +637,8 @@ void BehaviorControl::step_timer_callback()
         {
             detection_cnt = 0;
             current_step = 64;
-            camera_pt_.point.x = detected_target_[0];
-            camera_pt_.point.y = detected_target_[1];
+            camera_pt_.point.x = random_tank_target_[0];
+            camera_pt_.point.y = random_tank_target_[1];
         }
     }
     else if(current_step == 64) //下降投掷
@@ -658,8 +658,8 @@ void BehaviorControl::step_timer_callback()
             random_target_[0] = prev_random_target_[0];
             random_target_[1] = prev_random_target_[1];
         }
-        if(fabs(current_x_ - random_target_[0]) < 0.25)
-            if(fabs(current_y_ - random_target_[1]) < 0.25)
+        if(fabs(current_x_ - random_target_[0]) < 0.2)
+            if(fabs(current_y_ - random_target_[1]) < 0.2)
             {
                 current_step = 102;
             }
@@ -678,8 +678,8 @@ void BehaviorControl::step_timer_callback()
         {
             detection_cnt = 0;
             current_step = 104;
-            camera_pt_.point.x = detected_target_[0];
-            camera_pt_.point.y = detected_target_[1];
+            camera_pt_.point.x = random_target_[0];
+            camera_pt_.point.y = random_target_[1];
         }
     }
     else if(current_step == 104) //下降投掷
