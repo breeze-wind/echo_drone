@@ -163,6 +163,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     if_landing = false;
     if_nav = false;
 
+    is_tank_or_bridge_ = false;
+
     current_target_position_.transform.rotation.x = 0.0;
     current_target_position_.transform.rotation.y = 0.0;
     current_target_position_.transform.rotation.z = 0.0;
@@ -310,19 +312,33 @@ void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLo
         if_find_random_target_ = true;
         random_target_[0] = msg->image_x;
         random_target_[1] = msg->image_y;
+        detected_target_[0] = msg->image_x;
+        detected_target_[1] = msg->image_y;
     }
     else if(detected_target_id_ == 5)
     {
         if_find_random_tank_target_ = true;
         random_tank_target_[0] = msg->image_x;
         random_tank_target_[1] = msg->image_y;
-    }
-    else
-    {
         detected_target_[0] = msg->image_x;
         detected_target_[1] = msg->image_y;
     }
-   }
+    else
+    {
+        if(detected_target_id_ == 2)  //排除tank和bridge误识别情况
+        {
+            if((msg->image_x - bridge_[0]) * (msg->image_x - bridge_[0]) +
+                (msg->image_y - bridge_[1]) * (msg->image_y - bridge_[1]) >= 1.0) //实际是tank
+            {
+                if_find_random_tank_target_ = true;
+                random_tank_target_[0] = msg->image_x;
+                random_tank_target_[1] = msg->image_y;
+            }
+        }
+        detected_target_[0] = msg->image_x;
+        detected_target_[1] = msg->image_y;
+    }
+}
 
 void BehaviorControl::step_timer_callback()
 {
@@ -637,8 +653,16 @@ void BehaviorControl::step_timer_callback()
         {
             detection_cnt = 0;
             current_step = 64;
-            camera_pt_.point.x = random_tank_target_[0];
-            camera_pt_.point.y = random_tank_target_[1];
+            if(if_find_random_tank_target_)
+            {
+                camera_pt_.point.x = random_tank_target_[0];
+                camera_pt_.point.y = random_tank_target_[1];
+            }
+            else
+            {
+                camera_pt_.point.x = detected_target_[0];
+                camera_pt_.point.y = detected_target_[1];
+            }
         }
     }
     else if(current_step == 64) //下降投掷
@@ -678,8 +702,16 @@ void BehaviorControl::step_timer_callback()
         {
             detection_cnt = 0;
             current_step = 104;
-            camera_pt_.point.x = random_target_[0];
-            camera_pt_.point.y = random_target_[1];
+            if(if_find_random_target_)
+            {
+                camera_pt_.point.x = random_target_[0];
+                camera_pt_.point.y = random_target_[1];
+            }
+            else
+            {
+                camera_pt_.point.x = detected_target_[0];
+                camera_pt_.point.y = detected_target_[1];
+            }
         }
     }
     else if(current_step == 104) //下降投掷
@@ -1187,13 +1219,13 @@ void BehaviorControl::mission_timer_callback()
 //----------------------动态靶妹写完----------------------
     else if(current_step == 61)
     {
+        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
+		action_goal.pose.header.frame_id = "map";
         if(!if_find_random_tank_target_)
         {
             random_tank_target_[0] = prev_random_tank_target_[0];
             random_tank_target_[1] = prev_random_tank_target_[1];
         }
-        rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal action_goal;
-		action_goal.pose.header.frame_id = "map";
         action_goal.pose.pose.position.x = random_tank_target_[0];
         action_goal.pose.pose.position.y = random_tank_target_[1];
         action_goal.pose.pose.position.z = detection_height_;
@@ -1217,8 +1249,17 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 63)
     {
         camera_pt_.header.stamp = this->now();
-        camera_pt_.point.x = random_tank_target_[0];
-        camera_pt_.point.y = random_tank_target_[1];
+        if(if_find_random_tank_target_)
+        {
+            camera_pt_.point.x = random_tank_target_[0];
+            camera_pt_.point.y = random_tank_target_[1];
+        }
+        else
+        {
+            camera_pt_.point.x = detected_target_[0];
+            camera_pt_.point.y = detected_target_[1];
+        }
+
         try
         {
             tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
@@ -1351,8 +1392,16 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 103)
     {
         camera_pt_.header.stamp = this->now();
-        camera_pt_.point.x = detected_target_[0];
-        camera_pt_.point.y = detected_target_[1];
+        if(if_find_random_target_)
+        {
+            camera_pt_.point.x = random_target_[0];
+            camera_pt_.point.y = random_target_[1];
+        }
+        else
+        {
+            camera_pt_.point.x = detected_target_[0];
+            camera_pt_.point.y = detected_target_[1];
+        }
 
         try
         {

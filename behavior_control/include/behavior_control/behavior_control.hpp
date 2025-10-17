@@ -168,6 +168,8 @@ private:
     bool if_landing;
     bool if_nav;
 
+    bool is_tank_or_bridge_;
+
     /* 当前位置 */
     double current_x_;
     double current_y_;
