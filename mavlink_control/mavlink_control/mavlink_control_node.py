@@ -110,7 +110,7 @@ class MavlinkControl(Node):
         self.channel_position_timer = self.create_timer(0.1, self.channel_position_timer_callback)
         #监测心跳信号，是否已经解锁
         self.state_timer = self.create_timer(1.0, self.state_timer_callback)
-       # self.curr_vel_timer = self.create_timer(0.1, self.curr_vel_timer_callback)
+        # self.curr_vel_timer = self.create_timer(0.1, self.curr_vel_timer_callback)
 
     #接收决策传来的自身当前测量位置，并发送到飞控, 10Hz
     def current_pose_callback(self, msg):
@@ -138,7 +138,7 @@ class MavlinkControl(Node):
             if channels:
                 # RC_CHANNELS gives chan1_raw to chan8_raw (and up to chan18_raw)
                 if channels.get_type() == 'RC_CHANNELS':
-                    # self.get_logger().info('Chan1: %d' %channels.chan1_raw)
+                    self.get_logger().info('Chan1: %d' %channels.chan1_raw)
                     # self.get_logger().info('Chan2: %d' %channels.chan2_raw)
                     # self.get_logger().info('Chan3: %d' %channels.chan3_raw)
                     # self.get_logger().info('Chan4: %d' %channels.chan4_raw)
@@ -160,11 +160,11 @@ class MavlinkControl(Node):
     #监测心跳信号，是否已经解锁
     def state_timer_callback(self):
         hb = self.master.recv_match(type='HEARTBEAT', blocking=False)
-        #self.get_logger().info('！！！！！！！！！！！！！！！！！！！检查解锁！！!!!!!!!!!!!!!')
+        self.get_logger().info('！！！！！！！！！！！！！！！！！！！检查解锁！！!!!!!!!!!!!!!')
         if hb:
             armed = (hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED) != 0
             #for _ in range(5):
-                #self.get_logger().info(f'{YELLOW}????????Vehicle armed?  %d{RESET}' %armed)
+            self.get_logger().info(f'{YELLOW}????????Vehicle armed?  %d{RESET}' %armed)
             msg = Bool() #给决策发送是否解锁
             if armed: #飞控实际状态解锁
                 self.arming_state = True
