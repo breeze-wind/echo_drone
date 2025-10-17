@@ -26,6 +26,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter<std::vector<double>>("random_target_init_search_1", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("random_target_init_search_2", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<double>>("prev_random_target", std::vector<double>{0.0, 0.0});
+    this->declare_parameter<std::vector<double>>("prev_random_tank_target", std::vector<double>{0.0, 0.0});
     this->declare_parameter<std::vector<std::string>>("target_sequence", std::vector<std::string>{"tent", "car", "pillbox", "tank"});
     this->declare_parameter("cruise_height", 0.6);
     this->declare_parameter("detection_height", 1.5);
@@ -73,6 +74,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter<std::vector<double>>("random_target_init_search_1", random_target_init_search_1_);
     this->get_parameter<std::vector<double>>("random_target_init_search_2", random_target_init_search_2_);
     this->get_parameter<std::vector<double>>("prev_random_target", prev_random_target_);
+    this->get_parameter<std::vector<double>>("prev_random_tank_target", prev_random_tank_target_);
     this->get_parameter("cruise_height", cruise_height_);
     this->get_parameter("detection_height", detection_height_);
     this->get_parameter("H_detection_height", H_detection_height_);
@@ -367,6 +369,7 @@ void BehaviorControl::step_timer_callback()
                 std_msgs::msg::Bool camera_choose_msg;
                 camera_choose_msg.data = true;
                 camera_choose_pub_->publish(camera_choose_msg);
+                RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>使用d435<<<<<<<<<<<<<<<<<<<");
             }
         }
         detection_cnt++;
@@ -395,6 +398,7 @@ void BehaviorControl::step_timer_callback()
                 std_msgs::msg::Bool camera_choose_msg;
                 camera_choose_msg.data = true;
                 camera_choose_pub_->publish(camera_choose_msg);
+                RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>使用d435<<<<<<<<<<<<<<<<<<<");
             }
         }
         detection_cnt++;
@@ -407,6 +411,7 @@ void BehaviorControl::step_timer_callback()
                 std_msgs::msg::Bool camera_choose_msg;
                 camera_choose_msg.data = true;
                 camera_choose_pub_->publish(camera_choose_msg);
+                RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>使用d435<<<<<<<<<<<<<<<<<<<");
             }
         }
     }
