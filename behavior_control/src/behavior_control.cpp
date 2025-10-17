@@ -287,54 +287,136 @@ void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformSta
     map_to_camera.transform.rotation.w = base_quat_result.w();
 }
 
-void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg)
+void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg) //usb相机发过来的是livox系
 {
     if(current_step == 112 || current_step == 114)
     {
         if(msg->id == 6)
         {
             if_find_random_target_ = true;
-            random_target_[0] = msg->image_x;
-            random_target_[1] = msg->image_y;
+            geometry_msgs::msg::PointStamped camera_point, world_point;
+            camera_point.header.frame_id = "livox";
+            camera_point.header.stamp = this->now();
+            camera_point.point.x = msg->image_x;
+            camera_point.point.y = msg->image_y;
+            camera_point.point.z = 0.0;
+            try
+            {
+                tf2::doTransform(camera_point, world_point, map_to_livox);
+
+                random_target_[0] = world_point.point.x;
+                random_target_[1] = world_point.point.y;
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in USBCameraInfoCallback: %s", ex.what());
+            }
         }
         if(msg->id == 5)
         {
             if_find_random_tank_target_ = true;
-            random_tank_target_[0] = msg->image_x;
-            random_tank_target_[1] = msg->image_y;
+            geometry_msgs::msg::PointStamped camera_point, world_point;
+            camera_point.header.frame_id = "livox";
+            camera_point.header.stamp = this->now();
+            camera_point.point.x = msg->image_x;
+            camera_point.point.y = msg->image_y;
+            camera_point.point.z = 0.0;
+            try
+            {
+                tf2::doTransform(camera_point, world_point, map_to_livox);
+
+                random_tank_target_[0] = world_point.point.x;
+                random_tank_target_[1] = world_point.point.y;
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in USBCameraInfoCallback: %s", ex.what());
+            }
         }
     }
 }
 
-void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg)
+void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg) //d435发过来是camera_link系
 {
     detected_target_id_ = msg->id;
-    if(detected_target_id_ == 6)
+    if(detected_target_id_ == 6) //十字随机目标
     {
         if_find_random_target_ = true;
-        random_target_[0] = msg->image_x;
-        random_target_[1] = msg->image_y;
         detected_target_[0] = msg->image_x;
         detected_target_[1] = msg->image_y;
+
+        geometry_msgs::msg::PointStamped camera_point, world_point;
+        camera_point.header.frame_id = "camera_link";
+        camera_point.header.stamp = this->now();
+        camera_point.point.x = msg->image_x;
+        camera_point.point.y = msg->image_y;
+        camera_point.point.z = 0.0;
+        try
+        {
+            tf2::doTransform(camera_point, world_point, map_to_camera);
+
+            random_target_[0] = world_point.point.x;
+            random_target_[1] = world_point.point.y;
+        }
+        catch (const tf2::TransformException &ex)
+        {
+            RCLCPP_WARN(this->get_logger(), "TF transform failed in ImageLocationCallback: %s", ex.what());
+        }
     }
-    else if(detected_target_id_ == 5)
+    else if(detected_target_id_ == 5)  //tank随机目标
     {
         if_find_random_tank_target_ = true;
-        random_tank_target_[0] = msg->image_x;
-        random_tank_target_[1] = msg->image_y;
         detected_target_[0] = msg->image_x;
         detected_target_[1] = msg->image_y;
+
+        geometry_msgs::msg::PointStamped camera_point, world_point;
+        camera_point.header.frame_id = "camera_link";
+        camera_point.header.stamp = this->now();
+        camera_point.point.x = msg->image_x;
+        camera_point.point.y = msg->image_y;
+        camera_point.point.z = 0.0;
+        try
+        {
+            tf2::doTransform(camera_point, world_point, map_to_camera);
+
+            random_tank_target_[0] = world_point.point.x;
+            random_tank_target_[1] = world_point.point.y;
+        }
+        catch (const tf2::TransformException &ex)
+        {
+            RCLCPP_WARN(this->get_logger(), "TF transform failed in ImageLocationCallback: %s", ex.what());
+        }
     }
     else
     {
         if(detected_target_id_ == 2)  //排除tank和bridge误识别情况
         {
-            if((msg->image_x - bridge_[0]) * (msg->image_x - bridge_[0]) +
-                (msg->image_y - bridge_[1]) * (msg->image_y - bridge_[1]) >= 1.0) //实际是tank
+            // 先转坐标系
+            geometry_msgs::msg::PointStamped camera_point, world_point;
+            double curr_detected_target[2];
+            camera_point.header.frame_id = "camera_link";
+            camera_point.header.stamp = this->now();
+            camera_point.point.x = msg->image_x;
+            camera_point.point.y = msg->image_y;
+            camera_point.point.z = 0.0;
+            try
+            {
+                tf2::doTransform(camera_point, world_point, map_to_camera);
+
+                curr_detected_target[0] = world_point.point.x;
+                curr_detected_target[1] = world_point.point.y;
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in ImageLocationCallback: %s", ex.what());
+            }
+
+            if((curr_detected_target[0] - bridge_[0]) * (curr_detected_target[0] - bridge_[0]) +
+                (curr_detected_target[1] - bridge_[1]) * (curr_detected_target[1] - bridge_[1]) >= 1.0) //实际是tank
             {
                 if_find_random_tank_target_ = true;
-                random_tank_target_[0] = msg->image_x;
-                random_tank_target_[1] = msg->image_y;
+                random_tank_target_[0] = curr_detected_target[0];
+                random_tank_target_[1] = curr_detected_target[1];
             }
         }
         detected_target_[0] = msg->image_x;
@@ -660,13 +742,13 @@ void BehaviorControl::step_timer_callback()
             current_step = 64;
             if(if_find_random_tank_target_)
             {
-                camera_pt_.point.x = random_tank_target_[0];
-                camera_pt_.point.y = random_tank_target_[1];
+                stored_point[0] = random_tank_target_[0];
+                stored_point[1] = random_tank_target_[1];
             }
             else
             {
-                camera_pt_.point.x = detected_target_[0];
-                camera_pt_.point.y = detected_target_[1];
+                stored_point[0] = detected_target_[0];
+                stored_point[1] = detected_target_[1];
             }
         }
     }
@@ -709,13 +791,13 @@ void BehaviorControl::step_timer_callback()
             current_step = 104;
             if(if_find_random_target_)
             {
-                camera_pt_.point.x = random_target_[0];
-                camera_pt_.point.y = random_target_[1];
+                stored_point[0] = random_target_[0];
+                stored_point[1] = random_target_[1];
             }
             else
             {
-                camera_pt_.point.x = detected_target_[0];
-                camera_pt_.point.y = detected_target_[1];
+                stored_point[0] = detected_target_[0];
+                stored_point[1] = detected_target_[1];
             }
         }
     }
@@ -1256,57 +1338,78 @@ void BehaviorControl::mission_timer_callback()
         camera_pt_.header.stamp = this->now();
         if(if_find_random_tank_target_)
         {
-            camera_pt_.point.x = random_tank_target_[0];
-            camera_pt_.point.y = random_tank_target_[1];
+            current_target_position_.transform.translation.x = random_tank_target_[0] + offset_x_2_;
+            current_target_position_.transform.translation.y = random_tank_target_[1] + offset_y_2_;
+            current_target_position_.transform.translation.z = detection_height_;
+            target_pose_pub_->publish(current_target_position_);
+            RCLCPP_INFO(this->get_logger(), "识别中... (相机发来map坐标: %.2f, %.2f)",
+                                random_tank_target_[0], random_tank_target_[1]);
         }
         else
         {
             camera_pt_.point.x = detected_target_[0];
             camera_pt_.point.y = detected_target_[1];
+            try
+            {
+                tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
+
+                current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
+                current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
+                current_target_position_.transform.translation.z = detection_height_;
+                target_pose_pub_->publish(current_target_position_);
+                RCLCPP_INFO(this->get_logger(), "识别中... (相机发来map坐标: %.2f, %.2f)",
+                                    world_pt_.point.x, world_pt_.point.y);
+                // RCLCPP_INFO(this->get_logger(), "识别中... (飞机自身坐标: %.2f, %.2f)",
+                //                 current_x_, current_y_);
+                RCLCPP_INFO(this->get_logger(), "识别中... (转换前坐标: %.2f, %.2f)",
+                            camera_pt_.point.x, camera_pt_.point.y);
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
+            }
         }
 
-        try
-        {
-            tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
-
-            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
-            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
-            current_target_position_.transform.translation.z = detection_height_;
-            target_pose_pub_->publish(current_target_position_);
-            RCLCPP_INFO(this->get_logger(), "识别中... (相机发来map坐标: %.2f, %.2f)",
-                                world_pt_.point.x, world_pt_.point.y);
-            RCLCPP_INFO(this->get_logger(), "识别中... (飞机自身坐标: %.2f, %.2f)",
-                            current_x_, current_y_);
-            RCLCPP_INFO(this->get_logger(), "识别中... (转换前坐标: %.2f, %.2f)",
-                        camera_pt_.point.x, camera_pt_.point.y);
-        }
-        catch (const tf2::TransformException &ex)
-        {
-            RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
-        }
         if_nav = false;
     }
     else if(current_step == 64) //下降投掷
     {
         camera_pt_.header.stamp = this->now();
-        try
+        if(if_find_random_tank_target_)
         {
-            tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
-
-            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
-            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
+            current_target_position_.transform.translation.x = stored_point[0] + offset_x_2_;
+            current_target_position_.transform.translation.y = stored_point[1] + offset_y_2_;
             if (current_z_ - eject_height_ >= 0.6)
                 current_target_position_.transform.translation.z = current_z_ - 0.6;
             else
                 current_target_position_.transform.translation.z = eject_height_;
 
             target_pose_pub_->publish(current_target_position_);
-            RCLCPP_INFO(this->get_logger(), "tank投掷，第 %d 个投放位", servo_index_);
         }
-        catch (const tf2::TransformException &ex)
+        else
         {
-            RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
+            camera_pt_.point.x = stored_point[0];
+            camera_pt_.point.y = stored_point[1];
+            camera_pt_.point.z = 0.0;
+            try
+            {
+                tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
+
+                current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
+                current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
+                if (current_z_ - eject_height_ >= 0.6)
+                    current_target_position_.transform.translation.z = current_z_ - 0.6;
+                else
+                    current_target_position_.transform.translation.z = eject_height_;
+
+                target_pose_pub_->publish(current_target_position_);
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
+            }
         }
+
         if(eject_cnt >= 13)
         {
             servo_index_ = 2;
@@ -1399,30 +1502,36 @@ void BehaviorControl::mission_timer_callback()
         camera_pt_.header.stamp = this->now();
         if(if_find_random_target_)
         {
-            camera_pt_.point.x = random_target_[0];
-            camera_pt_.point.y = random_target_[1];
+            current_target_position_.transform.translation.x = random_target_[0] + offset_x_3_;
+            current_target_position_.transform.translation.y = random_target_[1] + offset_y_3_;
+            current_target_position_.transform.translation.z = detection_height_;
+            target_pose_pub_->publish(current_target_position_);
+            RCLCPP_INFO(this->get_logger(), "识别中... (map坐标: %.2f, %.2f, %.2f)",
+                        random_target_[0], random_target_[1], detection_height_);
         }
         else
         {
             camera_pt_.point.x = detected_target_[0];
             camera_pt_.point.y = detected_target_[1];
-        }
 
-        try
-        {
-            tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
+            try
+            {
+                tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
 
-            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_3_;
-            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_3_;
-            current_target_position_.transform.translation.z = detection_height_;
+                current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_3_;
+                current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_3_;
+                current_target_position_.transform.translation.z = detection_height_;
 
-            target_pose_pub_->publish(current_target_position_);
-            RCLCPP_INFO(this->get_logger(), "识别中... (map坐标: %.2f, %.2f, %.2f)",
-                        world_pt_.point.x, world_pt_.point.y, detection_height_);
-        }
-        catch (const tf2::TransformException& ex)
-        {
-            RCLCPP_WARN(this->get_logger(), "TF transform failed in step 103: %s", ex.what());
+                target_pose_pub_->publish(current_target_position_);
+                RCLCPP_INFO(this->get_logger(), "识别中... (map坐标: %.2f, %.2f, %.2f)",
+                            world_pt_.point.x, world_pt_.point.y, detection_height_);
+                RCLCPP_INFO(this->get_logger(), "识别中... (转换前坐标: %.2f, %.2f)",
+                            camera_pt_.point.x, camera_pt_.point.y);
+            }
+            catch (const tf2::TransformException& ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in step 103: %s", ex.what());
+            }
         }
 
         if_nav = false;
@@ -1431,23 +1540,41 @@ void BehaviorControl::mission_timer_callback()
     else if(current_step == 104)
     {
         camera_pt_.header.stamp = this->now();
-        try
+        if(if_find_random_target_)
         {
-            tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
+            current_target_position_.transform.translation.x = stored_point[0] + offset_x_2_;
+            current_target_position_.transform.translation.y = stored_point[1] + offset_y_2_;
+            if (current_z_ - eject_height_ >= 0.6)
+                current_target_position_.transform.translation.z = current_z_ - 0.6;
+            else
+                current_target_position_.transform.translation.z = eject_height_;
 
-            current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_3_;
-            current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_3_;
+            target_pose_pub_->publish(current_target_position_);
         }
-        catch (const tf2::TransformException &ex)
-        {
-            RCLCPP_WARN(this->get_logger(), "TF transform failed in step 104: %s", ex.what());
-        }
-        if(current_z_ - eject_height_ >= 0.6)
-            current_target_position_.transform.translation.z = current_z_ - 0.6;
         else
-            current_target_position_.transform.translation.z = eject_height_;
-        target_pose_pub_->publish(current_target_position_);
-        if_nav = false;
+        {
+            camera_pt_.point.x = stored_point[0];
+            camera_pt_.point.y = stored_point[1];
+            camera_pt_.point.z = 0.0;
+            try
+            {
+                tf2::doTransform(camera_pt_, world_pt_, map_to_camera);
+
+                current_target_position_.transform.translation.x = world_pt_.point.x + offset_x_2_;
+                current_target_position_.transform.translation.y = world_pt_.point.y + offset_y_2_;
+                if (current_z_ - eject_height_ >= 0.6)
+                    current_target_position_.transform.translation.z = current_z_ - 0.6;
+                else
+                    current_target_position_.transform.translation.z = eject_height_;
+
+                target_pose_pub_->publish(current_target_position_);
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in step 63: %s", ex.what());
+            }
+        }
+
         if(eject_cnt >= 13)
         {
             servo_index_ = 3;

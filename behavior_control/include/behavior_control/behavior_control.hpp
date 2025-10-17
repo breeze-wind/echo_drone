@@ -243,6 +243,8 @@ private:
     geometry_msgs::msg::TransformStamped current_target_position_;
 
     geometry_msgs::msg::PointStamped camera_pt_, world_pt_;
+
+    double stored_point[2];
 };
 
 #endif //BEHAVIOR_CONTROL_HPP
