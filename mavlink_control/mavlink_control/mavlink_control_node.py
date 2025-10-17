@@ -128,7 +128,7 @@ class MavlinkControl(Node):
             roll, -pitch, -yaw
         )
         self.get_logger().info(f'{YELLOW}mavlink: send vision estimate pose x y z: %f, %f, %f{RESET}'
-                               % (self.current_x, -self.current_y, -(self.current_z - 0.08)))
+                                % (self.current_x, -self.current_y, -(self.current_z - 0.08)))
         # self.get_logger().info('mavlink: send vision estimate rpy: %f, %f, %f' %(roll, -pitch, -yaw))
 
     #读取遥控杆位置
@@ -138,7 +138,7 @@ class MavlinkControl(Node):
             if channels:
                 # RC_CHANNELS gives chan1_raw to chan8_raw (and up to chan18_raw)
                 if channels.get_type() == 'RC_CHANNELS':
-                    self.get_logger().info('Chan1: %d' %channels.chan1_raw)
+                    #self.get_logger().info('Chan1: %d' %channels.chan1_raw)
                     # self.get_logger().info('Chan2: %d' %channels.chan2_raw)
                     # self.get_logger().info('Chan3: %d' %channels.chan3_raw)
                     # self.get_logger().info('Chan4: %d' %channels.chan4_raw)
@@ -192,7 +192,7 @@ class MavlinkControl(Node):
             msg.angular.z = 0.0
             self.v_pub.publish(msg)
 
-            self.get_logger().info("mavlink: curr_vx=%f, curr_vy=%f, curr_vz=%f" %(curr_vx, curr_vy, curr_vz))
+            self.get_logger().info(f"{YELLOW}mavlink: curr_vx=%f, curr_vy=%f, curr_vz=%f{RESET}" %(curr_vx, curr_vy, curr_vz))
 
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):
@@ -259,7 +259,7 @@ class MavlinkControl(Node):
                     0.0, 0.0, 0.0,
                     -self.target_yaw, 0.0
                 )
-            # self.get_logger().info('mavlink: send target_yaw: %f' %(-self.target_yaw))
+            self.get_logger().info('mavlink: send target_yaw: %f' %(-self.target_yaw))
             self.get_logger().info(f'{YELLOW}mavlink: send target pose x y z: %f, %f, %f{RESET}' %(x, y, z))
 
     def nav_state_callback(self, msg):

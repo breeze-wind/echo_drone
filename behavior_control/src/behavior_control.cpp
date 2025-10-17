@@ -1240,7 +1240,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.w = 1.0;
         navigate_to_pose_client_->async_send_goal(action_goal);
         if_nav = true;
-        RCLCPP_INFO(this->get_logger(), "tank目标点，current x y: %lf, %lf", current_x_, current_y_);
+        RCLCPP_INFO(this->get_logger(), "tank目标点: %lf, %lf", random_tank_target_[0], random_tank_target_[1]);
     }
     else if(current_step == 62)
   	{
