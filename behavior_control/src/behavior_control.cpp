@@ -339,7 +339,7 @@ void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLo
             {
                 RCLCPP_INFO(this->get_logger(), "1111111111111111111111111");
                 if ((random_tank_target_[0] - target_positions_[target_sequence_[i]][0])*(random_tank_target_[0] - target_positions_[target_sequence_[i]][0]) +
-                    (random_tank_target_[1] - target_positions_[target_sequence_[i]][1])*(random_tank_target_[1] - target_positions_[target_sequence_[i]][1]) <= 0.3)
+                    (random_tank_target_[1] - target_positions_[target_sequence_[i]][1])*(random_tank_target_[1] - target_positions_[target_sequence_[i]][1]) <= 1.0)
                 {
                     RCLCPP_INFO(this->get_logger(), "tank与其他目标点重合!!!!!!!!");
                     if_find_random_tank_target_ = false;
@@ -410,7 +410,7 @@ void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLo
             for (int i = 0; i < target_positions_.size(); i++)
             {
                 if ((random_tank_target_[0] - target_positions_[target_sequence_[i]][0])*(random_tank_target_[0] - target_positions_[target_sequence_[i]][0]) +
-                    (random_tank_target_[1] - target_positions_[target_sequence_[i]][1])*(random_tank_target_[1] - target_positions_[target_sequence_[i]][1]) <= 0.8)
+                    (random_tank_target_[1] - target_positions_[target_sequence_[i]][1])*(random_tank_target_[1] - target_positions_[target_sequence_[i]][1]) <= 1.0)
                 {
                     RCLCPP_INFO(this->get_logger(), "??????目标点重合");
                     if_find_random_tank_target_ = false;
