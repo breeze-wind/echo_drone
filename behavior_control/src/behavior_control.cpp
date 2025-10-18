@@ -6,7 +6,7 @@
 
 BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 {
-    current_step = 0;
+    current_step = 1;
     RCLCPP_INFO(this->get_logger(), "%s node create", name.c_str());
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -121,7 +121,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     RCLCPP_INFO(this->get_logger(), "pillbox_position: %lf, %lf", pillbox_[0], pillbox_[1]);
     RCLCPP_INFO(this->get_logger(), "bridge_position: %lf, %lf", bridge_[0], bridge_[1]);
 
-    target_positions_["tank"] = tank_;
+    // target_positions_["tank"] = tank_;
     target_positions_["tent"] = tent_;
     target_positions_["car"] = car_;
     target_positions_["pillbox"] = pillbox_;
@@ -150,7 +150,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     eject_cnt_threshold_ = 4.0 / 0.25; //等待投掷时间
     dynamic_eject_cnt_threshold_ = 1.5 / 0.25; //动态靶等待投掷时间
     detection_cnt_threshold_ = 2.5 / 0.25; //等待识别时间
-    dynamic_detection_cnt_threshold_ = 2.5 / 0.25; //在初始起飞后寻找随机靶的等待时间
+    dynamic_detection_cnt_threshold_ = 5.0 / 0.25; //在初始起飞后寻找随机靶的等待时间
     turning_cnt_threshold_ = 5.0 / 0.25; //等待转向时间
 
     obstacle_height_ = 2.0;
@@ -314,6 +314,7 @@ void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLo
         }
         if(msg->id == 5)
         {
+            RCLCPP_INFO(this->get_logger(), "USB Camera detected!!!!!");
             if_find_random_tank_target_ = true;
             geometry_msgs::msg::PointStamped camera_point, world_point;
             camera_point.header.frame_id = "livox";
@@ -332,6 +333,18 @@ void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLo
             {
                 RCLCPP_WARN(this->get_logger(), "TF transform failed in USBCameraInfoCallback: %s", ex.what());
             }
+
+            //
+            for (int i = 0; i < target_positions_.size(); i++)
+            {
+                RCLCPP_INFO(this->get_logger(), "1111111111111111111111111");
+                if ((random_tank_target_[0] - target_positions_[target_sequence_[i]][0])*(random_tank_target_[0] - target_positions_[target_sequence_[i]][0]) +
+                    (random_tank_target_[1] - target_positions_[target_sequence_[i]][1])*(random_tank_target_[1] - target_positions_[target_sequence_[i]][1]) <= 0.3)
+                {
+                    RCLCPP_INFO(this->get_logger(), "tank与其他目标点重合!!!!!!!!");
+                    if_find_random_tank_target_ = false;
+                }
+            }
         }
     }
 }
@@ -341,50 +354,68 @@ void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLo
     detected_target_id_ = msg->id;
     if(detected_target_id_ == 6) //十字随机目标
     {
-        if_find_random_target_ = true;
-        detected_target_[0] = msg->image_x;
-        detected_target_[1] = msg->image_y;
-
-        geometry_msgs::msg::PointStamped camera_point, world_point;
-        camera_point.header.frame_id = "camera_link";
-        camera_point.header.stamp = this->now();
-        camera_point.point.x = msg->image_x;
-        camera_point.point.y = msg->image_y;
-        camera_point.point.z = 0.0;
-        try
+        if (!if_find_random_target_)
         {
-            tf2::doTransform(camera_point, world_point, map_to_camera);
+            if_find_random_target_ = true;
+            detected_target_[0] = msg->image_x;
+            detected_target_[1] = msg->image_y;
 
-            random_target_[0] = world_point.point.x;
-            random_target_[1] = world_point.point.y;
-        }
-        catch (const tf2::TransformException &ex)
-        {
-            RCLCPP_WARN(this->get_logger(), "TF transform failed in ImageLocationCallback: %s", ex.what());
+            geometry_msgs::msg::PointStamped camera_point, world_point;
+            camera_point.header.frame_id = "camera_link";
+            camera_point.header.stamp = this->now();
+            camera_point.point.x = msg->image_x;
+            camera_point.point.y = msg->image_y;
+            camera_point.point.z = 0.0;
+            try
+            {
+                tf2::doTransform(camera_point, world_point, map_to_camera);
+
+                random_target_[0] = world_point.point.x;
+                random_target_[1] = world_point.point.y;
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in ImageLocationCallback: %s", ex.what());
+            }
         }
     }
     else if(detected_target_id_ == 5)  //tank随机目标
     {
-        if_find_random_tank_target_ = true;
-        detected_target_[0] = msg->image_x;
-        detected_target_[1] = msg->image_y;
-
-        geometry_msgs::msg::PointStamped camera_point, world_point;
-        camera_point.header.frame_id = "camera_link";
-        camera_point.header.stamp = this->now();
-        camera_point.point.x = msg->image_x;
-        camera_point.point.y = msg->image_y;
-        camera_point.point.z = 0.0;
-        try
+        RCLCPP_INFO(this->get_logger(), "!!!!!!!!Detected tank!!!!!");
+        if (!if_find_random_tank_target_)
         {
-            tf2::doTransform(camera_point, world_point, map_to_camera);
+            RCLCPP_INFO(this->get_logger(), "----------------------");
+            if_find_random_tank_target_ = true;
+            detected_target_[0] = msg->image_x;
+            detected_target_[1] = msg->image_y;
 
-            random_tank_target_[0] = world_point.point.x;
-            random_tank_target_[1] = world_point.point.y;
-        }
-        catch (const tf2::TransformException &ex)
-        {
-            RCLCPP_WARN(this->get_logger(), "TF transform failed in ImageLocationCallback: %s", ex.what());
+            geometry_msgs::msg::PointStamped camera_point, world_point;
+            camera_point.header.frame_id = "camera_link";
+            camera_point.header.stamp = this->now();
+            camera_point.point.x = msg->image_x;
+            camera_point.point.y = msg->image_y;
+            camera_point.point.z = 0.0;
+            try
+            {
+                tf2::doTransform(camera_point, world_point, map_to_camera);
+
+                random_tank_target_[0] = world_point.point.x;
+                random_tank_target_[1] = world_point.point.y;
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed in ImageLocationCallback: %s", ex.what());
+            }
+            //
+            for (int i = 0; i < target_positions_.size(); i++)
+            {
+                if ((random_tank_target_[0] - target_positions_[target_sequence_[i]][0])*(random_tank_target_[0] - target_positions_[target_sequence_[i]][0]) +
+                    (random_tank_target_[1] - target_positions_[target_sequence_[i]][1])*(random_tank_target_[1] - target_positions_[target_sequence_[i]][1]) <= 0.8)
+                {
+                    RCLCPP_INFO(this->get_logger(), "??????目标点重合");
+                    if_find_random_tank_target_ = false;
+                }
+            }
         }
     }
     else
@@ -678,6 +709,7 @@ void BehaviorControl::step_timer_callback()
         if(if_find_random_target_ && if_find_random_tank_target_)
         {
             current_step = 61; //找到2个随机靶
+            RCLCPP_INFO(this->get_logger(), "----------找到2个随机靶--------");
             return;
         }
         if(fabs(current_x_ - random_target_search_1_[0]) < 0.15)
@@ -870,6 +902,9 @@ void BehaviorControl::step_timer_callback()
 
 void BehaviorControl::mission_timer_callback()
 {
+    RCLCPP_INFO(this->get_logger(), "+++++++++++++++++tank position: %lf, %lf+++++++++++++++++",
+        random_tank_target_[0], random_tank_target_[1]);
+    RCLCPP_INFO(this->get_logger(), "+++++++++++++++if_find_random_tank_target: %d+++++++++++++++++",if_find_random_tank_target_);
     if(current_step == 0)
     {
         current_target_position_.transform.translation.x = 0.0;

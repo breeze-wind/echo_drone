@@ -15,7 +15,7 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
         random_target_init_search_2: [0.2, -2.2]
         prev_random_target: [4.7,2.5]
         prev_random_tank_target: [1.2,-1.0]
-        target_sequence: ["car", "bridge", "pillbox", "tent", "tank"]
+        target_sequence: ["car", "bridge", "pillbox", "tent"]
         cruise_height: 1.0
         detection_height: 1.5
         H_detection_height: 1.4
@@ -84,7 +84,7 @@ pcd2pgm_node:
 
 map_server:
     ros__parameters:
-        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_10_17_11_06_47_merged.yaml" #map3 重命名 checklist
+        yaml_filename: "/home/sentry/roboposter/src/roboposter/robot_bring_up/maps/2025_10_16_22_54_23_merged.yaml" #map3 重命名 checklist
 
 obstacle_segmentation_node:
     ros__parameters:
@@ -187,7 +187,7 @@ laser_mapping:
 
         pcd_save:
             use_pcd_map_: true
-            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge/2025_10_17_11_06_47_merged.pcd" #map3 重命名和路径 checklist
+            prior_PCD_map_path: "/home/sentry/roboposter/src/roboposter/Point-LIO/PCD/merge(test)/2025_10_16_22_54_23_merged.pcd" #map3 重命名和路径 checklist
             pcd_save_en: false #建图第一步
             interval: 900
         #RMUC
@@ -216,7 +216,7 @@ controller_server:
             plugin: teb_local_planner::TebLocalPlannerROS
 
             teb_autosize: 1.0
-            dt_ref: 0.13 # 所需的轨迹时间分辨率#3.17
+            dt_ref: 0.15 # 所需的轨迹时间分辨率#3.17
             dt_hysteresis: 0.02 # 根据当前时间分辨率自动调整大小的滞后，建议使用dt_ref的 10%#3.17
             max_samples: 500
             min_samples: 3 # 最小采样数,大于2
@@ -292,7 +292,7 @@ controller_server:
             weight_acc_lim_theta: 0.5 # 满足最大允许角加速度的优化权重
             weight_kinematics_nh: 0.01 # 满足非完整运动学约束（不平移，原地旋转）的优化权重，该参数必须很高 3.17
             weight_kinematics_forward_drive: 0.0 # 用于迫使机器人仅选择前进方向（正平移速度）的优化权重。较小的权重（例如 1.0）仍然允许向后行驶。 1000左右的值几乎可以防止向后行驶（但不能保证）。
-            weight_optimaltime: 1000.0 # must be > 0 用于收缩相对于转换/执行时间的轨迹的优化权重 2.28//fjq 500
+            weight_optimaltime: 1500.0 # must be > 0 用于收缩相对于转换/执行时间的轨迹的优化权重 2.28//fjq 500
             weight_shortest_path: 10.0
             weight_obstacle: 500.0 # 用于满足与障碍物距离的权重 2.28
             weight_inflation: 2.0 # 膨胀区域的权重 应该很小
