@@ -140,7 +140,7 @@ laser_mapping:
             time_lag_imu_to_lidar: 0.0 # Time offset between LiDAR and IMU calibrated by other algorithms, e.g., LI-Init (find in Readme)
             # the timesample of IMU is transferred from the current timeline to LiDAR's timeline by subtracting this value
             map_frame: "odom"
-            odom_frame: "livox"
+            odom_frame: "livox_raw"
 
         preprocess:
             lidar_type: 1
@@ -434,26 +434,25 @@ planner_server:
             allow_unknown: true # 是否允许在未知空间进行规划。
             use_final_approach_orientation: true # 如果为true，则由planner产生的路径的最后姿态将其方向设置为进近方向，即连接路径最后两点的向量的方向
 
-smoother_server:
+recoveries_server:
     ros__parameters:
-        smoother_plugins: ["simple_smoother"]
-        simple_smoother:
-            plugin: "nav2_smoother::SimpleSmoother"
-            tolerance: 1.0e-10
-            max_its: 1000
-            do_refinement: True
-
-behavior_server:
-    ros__parameters:
-        point_topic: "/cloud_obstacle"
-        cycle_frequency: 50.0
-        behavior_plugins: ["keep_away_from_obstacles"]
-        robot_radius: 0.3
-        keep_away_from_obstacles:
-            plugin: "nav2_behaviors/KeepAwayFromObstacles"
+        costmap_topic: local_costmap/costmap_raw
+        footprint_topic: local_costmap/published_footprint
+        cycle_frequency: 20.0
+        recovery_plugins: ["spin", "back_up", "wait"]
+        spin:
+            plugin: "nav2_recoveries/Spin"
+        back_up:
+            plugin: "nav2_recoveries/BackUp"
+        wait:
+            plugin: "nav2_recoveries/Wait"
         global_frame: map
         robot_base_frame: livox
-        transform_tolerance: 0.1
+        transform_timeout: 0.1
+        simulate_ahead_time: 2.0
+        max_rotational_vel: 1.0
+        min_rotational_vel: 0.4
+        rotational_acc_lim: 3.2
 
 waypoint_follower:
     ros__parameters:
@@ -464,17 +463,3 @@ waypoint_follower:
             plugin: "nav2_waypoint_follower::WaitAtWaypoint"
             enabled: True
             waypoint_pause_duration: 200
-
-velocity_smoother:
-    ros__parameters:
-        smoothing_frequency: 50.0
-        scale_velocities: True
-        feedback: "OPEN_LOOP"
-        max_velocity: [30.0, 30.0, 30.0]
-        min_velocity: [-30.0, -30.0, -30.0]
-        max_accel: [10.0, 10.0, 200.0]
-        max_decel: [-10.0, -10.0, -200.0]
-        odom_topic: "/Odometry"
-        odom_duration: 0.02
-        deadband_velocity: [0.0, 0.0, 0.0]
-        velocity_timeout: 1.0

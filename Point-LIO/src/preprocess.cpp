@@ -45,13 +45,13 @@ void Preprocess::set(bool feat_en, int lid_type, double bld, int pfilt_num)
  * @param msg 
  * @param pcl_out 
  */
-void Preprocess::process(const livox_ros_driver2::msg::CustomMsg::UniquePtr &msg, PointCloudXYZI::Ptr &pcl_out)
+void Preprocess::process(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg, PointCloudXYZI::Ptr &pcl_out)
 {  
   avia_handler(msg);
   *pcl_out = pl_surf;
 }
 
-void Preprocess::process(const sensor_msgs::msg::PointCloud2::UniquePtr &msg, PointCloudXYZI::Ptr &pcl_out)
+void Preprocess::process(const sensor_msgs::msg::PointCloud2::SharedPtr msg, PointCloudXYZI::Ptr &pcl_out)
 {
   switch (time_unit)
   {
@@ -98,7 +98,7 @@ void Preprocess::process(const sensor_msgs::msg::PointCloud2::UniquePtr &msg, Po
  * 
  * @param msg 
  */
-void Preprocess::avia_handler(const livox_ros_driver2::msg::CustomMsg::UniquePtr &msg)
+void Preprocess::avia_handler(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg)
 {
   pl_surf.clear();
   // pl_corn.clear();
@@ -149,7 +149,7 @@ void Preprocess::avia_handler(const livox_ros_driver2::msg::CustomMsg::UniquePtr
   // printf("num of surf points: %d\r\n",pl_surf.size());
 }
 
-void Preprocess::oust64_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg)
+void Preprocess::oust64_handler(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
   pl_surf.clear();
   // pl_corn.clear();
@@ -189,7 +189,7 @@ void Preprocess::oust64_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &
   
 }
 
-void Preprocess::velodyne_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg)
+void Preprocess::velodyne_handler(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
     pl_surf.clear();
     // pl_corn.clear();
@@ -285,7 +285,7 @@ void Preprocess::velodyne_handler(const sensor_msgs::msg::PointCloud2::UniquePtr
     
 }
 
-void Preprocess::hesai_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg)
+void Preprocess::hesai_handler(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
     pl_surf.clear();
     // pl_corn.clear();

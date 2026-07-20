@@ -168,7 +168,7 @@ void TebConfig::declareParameters(const nav2_util::LifecycleNode::SharedPtr nh, 
   declare_parameter_if_not_declared(nh, name + "." + "divergence_detection_max_chi_squared", rclcpp::ParameterValue(recovery.divergence_detection_max_chi_squared));
 
   // footprint model
-  declare_parameter_if_not_declared(nh, name + "." + "footprint_model.type", rclcpp::ParameterType::PARAMETER_STRING);
+  declare_parameter_if_not_declared(nh, name + "." + "footprint_model.type", rclcpp::ParameterValue(std::string("point")));
 }
 
 void TebConfig::loadRosParamFromNodeHandle(const nav2_util::LifecycleNode::SharedPtr nh, const std::string name)
@@ -311,7 +311,7 @@ void TebConfig::loadRosParamFromNodeHandle(const nav2_util::LifecycleNode::Share
   // circular
   else if (model_name.compare("circular") == 0)
   {
-    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.radius", rclcpp::ParameterType::PARAMETER_DOUBLE);
+    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.radius", rclcpp::ParameterValue(0.0));
     // get radius
     double radius;
     if (!nh->get_parameter(name + "." + "footprint_model.radius", radius))
@@ -330,8 +330,8 @@ void TebConfig::loadRosParamFromNodeHandle(const nav2_util::LifecycleNode::Share
   // line
   else if (model_name.compare("line") == 0)
   {
-    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.line_start", rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY);
-    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.line_end", rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY);
+    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.line_start", rclcpp::ParameterValue(std::vector<double>{0.0, 0.0}));
+    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.line_end", rclcpp::ParameterValue(std::vector<double>{0.0, 0.0}));
     std::vector<double> line_start, line_end;
     // check parameters
     if (!nh->get_parameter(name + "." + "footprint_model.line_start", line_start) || !nh->get_parameter(name + "." + "footprint_model.line_end", line_end))
@@ -359,10 +359,10 @@ void TebConfig::loadRosParamFromNodeHandle(const nav2_util::LifecycleNode::Share
   else if (model_name.compare("two_circles") == 0)
   {
     rclcpp::Parameter dummy;
-    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.front_offset", rclcpp::ParameterType::PARAMETER_DOUBLE);
-    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.front_radius", rclcpp::ParameterType::PARAMETER_DOUBLE);
-    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.rear_offset", rclcpp::ParameterType::PARAMETER_DOUBLE);
-    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.rear_radius", rclcpp::ParameterType::PARAMETER_DOUBLE);
+    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.front_offset", rclcpp::ParameterValue(0.0));
+    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.front_radius", rclcpp::ParameterValue(0.0));
+    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.rear_offset", rclcpp::ParameterValue(0.0));
+    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.rear_radius", rclcpp::ParameterValue(0.0));
     // check parameters
     if (!nh->get_parameter(name + "." + "footprint_model.front_offset", dummy) || !nh->get_parameter(name + "." + "footprint_model.front_radius", dummy)
         || !nh->get_parameter(name + "." + "footprint_model.rear_offset", dummy) || !nh->get_parameter(name + "." + "footprint_model.rear_radius", dummy))
@@ -387,7 +387,7 @@ void TebConfig::loadRosParamFromNodeHandle(const nav2_util::LifecycleNode::Share
   // polygon
   else if (model_name.compare("polygon") == 0)
   {
-    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.vertices", rclcpp::ParameterType::PARAMETER_STRING);
+    declare_parameter_if_not_declared(nh, name + "." + "footprint_model.vertices", rclcpp::ParameterValue(std::string("[]")));
     // check parameters
     std::string footprint_string;
     if (!nh->get_parameter(name + "." + "footprint_model.vertices", footprint_string) )

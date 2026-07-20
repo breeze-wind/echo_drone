@@ -115,8 +115,8 @@ class Preprocess
   Preprocess();
   ~Preprocess();
   
-  void process(const livox_ros_driver2::msg::CustomMsg::UniquePtr &msg, PointCloudXYZI::Ptr &pcl_out);
-  void process(const sensor_msgs::msg::PointCloud2::UniquePtr &msg, PointCloudXYZI::Ptr &pcl_out);
+  void process(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg, PointCloudXYZI::Ptr &pcl_out);
+  void process(const sensor_msgs::msg::PointCloud2::SharedPtr msg, PointCloudXYZI::Ptr &pcl_out);
   void set(bool feat_en, int lid_type, double bld, int pfilt_num);
 
   // sensor_msgs::PointCloud2::SharedPtr pointcloud;
@@ -131,10 +131,10 @@ class Preprocess
     
 
   private:
-  void avia_handler(const livox_ros_driver2::msg::CustomMsg::UniquePtr &msg);
-  void oust64_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
-  void velodyne_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
-  void hesai_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
+  void avia_handler(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg);
+  void oust64_handler(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+  void velodyne_handler(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+  void hesai_handler(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
   void give_feature(PointCloudXYZI &pl, vector<orgtype> &types);
   // void pub_func(PointCloudXYZI &pl, const ros::Time &ct);
     void pub_func(PointCloudXYZI &pl, const rclcpp::Time &ct);

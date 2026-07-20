@@ -66,7 +66,6 @@
 
 // costmap
 #include <costmap_converter/costmap_converter_interface.h>
-#include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
 
 #include <nav2_util/lifecycle_node.hpp>
 #include <nav2_costmap_2d/costmap_2d_ros.hpp>
@@ -109,10 +108,10 @@ public:
    * @param costmap_ros Cost map representing occupied and free space
    */
   void configure(
-    const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
+    const rclcpp_lifecycle::LifecycleNode::SharedPtr & parent,
     std::string name,
-    std::shared_ptr<tf2_ros::Buffer> tf,
-    std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros) override;
+    const std::shared_ptr<tf2_ros::Buffer> & tf,
+    const std::shared_ptr<nav2_costmap_2d::Costmap2DROS> & costmap_ros) override;
   void activate() override;
   void deactivate() override;
   void cleanup() override;
@@ -137,8 +136,7 @@ public:
     */
   geometry_msgs::msg::TwistStamped computeVelocityCommands(
     const geometry_msgs::msg::PoseStamped &pose,
-    const geometry_msgs::msg::Twist &velocity,
-      nav2_core::GoalChecker * goal_checker);
+    const geometry_msgs::msg::Twist &velocity) override;
   
     
   /** @name Public utility functions/methods */
@@ -422,5 +420,3 @@ public:
 }; // end namespace teb_local_planner
 
 #endif // TEB_LOCAL_PLANNER_ROS_H_
-
-

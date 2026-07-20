@@ -58,13 +58,18 @@
 #include <nav2_costmap_2d/footprint.hpp>
 #include <nav_2d_utils/tf_help.hpp>
 
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <tf2_eigen/tf2_eigen.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 using nav2_util::declare_parameter_if_not_declared;
 
 namespace teb_local_planner
 {
+
+namespace
+{
+constexpr double kNoSpeedLimit = 0.0;
+}
   
 
 TebLocalPlannerROS::TebLocalPlannerROS() 
@@ -192,10 +197,10 @@ void TebLocalPlannerROS::initialize(nav2_util::LifecycleNode::SharedPtr node)
 }
 
 void TebLocalPlannerROS::configure(
-    const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
+    const rclcpp_lifecycle::LifecycleNode::SharedPtr & parent,
     std::string name,
-    std::shared_ptr<tf2_ros::Buffer> tf,
-    std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros) {
+    const std::shared_ptr<tf2_ros::Buffer> & tf,
+    const std::shared_ptr<nav2_costmap_2d::Costmap2DROS> & costmap_ros) {
   nh_ = parent;
 
   auto node = nh_.lock();
@@ -241,7 +246,7 @@ void TebLocalPlannerROS::setPlan(const nav_msgs::msg::Path & orig_global_plan)
 
 
 geometry_msgs::msg::TwistStamped TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::msg::PoseStamped &pose,
-  const geometry_msgs::msg::Twist &velocity, nav2_core::GoalChecker *goal_checker)
+  const geometry_msgs::msg::Twist &velocity)
 {
   // check if plugin initialized
   if(!initialized_)
@@ -258,15 +263,6 @@ geometry_msgs::msg::TwistStamped TebLocalPlannerROS::computeVelocityCommands(con
   cmd_vel.twist.linear.y = 0;
   cmd_vel.twist.angular.z = 0;
 
-  // Update for the current goal checker's state
-  geometry_msgs::msg::Pose pose_tolerance;
-  geometry_msgs::msg::Twist vel_tolerance;
-  if (!goal_checker->getTolerances(pose_tolerance, vel_tolerance)) {
-    RCLCPP_WARN(logger_, "Unable to retrieve goal checker's tolerances!");
-  } else {
-    cfg_->goal_tolerance.xy_goal_tolerance = pose_tolerance.position.x;
-  }
-  
   // Get robot pose
   robot_pose_ = PoseSE2(pose.pose);
   geometry_msgs::msg::PoseStamped robot_pose;
@@ -1040,7 +1036,7 @@ void TebLocalPlannerROS::configureBackupModes(std::vector<geometry_msgs::msg::Po
 void TebLocalPlannerROS::setSpeedLimit(
     const double & speed_limit, const bool & percentage)
 {
-  if (speed_limit == nav2_costmap_2d::NO_SPEED_LIMIT) {
+  if (speed_limit == kNoSpeedLimit) {
     // Restore default value
     cfg_->robot.max_vel_x = cfg_->robot.base_max_vel_x;
     cfg_->robot.base_max_vel_x_backwards = cfg_->robot.base_max_vel_x_backwards;

@@ -110,7 +110,7 @@ private:
     *
     * @param msg
     */
-    void standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
+    void standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
     /**
     * @brief 根据选项，将点云存入lidar_buffer中。可选1：将一帧点云按时间分开
@@ -119,14 +119,14 @@ private:
     *
     * @param msg
     */
-    void livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::UniquePtr &msg);
+    void livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg);
 
     /**
     * @brief 将imu数据加入队列
     *
     * @param msg_in
     */
-    void imu_cbk(const sensor_msgs::msg::Imu::UniquePtr &msg_in);
+    void imu_cbk(const sensor_msgs::msg::Imu::SharedPtr msg_in);
 
     /**
     * @brief 将lidar_buffer中的最早一份点云传给Measures，并根据条件初始化Measures中的imu
@@ -213,7 +213,6 @@ private:
 
     //初始化发布者和订阅者
     rclcpp::CallbackGroup::SharedPtr callback_group_;
-    rclcpp::executors::SingleThreadedExecutor callback_group_executor_;
     rclcpp::SubscriptionOptions sub_option;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_pcl_pc; //订阅PointCloud2类型的点云消息
     rclcpp::Subscription<livox_ros_driver2::msg::CustomMsg>::SharedPtr sub_pcl_livox_; //订阅CustomMsg类型的点云消息

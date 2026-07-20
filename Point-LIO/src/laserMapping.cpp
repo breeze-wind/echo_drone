@@ -58,18 +58,17 @@ LaserMappingNode::LaserMappingNode(const rclcpp::NodeOptions &options) : Node("l
             ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
 
     //初始化发布者订阅者
-    callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive, false);
-    callback_group_executor_.add_callback_group(callback_group_, this->get_node_base_interface());
+    callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     sub_option.callback_group = callback_group_;
     if (p_pre->lidar_type == AVIA) {
         sub_pcl_livox_ = this->create_subscription<livox_ros_driver2::msg::CustomMsg>(lid_topic, 200000,
-            std::bind(&LaserMappingNode::livox_pcl_cbk, this, std::placeholders::_1));
+            std::bind(&LaserMappingNode::livox_pcl_cbk, this, std::placeholders::_1), sub_option);
     } else {
         sub_pcl_pc = this->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, 200000,
-            std::bind(&LaserMappingNode::standard_pcl_cbk, this, std::placeholders::_1));
+            std::bind(&LaserMappingNode::standard_pcl_cbk, this, std::placeholders::_1), sub_option);
     }
     sub_imu = this->create_subscription<sensor_msgs::msg::Imu>(imu_topic, 200000,
-        std::bind(&LaserMappingNode::imu_cbk, this, std::placeholders::_1));
+        std::bind(&LaserMappingNode::imu_cbk, this, std::placeholders::_1), sub_option);
     pubLaserCloudFull = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 100000);
     pubLaserCloudFull_body = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered_body", 100000);
     pubLaserCloudObstacle = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_obstacle_new", 100000);
@@ -347,7 +346,7 @@ void LaserMappingNode::lasermap_fov_segment()
     points_cache_collect();
     if(cub_needrm.size() > 0) int kdtree_delete_counter = ikdtree.Delete_Point_Boxes(cub_needrm);
 }
-void LaserMappingNode::standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::UniquePtr &msg)
+void LaserMappingNode::standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
     mtx_buffer.lock();
     scan_count ++;
@@ -423,7 +422,7 @@ void LaserMappingNode::standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::Uni
     mtx_buffer.unlock();
     sig_buffer.notify_all();
 }
-void LaserMappingNode::livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::UniquePtr &msg)
+void LaserMappingNode::livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::SharedPtr msg)
 {
     auto curr_time = std::chrono::high_resolution_clock::now();
     auto msg_time_chrono = std::chrono::time_point<std::chrono::high_resolution_clock>(
@@ -502,7 +501,7 @@ void LaserMappingNode::livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::Un
     mtx_buffer.unlock();
     sig_buffer.notify_all();
 }
-void LaserMappingNode::imu_cbk(const sensor_msgs::msg::Imu::UniquePtr &msg_in)
+void LaserMappingNode::imu_cbk(const sensor_msgs::msg::Imu::SharedPtr msg_in)
 {
     rclcpp::Time time_;
     stamp_ = (float)msg_in->header.stamp.sec;
