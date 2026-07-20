@@ -1,0 +1,23 @@
+robot_serial_manager:
+  ros__parameters:
+    dry_run: true
+    scan_period: 1.0
+    devices: ["px4_fcu", "stm32_servo", "openmv"]
+
+    device.px4_fcu.required: true
+    device.px4_fcu.owner: "mavros"
+    device.px4_fcu.port: "/dev/px4_fcu"
+    device.px4_fcu.baudrate: 230400
+    device.px4_fcu.manufacturer: "CUAV"
+
+    device.stm32_servo.required: true
+    device.stm32_servo.owner: "servo_node"
+    device.stm32_servo.port: "/dev/stm32_servo"
+    device.stm32_servo.baudrate: 115200
+    device.stm32_servo.manufacturer: "STMicroelectronics"
+
+    device.openmv.required: false
+    device.openmv.owner: "openmv_serial_driver"
+    device.openmv.port: "/dev/openmv_serial"
+    device.openmv.baudrate: 115200
+    device.openmv.manufacturer: ""

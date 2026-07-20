@@ -241,8 +241,10 @@ launch/
 └── debug.launch.py
 
 config/
+├── hardware/ports.yaml
 ├── hardware/mavros.yaml
 ├── hardware/servo.yaml
+├── hardware/openmv.yaml
 ├── sensing/livox.yaml
 ├── localization/point_lio.yaml
 ├── tf/static_transforms.yaml
@@ -256,10 +258,13 @@ config/
 
 ### 6.2 launch 参数
 
-- [ ] `mode:=real|dryrun|replay`
+- [x] `dry_run:=true|false`
 - [ ] `use_rviz:=true|false`
-- [ ] `use_mavros:=true|false`
-- [ ] `use_servo:=true|false`
+- [x] `use_mavros:=true|false`
+- [x] `use_legacy_mavlink:=true|false`
+- [x] `use_servo:=true|false`
+- [x] `use_serial_manager:=true|false`
+- [x] `use_openmv:=true|false`
 - [ ] `use_navigation:=true|false`
 - [ ] `use_perception:=true|false`
 - [ ] `localization:=point_lio`
@@ -268,18 +273,19 @@ config/
 
 ### 6.3 配置规则
 
-- [ ] 参数文件按功能拆分。
-- [ ] 每个包只加载自己需要的参数。
+- [x] 硬件参数已拆出 `config/hardware/ports.yaml`、`mavros.yaml`、`servo.yaml`、`openmv.yaml`。
+- [ ] 非硬件参数继续从 `drone.yaml` 拆分。
+- [x] `servo_node` 只加载舵机参数。
 - [ ] 试验机路径不写死在代码里。
 - [ ] PCD/map 路径统一放在 mapping config。
-- [ ] 所有硬件设备名支持参数覆盖。
+- [x] 飞控、舵机、OpenMV 设备名支持参数覆盖。
 
 ## 7. Phase G：Foxy + ARM64 约束
 
 - [x] C++ 默认使用 C++14；如使用 C++17，必须显式设置并在 ARM64 验证。当前 `merge_pcd` 已显式 C++17，本机 amd64 构建通过；ARM64 待验证。
 - [x] 不使用 Humble-only API。当前已清理 Nav2 smoother/behavior/costmap filter 等非 Foxy API。
 - [x] 不使用 `std::filesystem`，除非确认编译器/标准支持。当前 `merge_pcd` 使用 `std::filesystem`，已显式 C++17。
-- [ ] Python 按 3.8 兼容。
+- [x] Python 按 3.8 兼容；新增串口管理和舵机驱动代码已通过 `py_compile`。
 - [ ] 避免过度 component composition，优先独立进程方便调试。
 - [ ] 所有依赖写入 `package.xml`。
 - [ ] 第三方源码锁定版本。
@@ -298,7 +304,8 @@ config/
 ### 8.2 静态检查
 
 - [x] `ros2 launch robot_bring_up drone.launch.py --show-args`
-- [ ] `ros2 launch ... mode:=dryrun`
+- [x] `ros2 launch robot_bring_up hardware.launch.py --show-args`
+- [x] `timeout 6 ros2 launch robot_bring_up hardware.launch.py dry_run:=true use_mavros:=true use_servo:=true use_serial_manager:=true`
 - [ ] `ros2 node list`
 - [ ] `ros2 topic list`
 - [ ] `ros2 service list`
@@ -335,8 +342,8 @@ config/
 1. [ ] 在试验机确认 MAVROS Foxy/ARM64 可用版本。
 2. [ ] 新建 `robot_tf_manager`，集中 static TF 和高度偏置。
 3. [ ] 新建 `flight_control` MAVROS adapter，先兼容旧 `/robot/*`。
-4. [ ] 给 `servo_node` 增加无硬件保护和 service。
+4. [x] 给 `servo_node` 增加无硬件保护、dry-run、状态 topic 和 `/servo/drop` service。
 5. [ ] 给 `behavior_control` 增加 `/mission/status` 和 `/mission/event`，先不改状态机。
 6. [ ] 抽 `target_manager`，合并 4 个静态靶重复流程。
 7. [x] 清理 BT/third_party，减少构建负担。
-8. [ ] 拆 launch/config。
+8. [x] 第一批硬件 launch/config 已拆分。

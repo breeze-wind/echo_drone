@@ -10,9 +10,13 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
-  <depend>robot_serial</depend>
   <depend>std_msgs</depend>
   <depend>rosbag2_cpp</depend>
+
+  <exec_depend>mavlink_control</exec_depend>
+  <exec_depend>mavros</exec_depend>
+  <exec_depend>robot_serial_manager</exec_depend>
+  <exec_depend>servo_node</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

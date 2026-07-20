@@ -1,0 +1,9 @@
+openmv_serial_driver:
+  ros__parameters:
+    enabled: false
+    dry_run: true
+    required: false
+    port: "/dev/openmv_serial"
+    manufacturer: ""
+    baudrate: 115200
+    output_topic: "/robot/openmv_info"

@@ -76,7 +76,8 @@ behavior_control
 | `robot_behavior_tree/` | 多包 | 自定义 BT navigator/behavior/action | 已排除默认构建；主流程改用官方 Nav2 BT/recoveries |
 | `behavior_control/` | `behavior_control` | 任务决策、目标流程、投掷、穿门 | 必须重构为可调试状态机 |
 | `mavlink_control/` | `mavlink_control` | `pymavlink` 直连 PX4 | 必须替换为 MAVROS adapter |
-| `servo_node/` | `servo_node` | STM32 串口舵机 | 保留硬件功能，增加服务接口和无硬件保护 |
+| `servo_node/` | `servo_node` | STM32 串口舵机 | 已参数化，支持 dry-run、状态 topic、命令 topic、drop service，并兼容旧参数接口 |
+| `robot_serial_manager/` | `robot_serial_manager` | 串口设备枚举与状态发布 | 只做检查，不打开业务串口，避免和 MAVROS/驱动抢设备 |
 | `robot_bring_up/` | `robot_bring_up` | 全局 launch/config | 必须拆分 launch/config |
 | `robot_interfaces/` | `robot_interfaces` | 自定义视觉/舵机消息 | 短期保持兼容，不先改消息字段 |
 | `robot_mapping/` | `pcd2pgm`, `merge_pcd` | 地图工具 | 修 bug 后拆纯逻辑测试 |
@@ -119,7 +120,12 @@ behavior_control
 | `/camera/choose` | `std_msgs/msg/Bool` | behavior_control -> 相机选择节点 | `true` 选择 D435，当前只看到发布端 |
 | `/robot/image_location` | `robot_interfaces/msg/ImageLocation` | 视觉 -> behavior_control | D435 目标识别结果 |
 | `/robot/usb_camera` | `robot_interfaces/msg/ImageLocation` | USB 相机 -> behavior_control | 起飞点随机靶识别结果 |
-| `/servo_node/set_parameters` | `rcl_interfaces/srv/SetParameters` | behavior_control -> servo_node | 改 `/servo/servo` 触发投放 |
+| `/servo_node/set_parameters` | `rcl_interfaces/srv/SetParameters` | behavior_control -> servo_node | 旧兼容接口，改 `/servo/servo` 触发投放 |
+| `/servo/command` | `std_msgs/msg/Int32` | behavior_control/debug -> servo_node | 新舵机命令 topic，取值范围由 `servo.yaml` 约束 |
+| `/servo/drop` | `std_srvs/srv/Trigger` | behavior_control/debug -> servo_node | 新投放服务，发送 `drop_command` |
+| `/servo/status` | `std_msgs/msg/String` JSON | servo_node -> debug/monitor | 舵机串口状态、dry-run 状态、最近命令和错误 |
+| `/hardware/serial_status` | `std_msgs/msg/String` JSON | robot_serial_manager -> debug/monitor | 串口设备存在性、逻辑 owner、fallback 匹配状态 |
+| `/hardware/rescan_serials` | `std_srvs/srv/Trigger` | debug/monitor -> robot_serial_manager | 手动重新扫描串口设备 |
 | `/controller_server/set_parameters` | `rcl_interfaces/srv/SetParameters` | behavior_control -> Nav2 controller_server | 穿门时动态修改 TEB 参数 |
 | `/local_costmap/local_costmap/set_parameters` | `rcl_interfaces/srv/SetParameters` | behavior_control -> local_costmap | 穿门时动态修改 `robot_radius` |
 | `navigate_to_pose` | `nav2_msgs/action/NavigateToPose` | behavior_control -> Nav2 | 静态靶/随机靶/穿门导航 |
@@ -175,10 +181,14 @@ uint8 servo_pos
 | `robot_bring_up/launch/navigation_launch.py` | Foxy Nav2 navigation nodes | 已改为 `controller_server`、`planner_server`、`recoveries_server`、`bt_navigator`、`waypoint_follower` |
 | `robot_bring_up/launch/localization_launch.py` | map_server / AMCL 等模板逻辑 | 对当前无人机 LIO 体系可能部分冗余 |
 | `behavior_control/launch/behavior_control.launch.py` | 启动任务决策 | 单独入口 |
-| `robot_bring_up/launch/mavlink_control.launch.py` | 启动 `pymavlink` 节点 | 后续必须替换为 MAVROS adapter |
-| `robot_bring_up/launch/servo.launch.py` | 启动舵机节点 | 无参数文件 |
+| `robot_bring_up/launch/hardware.launch.py` | 统一硬件入口：serial manager、servo、MAVROS 或 legacy MAVLink fallback | 默认 dry-run，不在非试验机环境误开飞控串口 |
+| `robot_bring_up/launch/mavlink_control.launch.py` | 启动 `pymavlink` 节点 | 保留为 fallback，默认不由硬件入口启动 |
+| `robot_bring_up/launch/serial.launch.py` | 旧 `robot_serial` 入口 | 已改为 deprecated wrapper，只启动 dry-run serial manager |
+| `robot_bring_up/launch/servo.launch.py` | 启动舵机节点 | 已加载 `config/hardware/servo.yaml` 并支持 `dry_run` 参数 |
 | `obstacle_segmentation_tc/launch/obstacle_segmentation.launch.py` | 启动障碍物分割 | 默认加载 `drone.yaml` |
 | `Point-LIO/launch/pointlio.launch.py` | 启动 Point-LIO | 默认加载 `drone.yaml` |
+
+串口统一管理的使用说明见 `docs/serial_hardware_management.md`。
 
 目标 launch 需要提供：
 
@@ -218,6 +228,8 @@ launch/debug.launch.py
 ```text
 config/hardware/mavros.yaml
 config/hardware/servo.yaml
+config/hardware/ports.yaml
+config/hardware/openmv.yaml
 config/sensing/livox.yaml
 config/localization/point_lio.yaml
 config/tf/static_transforms.yaml

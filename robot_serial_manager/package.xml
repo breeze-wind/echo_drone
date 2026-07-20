@@ -1,14 +1,13 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>servo_node</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="ckyf@todo.todo">ckyf</maintainer>
+  <name>robot_serial_manager</name>
+  <version>0.1.0</version>
+  <description>Serial device inventory and health reporting for Echo Drone hardware.</description>
+  <maintainer email="sfx@example.com">sfx</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
-  <depend>rcl_interfaces</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
   <exec_depend>python3-serial</exec_depend>
