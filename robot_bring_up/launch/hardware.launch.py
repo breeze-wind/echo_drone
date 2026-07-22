@@ -1,8 +1,8 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
 from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
-from launch_xml.launch_description_sources import XMLLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -51,17 +51,15 @@ def generate_launch_description():
     )
 
     mavros_launch = IncludeLaunchDescription(
-        XMLLaunchDescriptionSource(PathJoinSubstitution([
-            FindPackageShare('mavros'), 'launch', 'px4.launch'
+        PythonLaunchDescriptionSource(PathJoinSubstitution([
+            FindPackageShare('flight_control'), 'launch',
+            'mavros_state.launch.py'
         ])),
         launch_arguments={
             'fcu_url': LaunchConfiguration('fcu_url'),
-            'gcs_url': LaunchConfiguration('gcs_url'),
             'tgt_system': LaunchConfiguration('target_system'),
             'tgt_component': LaunchConfiguration('target_component'),
             'fcu_protocol': LaunchConfiguration('fcu_protocol'),
-            'respawn_mavros': LaunchConfiguration('respawn_mavros'),
-            'log_output': 'screen',
         }.items(),
         condition=IfCondition(_true_and_not_dry_run('use_mavros')),
     )
@@ -119,11 +117,9 @@ def generate_launch_description():
         DeclareLaunchArgument('use_legacy_mavlink', default_value='false'),
         DeclareLaunchArgument('use_openmv', default_value='false'),
         DeclareLaunchArgument('fcu_url', default_value='/dev/px4_fcu:230400'),
-        DeclareLaunchArgument('gcs_url', default_value=''),
         DeclareLaunchArgument('target_system', default_value='1'),
         DeclareLaunchArgument('target_component', default_value='1'),
         DeclareLaunchArgument('fcu_protocol', default_value='v2.0'),
-        DeclareLaunchArgument('respawn_mavros', default_value='true'),
         LogInfo(
             msg=(
                 'hardware.launch.py dry-run: MAVROS is configured but not '
