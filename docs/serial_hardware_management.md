@@ -6,6 +6,8 @@
 
 飞控串口由 MAVROS 独占，`robot_serial_manager` 只检查设备是否存在，不打开飞控串口，避免和 MAVROS 抢设备。
 
+`flight_control/mavros_adapter_node` 只桥接旧 `/robot/*` 话题与 MAVROS topic/service，本身不打开串口。
+
 ## 当前硬件角色
 
 | 逻辑设备 | 默认端口 | owner | 当前处理 |
@@ -31,7 +33,7 @@ use_legacy_mavlink:=false
 use_openmv:=false
 ```
 
-默认 `dry_run=true` 时，MAVROS 不会启动，舵机不会写真实串口。
+默认 `dry_run=true` 时，MAVROS 不会启动，`mavros_adapter` 以 ROS-only 模式运行，舵机不会写真实串口。
 
 试验机上准备连接飞控和舵机时使用：
 
@@ -54,6 +56,7 @@ ros2 launch robot_bring_up hardware.launch.py dry_run:=false use_mavros:=false u
 | `/servo/command` | `std_msgs/msg/Int32` | 设置舵机命令 |
 | `/servo/drop` | `std_srvs/srv/Trigger` | 发送投放命令 |
 | `/servo/status` | `std_msgs/msg/String` JSON | 舵机驱动状态 |
+| `/flight_control/status` | `std_msgs/msg/String` JSON | MAVROS 适配层状态 |
 | `/servo_node/set_parameters` | `rcl_interfaces/srv/SetParameters` | 兼容旧 `behavior_control` 的 `/servo/servo` 参数调用 |
 
 ## dry-run 含义

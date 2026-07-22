@@ -1,0 +1,45 @@
+mavros_adapter:
+  ros__parameters:
+    dry_run: true
+    coordinate_mode: "legacy_ned_compatible"
+    frame_id: "map"
+    child_frame_id: "livox"
+
+    cruise_height: 0.6
+    passing_door_height: 0.6
+    height_feedback_z_offset: 0.39
+    fcu_reference_z_offset: 0.08
+    vision_pose_z_offset: 0.31
+    pid_height: 0.65
+
+    status_period: 1.0
+    setpoint_republish_period: 0.1
+    setpoint_stale_timeout: 1.0
+    pose_stale_timeout: 1.0
+
+    allow_rc_arming: true
+    arm_retry_period: 1.0
+    rc_arm_channels: [1, 2, 3, 4]
+    rc_arm_low_threshold: 1100
+    rc_arm_high_threshold: 1930
+
+    auto_set_mode: false
+    desired_mode: "OFFBOARD"
+    mode_retry_period: 1.0
+
+    mavros_state_topic: "/mavros/state"
+    mavros_rc_topic: "/mavros/rc/in"
+    mavros_arming_service: "/mavros/cmd/arming"
+    mavros_set_mode_service: "/mavros/set_mode"
+    mavros_vision_pose_topic: "/mavros/vision_pose/pose"
+    mavros_position_setpoint_topic: "/mavros/setpoint_position/local"
+    mavros_velocity_setpoint_topic: "/mavros/setpoint_velocity/cmd_vel"
+
+    current_pose_topic: "/robot/current_pose"
+    target_pose_topic: "/robot/target_pose"
+    cmd_vel_topic: "/cmd_vel"
+    nav_state_topic: "/robot/nav_state"
+    passing_door_state_topic: "/robot/passing_door_state"
+    turning_state_topic: "/robot/turning_state"
+    arm_state_topic: "/robot/arm_state"
+    status_topic: "/flight_control/status"

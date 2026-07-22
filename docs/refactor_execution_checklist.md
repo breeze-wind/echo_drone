@@ -53,6 +53,13 @@
 
 目标：用 MAVROS 替代 `mavlink_control` 的 `pymavlink` 直连，同时保持旧 `/robot/*` 接口兼容。
 
+### 当前进度
+
+- [x] 新增 `flight_control` 包，已落地 `mavros_adapter_node`。
+- [x] `hardware.launch.py` 默认挂载 MAVROS 适配层，`mavlink_control` 继续作为 fallback。
+- [x] `/robot/current_pose`、`/robot/target_pose`、`/cmd_vel`、`/robot/nav_state`、`/robot/passing_door_state`、`/robot/turning_state` 已接入适配层。
+- [ ] 需要在试验机上补 `auto_set_mode`、无桨联调和失联安全策略验证。
+
 ### 2.1 试验机依赖确认
 
 - [ ] 确认试验机 ROS2 版本：Foxy。
@@ -70,8 +77,8 @@
 flight_control/
 ├── package.xml
 ├── CMakeLists.txt 或 setup.py
-├── launch/flight_control.launch.py
-├── config/mavros_bridge.yaml
+├── launch/mavros_adapter.launch.py
+├── config/mavros_adapter.yaml
 └── src 或 flight_control/
     ├── mavros_adapter
     ├── setpoint_mux
@@ -81,21 +88,21 @@ flight_control/
 
 ### 2.3 兼容接口
 
-- [ ] `/robot/current_pose` -> MAVROS vision pose 输入。
-- [ ] `/robot/target_pose` -> MAVROS position setpoint。
-- [ ] `/cmd_vel` -> MAVROS velocity setpoint。
-- [ ] MAVROS state -> `/robot/arm_state`。
-- [ ] `/robot/nav_state` 控制 setpoint 来源。
-- [ ] `/robot/passing_door_state` 保留穿门坐标/姿态逻辑。
-- [ ] `/robot/turning_state` 保留转向 yaw 逻辑。
-- [ ] 原 `mavlink_control` launch 改为启动 MAVROS + adapter。
-- [ ] 保留旧 `mavlink_control` 为 fallback，但默认不启动。
+- [x] `/robot/current_pose` -> MAVROS vision pose 输入。
+- [x] `/robot/target_pose` -> MAVROS position setpoint。
+- [x] `/cmd_vel` -> MAVROS velocity setpoint。
+- [x] MAVROS state -> `/robot/arm_state`。
+- [x] `/robot/nav_state` 控制 setpoint 来源。
+- [x] `/robot/passing_door_state` 保留穿门坐标/姿态逻辑。
+- [x] `/robot/turning_state` 保留转向 yaw 逻辑。
+- [x] `hardware.launch.py` 改为启动 MAVROS + adapter。
+- [x] 保留旧 `mavlink_control` 为 fallback，但默认不启动。
 
 ### 2.4 安全与测试
 
-- [ ] Adapter 提供 `dry_run` 参数，dry-run 下不调用 MAVROS armed/mode 服务。
-- [ ] Adapter 发布 `/flight_control/status`。
-- [ ] 丢失 `/robot/current_pose` 时停止 setpoint 或进入安全状态。
+- [x] Adapter 提供 `dry_run` 参数，dry-run 下不调用 MAVROS armed/mode 服务。
+- [x] Adapter 发布 `/flight_control/status`。
+- [x] 丢失 `/robot/current_pose` 时停止 setpoint 或进入安全状态。
 - [ ] MAVROS disconnected 时拒绝任务启动。
 - [ ] 无桨测试：vision pose 输入正常。
 - [ ] 无桨测试：position setpoint 正常。

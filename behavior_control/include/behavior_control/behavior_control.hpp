@@ -53,6 +53,8 @@ private:
     void ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg);
     /// 接收usb相机传来的随机靶信息
     void USBCameraInfoCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg);
+    void start_takeoff_circle_if_needed();
+    void publish_takeoff_circle_target();
 
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
@@ -222,6 +224,15 @@ private:
     double offset_y_2_;
     double offset_x_3_;
     double offset_y_3_;
+
+    bool takeoff_circle_enabled_;
+    bool takeoff_circle_started_;
+    double takeoff_circle_radius_;
+    double takeoff_circle_speed_;
+    double takeoff_circle_direction_;
+    double takeoff_circle_center_x_;
+    double takeoff_circle_center_y_;
+    rclcpp::Time takeoff_circle_start_time_;
 
     //导航模式，0--正常导航，1--穿门时导航
     int current_nav_mode;

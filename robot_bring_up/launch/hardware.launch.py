@@ -28,6 +28,7 @@ def generate_launch_description():
 
     ports_file = LaunchConfiguration('ports_file')
     servo_file = LaunchConfiguration('servo_file')
+    mavros_adapter_file = LaunchConfiguration('mavros_adapter_file')
     dry_run = LaunchConfiguration('dry_run')
 
     serial_manager_node = Node(
@@ -65,6 +66,16 @@ def generate_launch_description():
         condition=IfCondition(_true_and_not_dry_run('use_mavros')),
     )
 
+    mavros_adapter_node = Node(
+        package='flight_control',
+        executable='mavros_adapter_node',
+        name='mavros_adapter',
+        output='screen',
+        parameters=[mavros_adapter_file, {'dry_run': dry_run}],
+        respawn=True,
+        condition=IfCondition(LaunchConfiguration('use_mavros')),
+    )
+
     legacy_mavlink_node = Node(
         package='mavlink_control',
         executable='mavlink_control_node',
@@ -93,6 +104,14 @@ def generate_launch_description():
             ]),
             description='Parameter file for the legacy pymavlink fallback node.',
         ),
+        DeclareLaunchArgument(
+            'mavros_adapter_file',
+            default_value=PathJoinSubstitution([
+                FindPackageShare('flight_control'), 'config',
+                'mavros_adapter.yaml'
+            ]),
+            description='Parameter file for the MAVROS adapter node.',
+        ),
         DeclareLaunchArgument('dry_run', default_value='true'),
         DeclareLaunchArgument('use_serial_manager', default_value='true'),
         DeclareLaunchArgument('use_servo', default_value='true'),
@@ -106,7 +125,10 @@ def generate_launch_description():
         DeclareLaunchArgument('fcu_protocol', default_value='v2.0'),
         DeclareLaunchArgument('respawn_mavros', default_value='true'),
         LogInfo(
-            msg='hardware.launch.py dry-run: MAVROS is configured but not started.',
+            msg=(
+                'hardware.launch.py dry-run: MAVROS is configured but not '
+                'started; mavros_adapter runs in ROS-only mode.'
+            ),
             condition=IfCondition(_true_and_dry_run('use_mavros')),
         ),
         LogInfo(
@@ -116,6 +138,7 @@ def generate_launch_description():
         serial_manager_node,
         servo_node,
         mavros_launch,
+        mavros_adapter_node,
         legacy_mavlink_node,
         LogInfo(
             msg='OpenMV serial driver is not implemented in this baseline.',

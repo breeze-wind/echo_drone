@@ -75,7 +75,8 @@ behavior_control
 | `teb_local_planner/` | 多包 | TEB、costmap_converter、teb_msgs | Foxy 无 ROS2 TEB apt 包，当前 fork 保留并已补 Foxy API |
 | `robot_behavior_tree/` | 多包 | 自定义 BT navigator/behavior/action | 已排除默认构建；主流程改用官方 Nav2 BT/recoveries |
 | `behavior_control/` | `behavior_control` | 任务决策、目标流程、投掷、穿门 | 必须重构为可调试状态机 |
-| `mavlink_control/` | `mavlink_control` | `pymavlink` 直连 PX4 | 必须替换为 MAVROS adapter |
+| `flight_control/` | `flight_control` | MAVROS adapter，兼容旧 `/robot/*` 飞控接口 | 默认飞控适配层，后续补安全门和试验机验证 |
+| `mavlink_control/` | `mavlink_control` | `pymavlink` 直连 PX4 | 仅保留为 fallback，默认不启动 |
 | `servo_node/` | `servo_node` | STM32 串口舵机 | 已参数化，支持 dry-run、状态 topic、命令 topic、drop service，并兼容旧参数接口 |
 | `robot_serial_manager/` | `robot_serial_manager` | 串口设备枚举与状态发布 | 只做检查，不打开业务串口，避免和 MAVROS/驱动抢设备 |
 | `robot_bring_up/` | `robot_bring_up` | 全局 launch/config | 必须拆分 launch/config |
@@ -91,7 +92,7 @@ behavior_control
 | `/livox/lidar` | `livox_ros_driver2/msg/CustomMsg` | Livox driver | Point-LIO | 原始 Livox 点云 |
 | `/livox/imu` | `sensor_msgs/msg/Imu` | Livox driver | Point-LIO | IMU |
 | `/Odometry` | `nav_msgs/msg/Odometry` | Point-LIO | Nav2/TEB | 当前里程计 |
-| `/robot/current_pose` | `geometry_msgs/msg/TransformStamped` | Point-LIO | behavior_control, mavlink_control, obstacle_segmentation | 当前位姿主接口 |
+| `/robot/current_pose` | `geometry_msgs/msg/TransformStamped` | Point-LIO | behavior_control, flight_control, obstacle_segmentation | 当前位姿主接口 |
 | `/cloud_registered` | `sensor_msgs/msg/PointCloud2` | Point-LIO | RViz/调试 | map 系点云 |
 | `/cloud_registered_body` | `sensor_msgs/msg/PointCloud2` | Point-LIO | obstacle_segmentation | 机体系点云 |
 | `/cloud_obstacle_new` | `sensor_msgs/msg/PointCloud2` | Point-LIO | 暂未作为主链路 | Point-LIO 内部障碍物输出 |
@@ -103,18 +104,18 @@ behavior_control
 | 话题 | 类型 | 发布者 | 订阅者 | 说明 |
 |---|---|---|---|---|
 | `/cloud_obstacle` | `sensor_msgs/msg/PointCloud2` | obstacle_segmentation | local_costmap, global_costmap | 主避障点云 |
-| `/cmd_vel` | `geometry_msgs/msg/Twist` | Nav2 controller/TEB | mavlink_control | 导航速度指令 |
+| `/cmd_vel` | `geometry_msgs/msg/Twist` | Nav2 controller/TEB | flight_control | 导航速度指令 |
 | `/goal_pose` | `geometry_msgs/msg/PoseStamped` | behavior_control | Nav2/RViz | 调试或目标点输入 |
 
 ### 4.3 任务决策接口
 
 | 话题/服务 | 类型 | 方向 | 说明 |
 |---|---|---|---|
-| `/robot/arm_state` | `std_msgs/msg/Bool` | mavlink_control -> behavior_control | 飞控解锁状态 |
-| `/robot/target_pose` | `geometry_msgs/msg/TransformStamped` | behavior_control -> mavlink_control | 非 Nav2 模式下的位置设定点 |
-| `/robot/nav_state` | `std_msgs/msg/Bool` | behavior_control -> mavlink_control | `true` 使用 `/cmd_vel`；`false` 使用 `/robot/target_pose` |
-| `/robot/passing_door_state` | `std_msgs/msg/Bool` | behavior_control -> mavlink_control | 穿门姿态/坐标逻辑标志 |
-| `/robot/turning_state` | `std_msgs/msg/Bool` | behavior_control -> mavlink_control | 穿门前转向标志 |
+| `/robot/arm_state` | `std_msgs/msg/Bool` | flight_control -> behavior_control | 飞控解锁状态 |
+| `/robot/target_pose` | `geometry_msgs/msg/TransformStamped` | behavior_control -> flight_control | 非 Nav2 模式下的位置设定点 |
+| `/robot/nav_state` | `std_msgs/msg/Bool` | behavior_control -> flight_control | `true` 使用 `/cmd_vel`；`false` 使用 `/robot/target_pose` |
+| `/robot/passing_door_state` | `std_msgs/msg/Bool` | behavior_control -> flight_control | 穿门姿态/坐标逻辑标志 |
+| `/robot/turning_state` | `std_msgs/msg/Bool` | behavior_control -> flight_control | 穿门前转向标志 |
 | `/robot/obstacle_height` | `std_msgs/msg/Float64` | behavior_control -> obstacle_segmentation | 障碍物高度筛选上限 |
 | `/robot/clear_state` | `std_msgs/msg/Bool` | behavior_control -> obstacle_segmentation/Nav2 相关逻辑 | 清图/清障碍状态 |
 | `/camera/choose` | `std_msgs/msg/Bool` | behavior_control -> 相机选择节点 | `true` 选择 D435，当前只看到发布端 |
@@ -124,6 +125,7 @@ behavior_control
 | `/servo/command` | `std_msgs/msg/Int32` | behavior_control/debug -> servo_node | 新舵机命令 topic，取值范围由 `servo.yaml` 约束 |
 | `/servo/drop` | `std_srvs/srv/Trigger` | behavior_control/debug -> servo_node | 新投放服务，发送 `drop_command` |
 | `/servo/status` | `std_msgs/msg/String` JSON | servo_node -> debug/monitor | 舵机串口状态、dry-run 状态、最近命令和错误 |
+| `/flight_control/status` | `std_msgs/msg/String` JSON | flight_control -> debug/monitor | MAVROS 连接、解锁、模式、setpoint 与位姿新鲜度 |
 | `/hardware/serial_status` | `std_msgs/msg/String` JSON | robot_serial_manager -> debug/monitor | 串口设备存在性、逻辑 owner、fallback 匹配状态 |
 | `/hardware/rescan_serials` | `std_srvs/srv/Trigger` | debug/monitor -> robot_serial_manager | 手动重新扫描串口设备 |
 | `/controller_server/set_parameters` | `rcl_interfaces/srv/SetParameters` | behavior_control -> Nav2 controller_server | 穿门时动态修改 TEB 参数 |

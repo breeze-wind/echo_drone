@@ -4,6 +4,16 @@
 
 #include "behavior_control/behavior_control.hpp"
 
+#include <cmath>
+
+namespace
+{
+constexpr int kTakeoffCircleStep = 110;
+constexpr double kTwoPi = 6.28318530717958647692;
+constexpr double kMinCircleRadius = 0.05;
+constexpr double kMinCircleSpeed = 0.01;
+}
+
 BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 {
     current_step = 1;
@@ -58,6 +68,10 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("max_global_plan_lookahead_dist", 1.25);
     this->declare_parameter("weight_inflation", 1.0);
     this->declare_parameter("robot_radius", 0.05);
+    this->declare_parameter("takeoff_circle_enabled", true);
+    this->declare_parameter("takeoff_circle_radius", 0.5);
+    this->declare_parameter("takeoff_circle_speed", 0.2);
+    this->declare_parameter("takeoff_circle_direction", 1.0);
 
     this->get_parameter<std::vector<double>>("tank_position", tank_);
     this->get_parameter<std::vector<double>>("tent_position", tent_);
@@ -104,6 +118,11 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter("max_global_plan_lookahead_dist", max_global_plan_lookahead_dist);
     this->get_parameter("weight_inflation", weight_inflation);
     this->get_parameter("robot_radius", robot_radius);
+    this->get_parameter("takeoff_circle_enabled", takeoff_circle_enabled_);
+    this->get_parameter("takeoff_circle_radius", takeoff_circle_radius_);
+    this->get_parameter("takeoff_circle_speed", takeoff_circle_speed_);
+    this->get_parameter("takeoff_circle_direction", takeoff_circle_direction_);
+    takeoff_circle_direction_ = takeoff_circle_direction_ >= 0.0 ? 1.0 : -1.0;
 
     if (!if_hit_tank_)
     {
@@ -166,6 +185,9 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     if_nav = false;
 
     is_tank_or_bridge_ = false;
+    takeoff_circle_started_ = false;
+    takeoff_circle_center_x_ = 0.0;
+    takeoff_circle_center_y_ = 0.0;
 
     current_target_position_.transform.rotation.x = 0.0;
     current_target_position_.transform.rotation.y = 0.0;
@@ -349,6 +371,59 @@ void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLo
     }
 }
 
+void BehaviorControl::start_takeoff_circle_if_needed()
+{
+    if(takeoff_circle_started_)
+        return;
+
+    takeoff_circle_start_time_ = this->now();
+    takeoff_circle_center_x_ = current_x_ - takeoff_circle_radius_;
+    takeoff_circle_center_y_ = current_y_;
+    takeoff_circle_started_ = true;
+
+    RCLCPP_INFO(this->get_logger(),
+        "起飞确认，开始匀速圆周运动: radius=%lf, speed=%lf, direction=%lf, center=(%lf, %lf)",
+        takeoff_circle_radius_, takeoff_circle_speed_, takeoff_circle_direction_,
+        takeoff_circle_center_x_, takeoff_circle_center_y_);
+}
+
+void BehaviorControl::publish_takeoff_circle_target()
+{
+    if(takeoff_circle_radius_ < kMinCircleRadius || takeoff_circle_speed_ < kMinCircleSpeed)
+    {
+        current_target_position_.transform.translation.x = current_x_;
+        current_target_position_.transform.translation.y = current_y_;
+        current_target_position_.transform.translation.z = cruise_height_;
+        target_pose_pub_->publish(current_target_position_);
+        if_nav = false;
+        return;
+    }
+
+    start_takeoff_circle_if_needed();
+
+    double elapsed = (this->now() - takeoff_circle_start_time_).seconds();
+    double angle_abs = std::fmod(takeoff_circle_speed_ / takeoff_circle_radius_ * elapsed, kTwoPi);
+
+    double angle = takeoff_circle_direction_ * angle_abs;
+    current_target_position_.header.stamp = this->now();
+    current_target_position_.header.frame_id = map_frame_;
+    current_target_position_.child_frame_id = target_frame_;
+    current_target_position_.transform.translation.x =
+        takeoff_circle_center_x_ + takeoff_circle_radius_ * std::cos(angle);
+    current_target_position_.transform.translation.y =
+        takeoff_circle_center_y_ + takeoff_circle_radius_ * std::sin(angle);
+    current_target_position_.transform.translation.z = cruise_height_;
+    current_target_position_.transform.rotation.x = 0.0;
+    current_target_position_.transform.rotation.y = 0.0;
+    current_target_position_.transform.rotation.z = 0.0;
+    current_target_position_.transform.rotation.w = 1.0;
+    target_pose_pub_->publish(current_target_position_);
+
+    if_nav = false;
+    current_passing_door_ = false;
+    if_turning = false;
+}
+
 void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg) //d435发过来是camera_link系
 {
     detected_target_id_ = msg->id;
@@ -475,8 +550,15 @@ void BehaviorControl::step_timer_callback()
     {
         if(fabs(current_z_ - cruise_height_) <= 0.05)
         {
-            current_step = 111;  //current_step=61;
+            if(takeoff_circle_enabled_)
+                current_step = kTakeoffCircleStep;
+            else
+                current_step = 111;  //current_step=61;
         }
+    }
+    else if(current_step == kTakeoffCircleStep) //起飞后持续执行匀速圆周运动
+    {
+        start_takeoff_circle_if_needed();
     }
     //在起飞点左右两侧移动，寻找随机靶
     else if(current_step == 111)
@@ -933,6 +1015,10 @@ void BehaviorControl::mission_timer_callback()
         target_pose_pub_->publish(current_target_position_);
         if_nav = false;
         RCLCPP_INFO(this->get_logger(), "等待起飞至巡航高度...");
+    }
+    else if(current_step == kTakeoffCircleStep)
+    {
+        publish_takeoff_circle_target();
     }
     else if(current_step == 111)
     {
