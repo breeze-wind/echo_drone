@@ -1,9 +1,8 @@
-"""Start a minimal MAVROS node for FCU state and topic inspection.
+"""启动最小 MAVROS 节点，用于检查飞控状态和话题。
 
-Foxy installations in this workspace did not reliably accept the upstream
-MAVROS XML launch file because it still uses old launch substitution syntax.
-This Python wrapper launches `mavros_node` directly with only the serial URL,
-target IDs, and protocol arguments needed for PX4 heartbeat checks.
+当前工作区的 Foxy 环境不能稳定解析上游 MAVROS XML launch 文件，因为其中
+仍有旧 launch 替换语法。这个 Python 包装只传入 PX4 心跳检查所需的串口
+URL、目标 ID 和协议参数，直接启动 `mavros_node`。
 """
 
 from launch import LaunchDescription
@@ -14,9 +13,8 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    # This wrapper intentionally does not pass a large plugin config yet.  Keep
-    # state-only bench checks simple until the exact plugin filter is verified
-    # on the target Foxy/ARM image.
+    # 暂时不传入大插件配置；在目标 Foxy/ARM 镜像上确认插件过滤方案前，
+    # 只读状态检查保持简单。
     mavros_node = Node(
         package='mavros',
         executable='mavros_node',
@@ -40,11 +38,27 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        # Default to the udev-managed FCU link, but allow /dev/ttyACM0 while
-        # testing under WSL/USBIP where udev rules may not be active.
-        DeclareLaunchArgument('fcu_url', default_value='/dev/ttyACM0:230400'),
-        DeclareLaunchArgument('tgt_system', default_value='1'),
-        DeclareLaunchArgument('tgt_component', default_value='1'),
-        DeclareLaunchArgument('fcu_protocol', default_value='v2.0'),
+        # 默认支持 udev 管理的飞控链接；WSL/USBIP 下 udev 可能未生效，
+        # 所以也允许直接使用 /dev/ttyACM0。
+        DeclareLaunchArgument(
+            'fcu_url',
+            default_value='/dev/ttyACM0:230400',
+            description='MAVROS 连接飞控的串口 URL。',
+        ),
+        DeclareLaunchArgument(
+            'tgt_system',
+            default_value='1',
+            description='MAVROS 目标系统 ID。',
+        ),
+        DeclareLaunchArgument(
+            'tgt_component',
+            default_value='1',
+            description='MAVROS 目标组件 ID。',
+        ),
+        DeclareLaunchArgument(
+            'fcu_protocol',
+            default_value='v2.0',
+            description='MAVROS 使用的 MAVLink 协议版本。',
+        ),
         mavros_node,
     ])

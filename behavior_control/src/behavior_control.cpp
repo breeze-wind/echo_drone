@@ -1,5 +1,5 @@
 //
-// Created by elsa on 25-7-4.
+// 由 elsa 于 25-7-4 创建。
 //
 
 #include "behavior_control/behavior_control.hpp"
@@ -8,9 +8,8 @@
 
 namespace
 {
-// 110 is reserved as the bench-test intercept step: once takeoff height is
-// reached, the node keeps publishing a circular target and does not advance
-// into the old target-search, drop, or gate-passing sequence.
+// 110 作为台架测试截断步骤：确认达到起飞高度后，只持续发布圆周目标，
+// 不再进入旧的搜索、投掷或穿门流程。
 constexpr int kTakeoffCircleStep = 110;
 constexpr double kTwoPi = 6.28318530717958647692;
 constexpr double kMinCircleRadius = 0.05;
@@ -379,8 +378,8 @@ void BehaviorControl::start_takeoff_circle_if_needed()
     if(takeoff_circle_started_)
         return;
 
-    // Lock the circle once so operator-visible motion is repeatable even if
-    // Point-LIO pose jitters later.  The first target lies on the current pose.
+    // 只在首次进入时锁定圆心，使 Point-LIO 后续轻微抖动也不会改变操作员
+    // 看到的圆周轨迹；第一个目标点落在当前位置。
     takeoff_circle_start_time_ = this->now();
     takeoff_circle_center_x_ = current_x_ - takeoff_circle_radius_;
     takeoff_circle_center_y_ = current_y_;
@@ -394,8 +393,7 @@ void BehaviorControl::start_takeoff_circle_if_needed()
 
 void BehaviorControl::publish_takeoff_circle_target()
 {
-    // Invalid circle parameters degrade to a stationary hover target instead
-    // of advancing into the rest of the legacy mission.
+    // 圆周参数非法时退化为原地悬停目标，不进入后续旧任务流程。
     if(takeoff_circle_radius_ < kMinCircleRadius || takeoff_circle_speed_ < kMinCircleSpeed)
     {
         current_target_position_.transform.translation.x = current_x_;
@@ -408,7 +406,7 @@ void BehaviorControl::publish_takeoff_circle_target()
 
     start_takeoff_circle_if_needed();
 
-    // Constant linear speed is converted to angular progress by omega = v / r.
+    // 用 omega = v / r 把固定线速度转换成角度推进量。
     double elapsed = (this->now() - takeoff_circle_start_time_).seconds();
     double angle_abs = std::fmod(takeoff_circle_speed_ / takeoff_circle_radius_ * elapsed, kTwoPi);
 

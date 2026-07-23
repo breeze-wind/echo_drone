@@ -1,8 +1,8 @@
-"""Executable checks for the legacy-to-MAVROS coordinate contract.
+"""旧飞控语义到 MAVROS 坐标契约的可执行检查。
 
-These tests intentionally pin the old pymavlink sign and height offsets.  They
-act as regression documentation while the rest of the stack still publishes
-legacy `/robot/*` messages and the adapter converts them to MAVROS ENU topics.
+这些测试故意固定旧 pymavlink 的符号和高度偏置。当系统其他部分仍发布旧
+`/robot/*` 消息、adapter 负责转换到 MAVROS ENU 话题时，它们就是回归
+说明文档。
 """
 
 import math

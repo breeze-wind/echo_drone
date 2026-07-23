@@ -35,6 +35,29 @@ Nav2 / TEB ----------------> PX4 flight controller
 - `robot_bring_up/launch/hardware.launch.py`：硬件层入口，管理串口检查、舵机、MAVROS 和 MAVROS adapter。
 - `robot_bring_up/launch/drone.launch.py`：旧整机入口，仍会一次性拉起 Livox、Point-LIO、Nav2、点云分割和 RViz，调试时不要优先使用。
 
+### 0.1 启动入口职责
+
+根目录 `README.md` 已列出完整脚本模式和 launch 表。架构上按下面边界理解：
+
+| 层级 | 入口 | 职责 |
+|---|---|---|
+| 操作入口 | `run_echo_drone.sh` | 面向调试人员，统一 source 环境、设置默认 ROS 变量，并把常用启动方式收敛成固定模式 |
+| 硬件层 | `robot_bring_up/launch/hardware.launch.py` | 管理串口检查、舵机、MAVROS、MAVROS adapter 和旧 pymavlink fallback |
+| 飞控桥接 | `flight_control/launch/mavros_state.launch.py`、`flight_control/launch/mavros_adapter.launch.py` | 前者只检查 MAVROS 到飞控连接，后者只运行旧接口到 MAVROS 的适配器 |
+| 感知/里程计 | `livox_ros_driver2`、`Point-LIO/launch/pointlio.launch.py`、`obstacle_segmentation_tc/launch/obstacle_segmentation.launch.py` | 按雷达驱动、LIO、点云障碍物分割的顺序启动 |
+| 导航层 | `robot_bring_up/launch/bringup_launch.py`、`navigation_launch.py`、`localization_launch.py` | 封装 Nav2 的地图、规划、控制和生命周期节点 |
+| 决策层 | `behavior_control/launch/behavior_control.launch.py` | 当前只用于起飞后圆周运动截断调试，后续再拆 HSM |
+| 旧整机入口 | `robot_bring_up/launch/drone.launch.py` | 一次性拉起多模块，容易掩盖 CPU/TF 问题，仅在分层验证后使用 |
+
+`run_echo_drone.sh` 的模式按风险分为四类：
+
+| 类别 | 模式 |
+|---|---|
+| 只读检查 | `check`、`topics`、`mavros-state` |
+| 低风险 dry-run | `hardware-dry`、`serial-dry`、`servo-dry`、`adapter-dry` |
+| 子系统启动 | `livox`、`pointlio`、`obstacle`、`behavior`、`nav` |
+| 真实硬件 | `mavros-real`、`servo-real`、`hardware-real`、`full` |
+
 飞控链路当前为：
 
 ```text

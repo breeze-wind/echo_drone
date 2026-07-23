@@ -1,9 +1,8 @@
-"""Bring up only hardware-facing nodes for bench and flight tests.
+"""只启动硬件相关节点，用于台架和试飞前检查。
 
-This launch file is the hardware layer boundary.  In dry_run mode it can start
-serial manager, servo node, and the MAVROS adapter without starting MAVROS
-against the FCU, which lets the operator verify ROS wiring before any flight
-controller service calls are possible.
+这个 launch 文件是硬件层边界。dry_run 模式下可以启动串口管理、舵机节点
+和 MAVROS adapter，但不启动真正连接飞控的 MAVROS，使操作员能在任何飞控
+服务调用发生前先验证 ROS 侧连线。
 """
 
 from launch import LaunchDescription
@@ -16,7 +15,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def _true_and_not_dry_run(flag_name):
-    """Launch a real hardware node only when its flag is true and dry_run=false."""
+    """仅在对应开关为 true 且 dry_run=false 时启动真实硬件节点。"""
     return PythonExpression([
         "'", LaunchConfiguration(flag_name), "'.lower() == 'true' and '",
         LaunchConfiguration('dry_run'), "'.lower() != 'true'"
@@ -24,7 +23,7 @@ def _true_and_not_dry_run(flag_name):
 
 
 def _true_and_dry_run(flag_name):
-    """Emit dry-run notices when a real hardware node was intentionally skipped."""
+    """真实硬件节点因 dry-run 被跳过时输出提示。"""
     return PythonExpression([
         "'", LaunchConfiguration(flag_name), "'.lower() == 'true' and '",
         LaunchConfiguration('dry_run'), "'.lower() == 'true'"
@@ -41,8 +40,7 @@ def generate_launch_description():
     mavros_adapter_file = LaunchConfiguration('mavros_adapter_file')
     dry_run = LaunchConfiguration('dry_run')
 
-    # Central serial inventory; it is safe to start in dry-run for device
-    # discovery and config validation.
+    # 统一串口清单节点；dry-run 下可安全用于设备发现和配置校验。
     serial_manager_node = Node(
         package='robot_serial_manager',
         executable='robot_serial_manager_node',
@@ -52,8 +50,7 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_serial_manager')),
     )
 
-    # Servo node has its own dry-run switch so the launch shape matches flight
-    # mode without moving any actuator during bench tests.
+    # 舵机节点带独立 dry-run 开关，台架测试时保持实飞 launch 形状但不动作。
     servo_node = Node(
         package='servo_node',
         executable='servo_node',
@@ -64,8 +61,8 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_servo')),
     )
 
-    # Use the local Python MAVROS wrapper instead of the upstream XML launch so
-    # Foxy CLI substitutions stay predictable on x86 and ARM images.
+    # 使用本地 Python MAVROS 包装，避免上游 XML launch 在 Foxy 的 x86 和
+    # ARM 镜像上出现替换语法差异。
     mavros_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(PathJoinSubstitution([
             FindPackageShare('flight_control'), 'launch',
@@ -80,8 +77,8 @@ def generate_launch_description():
         condition=IfCondition(_true_and_not_dry_run('use_mavros')),
     )
 
-    # The adapter may run in both dry-run and real modes.  In dry-run it only
-    # converts and republishes ROS topics; MAVROS service calls are suppressed.
+    # adapter 在 dry-run 和真实模式都可运行；dry-run 下只转换和转发 ROS
+    # 话题，MAVROS 服务调用会被抑制。
     mavros_adapter_node = Node(
         package='flight_control',
         executable='mavros_adapter_node',
@@ -92,8 +89,7 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_mavros')),
     )
 
-    # Legacy pymavlink node remains as an explicit fallback, disabled by
-    # default, while the MAVROS path is validated.
+    # 旧 pymavlink 节点只作为显式 fallback 保留，默认关闭，主线验证 MAVROS。
     legacy_mavlink_node = Node(
         package='mavlink_control',
         executable='mavlink_control_node',
@@ -108,19 +104,19 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'ports_file',
             default_value=PathJoinSubstitution([hardware_config_dir, 'ports.yaml']),
-            description='Serial device inventory and ownership configuration.',
+            description='串口设备清单和占用关系配置。',
         ),
         DeclareLaunchArgument(
             'servo_file',
             default_value=PathJoinSubstitution([hardware_config_dir, 'servo.yaml']),
-            description='Servo serial driver configuration.',
+            description='舵机串口驱动配置。',
         ),
         DeclareLaunchArgument(
             'legacy_mavlink_params_file',
             default_value=PathJoinSubstitution([
                 FindPackageShare('robot_bring_up'), 'config', 'drone.yaml'
             ]),
-            description='Parameter file for the legacy pymavlink fallback node.',
+            description='旧 pymavlink fallback 节点参数文件。',
         ),
         DeclareLaunchArgument(
             'mavros_adapter_file',
@@ -128,18 +124,38 @@ def generate_launch_description():
                 FindPackageShare('flight_control'), 'config',
                 'mavros_adapter.yaml'
             ]),
-            description='Parameter file for the MAVROS adapter node.',
+            description='MAVROS adapter 节点参数文件。',
         ),
-        DeclareLaunchArgument('dry_run', default_value='true'),
-        DeclareLaunchArgument('use_serial_manager', default_value='true'),
-        DeclareLaunchArgument('use_servo', default_value='true'),
-        DeclareLaunchArgument('use_mavros', default_value='true'),
-        DeclareLaunchArgument('use_legacy_mavlink', default_value='false'),
-        DeclareLaunchArgument('use_openmv', default_value='false'),
-        DeclareLaunchArgument('fcu_url', default_value='/dev/px4_fcu:230400'),
-        DeclareLaunchArgument('target_system', default_value='1'),
-        DeclareLaunchArgument('target_component', default_value='1'),
-        DeclareLaunchArgument('fcu_protocol', default_value='v2.0'),
+        DeclareLaunchArgument(
+            'dry_run', default_value='true',
+            description='是否进入 dry-run；true 时不启动真实 MAVROS 连接。'),
+        DeclareLaunchArgument(
+            'use_serial_manager', default_value='true',
+            description='是否启动串口管理节点。'),
+        DeclareLaunchArgument(
+            'use_servo', default_value='true',
+            description='是否启动舵机节点。'),
+        DeclareLaunchArgument(
+            'use_mavros', default_value='true',
+            description='是否启用 MAVROS 及其 adapter。'),
+        DeclareLaunchArgument(
+            'use_legacy_mavlink', default_value='false',
+            description='是否启动旧 pymavlink fallback 节点。'),
+        DeclareLaunchArgument(
+            'use_openmv', default_value='false',
+            description='是否尝试启用 OpenMV 串口驱动；当前只提示未实现。'),
+        DeclareLaunchArgument(
+            'fcu_url', default_value='/dev/px4_fcu:230400',
+            description='MAVROS 连接飞控的串口 URL。'),
+        DeclareLaunchArgument(
+            'target_system', default_value='1',
+            description='MAVROS 目标系统 ID。'),
+        DeclareLaunchArgument(
+            'target_component', default_value='1',
+            description='MAVROS 目标组件 ID。'),
+        DeclareLaunchArgument(
+            'fcu_protocol', default_value='v2.0',
+            description='MAVROS 使用的 MAVLink 协议版本。'),
         LogInfo(
             msg=(
                 'hardware.launch.py dry-run: MAVROS is configured but not '

@@ -1,10 +1,9 @@
-"""Coordinate helpers for bridging the legacy controller to MAVROS.
+"""旧飞控控制语义到 MAVROS 坐标语义的转换工具。
 
-The old pymavlink node wrote NED-like payloads directly to PX4 and mixed in a
-few sign/height offsets locally.  MAVROS accepts ROS ENU messages and converts
-them internally before sending MAVLink.  The helpers in this file intentionally
-apply the inverse transform so existing `/robot/*` producers can keep their old
-semantics while the transport moves to MAVROS.
+旧的 pymavlink 节点把近似 NED 的数据直接发给 PX4，并在本地混入了若干
+符号和高度偏置。MAVROS 接收 ROS ENU 消息，并在内部转换成 MAVLink。
+这里的函数显式做反向转换，让现有 `/robot/*` 生产者保持旧语义，同时把
+飞控传输层迁移到 MAVROS。
 """
 
 import math
@@ -14,27 +13,27 @@ MAVROS_ENU_COORDINATE_MODE = 'mavros_enu'
 
 
 def ned_xyz_to_mavros_enu(x_ned, y_ned, z_ned):
-    """Return the ROS ENU vector that MAVROS converts back to the NED input."""
+    """返回会被 MAVROS 转回输入 NED 向量的 ROS ENU 向量。"""
     return y_ned, x_ned, -z_ned
 
 
 def legacy_position_to_mavros_enu(x, y, z):
-    """Convert the old x, -y, -z MAVLink payload convention to MAVROS ENU."""
+    """把旧的 x、-y、-z MAVLink 位置约定转换为 MAVROS ENU。"""
     return ned_xyz_to_mavros_enu(x, -y, -z)
 
 
 def legacy_vision_pose_position(x, y, z, z_offset):
-    """Convert `/robot/current_pose` position into MAVROS vision-pose ENU."""
+    """把 `/robot/current_pose` 位置转换成 MAVROS vision_pose 使用的 ENU。"""
     return legacy_position_to_mavros_enu(x, y, z + z_offset)
 
 
 def legacy_target_position(x, y, z, reference_z_offset):
-    """Convert `/robot/target_pose` position into MAVROS local setpoint ENU."""
+    """把 `/robot/target_pose` 位置转换成 MAVROS 本地位置目标 ENU。"""
     return legacy_position_to_mavros_enu(x, y, z - reference_z_offset)
 
 
 def legacy_nav_velocity(cmd_x, cmd_y, current_height, target_height, pid_height):
-    """Preserve the old navigation velocity convention used by `/cmd_vel`."""
+    """保留旧 `/cmd_vel` 导航速度约定。"""
     vx_ned = cmd_x
     vy_ned = -cmd_y
     vz_ned = -pid_height * (target_height - current_height)
@@ -42,7 +41,7 @@ def legacy_nav_velocity(cmd_x, cmd_y, current_height, target_height, pid_height)
 
 
 def legacy_passing_door_velocity(cmd_x, cmd_y, current_height, target_height, pid_height):
-    """Preserve the old special velocity axes used while passing the door."""
+    """保留旧穿门阶段的特殊速度轴约定。"""
     vx_ned = cmd_y
     vy_ned = cmd_x
     vz_ned = -pid_height * (target_height - current_height)
@@ -50,12 +49,12 @@ def legacy_passing_door_velocity(cmd_x, cmd_y, current_height, target_height, pi
 
 
 def mavros_enu_yaw_for_legacy_ned_yaw(yaw_ned):
-    """Return ENU yaw that MAVROS converts back to the legacy NED yaw."""
+    """返回会被 MAVROS 转回旧 NED 航向角的 ENU 航向角。"""
     return math.pi / 2.0 - yaw_ned
 
 
 def quaternion_from_euler_xyzw(roll, pitch, yaw):
-    """Build a geometry-msg-style quaternion tuple from roll, pitch, yaw."""
+    """由 roll、pitch、yaw 生成 geometry_msgs 使用的四元数组。"""
     half_roll = roll * 0.5
     half_pitch = pitch * 0.5
     half_yaw = yaw * 0.5
@@ -75,7 +74,7 @@ def quaternion_from_euler_xyzw(roll, pitch, yaw):
 
 
 def euler_from_quaternion_msg(quaternion_msg):
-    """Extract roll, pitch, yaw from a geometry_msgs Quaternion-like object."""
+    """从 geometry_msgs Quaternion 类对象中解析 roll、pitch、yaw。"""
     x = quaternion_msg.x
     y = quaternion_msg.y
     z = quaternion_msg.z
@@ -99,6 +98,6 @@ def euler_from_quaternion_msg(quaternion_msg):
 
 
 def legacy_vision_orientation_to_mavros_enu(quaternion_msg):
-    """Convert old vision orientation into the ENU orientation MAVROS expects."""
+    """把旧视觉姿态转换成 MAVROS 期望的 ENU 姿态。"""
     roll, pitch, yaw = euler_from_quaternion_msg(quaternion_msg)
     return quaternion_from_euler_xyzw(roll, pitch, math.pi / 2.0 + yaw)

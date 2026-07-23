@@ -31,6 +31,79 @@ cd /home/sfx/echo_drone
 FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state
 ```
 
+## `run_echo_drone.sh` 用法
+
+基本格式：
+
+```bash
+./run_echo_drone.sh <模式> [额外 ros2 launch 参数...]
+```
+
+脚本会自动 source `/opt/ros/foxy/setup.bash` 和当前工作区的 `install/setup.bash`，并设置默认 `ROS_DOMAIN_ID=0`、`ROS_LOCALHOST_ONLY=0`、`RMW_IMPLEMENTATION=rmw_fastrtps_cpp`。
+
+常用环境变量：
+
+| 变量 | 作用 | 常用值 |
+|---|---|---|
+| `FCU_URL` | MAVROS 连接飞控的串口和波特率 | `/dev/px4_fcu:230400` 或 `/dev/ttyACM0:230400` |
+| `DRONE_PARAMS` | 覆盖主参数文件 | `/home/sfx/echo_drone/install/robot_bring_up/share/robot_bring_up/config/drone.yaml` |
+| `ECHO_DRONE_WS` | 覆盖工作区路径 | `/home/sfx/echo_drone` |
+| `ROS_DOMAIN_ID` | ROS2 域 ID | `0` |
+| `ROS_LOCALHOST_ONLY` | 是否限制本机通信 | `0` |
+
+脚本模式：
+
+| 模式 | 作用 | 风险级别 |
+|---|---|---|
+| `check` | 打印 ROS 环境、包列表和串口设备 | 只读 |
+| `build` | 构建整个工作区 | 软件构建 |
+| `topics` | 打印当前 ROS 话题 | 只读 |
+| `hardware-dry` | 启动串口管理、舵机节点和 MAVROS adapter，但全部 dry-run | 低风险 |
+| `serial-dry` | 只启动串口管理 dry-run | 低风险 |
+| `servo-dry` | 只启动舵机节点 dry-run | 低风险 |
+| `adapter-dry` | 只启动 MAVROS adapter，默认不调用飞控服务 | 低风险 |
+| `mavros-state` | 只启动 MAVROS 连接飞控，检查心跳和状态，不启动 adapter | 硬件只读 |
+| `hardware-real` | 启动串口管理、舵机、MAVROS 和 adapter | 真实硬件 |
+| `mavros-real` | 启动串口管理、MAVROS 和 adapter，不启动舵机 | 真实硬件 |
+| `servo-real` | 只启动真实舵机节点 | 真实硬件 |
+| `livox` | 启动 Livox MID360 驱动 | 传感器 |
+| `pointlio` | 启动 Point-LIO，默认关闭 RViz | 里程计 |
+| `obstacle` | 启动点云障碍物分割 | 感知 |
+| `behavior` | 启动任务决策节点 | 决策 |
+| `nav` | 启动 Nav2 bringup | 导航 |
+| `full` | 启动旧整机入口，默认关闭 RViz 和建图模式 | 高负载，谨慎 |
+
+额外 launch 参数会透传到对应入口，例如：
+
+```bash
+./run_echo_drone.sh pointlio rviz:=false
+FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state tgt_system:=1
+```
+
+## Launch 职责
+
+推荐优先通过 `run_echo_drone.sh` 启动，下面表格用于理解各 launch 文件边界。
+
+| launch 文件 | 职责 | 当前建议 |
+|---|---|---|
+| `robot_bring_up/launch/hardware.launch.py` | 硬件层总入口，编排串口管理、舵机、MAVROS、MAVROS adapter 和旧 pymavlink fallback | 台架和试飞硬件层优先入口 |
+| `flight_control/launch/mavros_state.launch.py` | 直接启动最小 MAVROS 节点，只做飞控串口和心跳检查 | 飞控接入后先跑 |
+| `flight_control/launch/mavros_adapter.launch.py` | 只启动 MAVROS adapter，桥接旧 `/robot/*` 接口到 MAVROS 话题和服务 | MAVROS 已单独运行时使用 |
+| `robot_bring_up/launch/serial.launch.py` | 兼容旧入口，内部转到 `hardware.launch.py` 且只开串口管理 dry-run | 已废弃，不优先用 |
+| `robot_bring_up/launch/servo.launch.py` | 单独启动 STM32 舵机节点 | 舵机单项调试用 |
+| `robot_bring_up/launch/mavlink_control.launch.py` | 单独启动旧 `pymavlink` 直连飞控节点 | 仅 fallback |
+| `robot_bring_up/launch/drone.launch.py` | 旧整机入口，一次性拉起 Livox、Point-LIO、Nav2、点云分割、TF 和 RViz | 高负载，问题定位时不要优先用 |
+| `robot_bring_up/launch/bringup_launch.py` | Nav2 总入口，包含 localization 和 navigation | `run_echo_drone.sh nav` 间接调用 |
+| `robot_bring_up/launch/navigation_launch.py` | 启动 Nav2 controller、planner、recoveries、bt_navigator、waypoint_follower 和 lifecycle manager | 导航子系统入口 |
+| `robot_bring_up/launch/localization_launch.py` | 启动 Nav2 map_server 和 localization lifecycle manager | 有静态地图时使用 |
+| `Point-LIO/launch/pointlio.launch.py` | 启动 Point-LIO 里程计 | 雷达和 IMU 数据确认后启动 |
+| `obstacle_segmentation_tc/launch/obstacle_segmentation.launch.py` | 启动点云障碍物分割节点，ROS 包名是 `obstacle_segmentation` | Point-LIO 点云稳定后启动 |
+| `behavior_control/launch/behavior_control.launch.py` | 启动任务决策节点，当前起飞后截断为匀速圆周运动 | 飞控和位姿链路确认后启动 |
+| `robot_mapping/merge_pcd/launch/merge_pcd.launch.py` | 点云地图合并工具 | 离线建图工具 |
+| `robot_mapping/pcd2pgm/launch/pcd2pgm.launch.py` | PCD 转占据栅格图工具 | 离线地图转换工具 |
+| `third_party/livox_ros_driver2/launch_ROS2/msg_MID360_launch.py` | Livox MID360 ROS2 驱动入口 | 通过 `run_echo_drone.sh livox` 间接调用 |
+| `robot_behavior_tree/robot_behaviors/launch/robot_behaviors.launch.py` | 旧行为树相关入口 | 历史遗留，当前主线不用 |
+
 更多 MAVROS 实测话题、未解决问题和完整启动命令见：
 
 - `docs/mavros_runtime_guide.md`

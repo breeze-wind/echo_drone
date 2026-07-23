@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Single operator entrypoint for the refactored stack.  It keeps bench-safe
-# dry-run modes, hardware-only checks, and the old full launch under one script
-# so the onboard computer can be tested subsystem by subsystem.
+# 重构后的一线操作入口。台架 dry-run、硬件只读检查和旧整机启动都放在
+# 同一个脚本下，方便机载单元按子系统逐层验证。
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS_DIR="${ECHO_DRONE_WS:-$SCRIPT_DIR}"
 ROS_SETUP="${ROS_SETUP:-/opt/ros/foxy/setup.bash}"
@@ -15,46 +14,45 @@ export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 export ROS_LOCALHOST_ONLY="${ROS_LOCALHOST_ONLY:-0}"
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
 
-# Printed by help mode and kept in this file so commands and documentation do
-# not drift apart during the hardware bring-up.
+# help 模式打印这一段；命令说明直接放在脚本内，避免联调时文档和实际命令脱节。
 usage() {
   cat <<'EOF'
-Usage:
-  ./run_echo_drone.sh <mode> [extra ros2 launch args...]
+用法:
+  ./run_echo_drone.sh <模式> [额外 ros2 launch 参数...]
 
-Safe software checks:
-  check             Print ROS/workspace/device status.
-  build             Build the current workspace.
-  topics            Print current ROS topic list.
+安全软件检查:
+  check             打印 ROS、工作区和串口设备状态。
+  build             构建当前工作区。
+  topics            打印当前 ROS 话题列表。
 
-Dry-run hardware layer:
-  hardware-dry      Run serial manager, servo node, and MAVROS adapter in dry-run.
-  serial-dry        Run only the serial manager in dry-run.
-  servo-dry         Run only the servo node in dry-run.
-  adapter-dry       Run only the MAVROS adapter with its dry-run config.
+硬件层 dry-run:
+  hardware-dry      dry-run 启动串口管理、舵机节点和 MAVROS adapter。
+  serial-dry        只 dry-run 启动串口管理。
+  servo-dry         只 dry-run 启动舵机节点。
+  adapter-dry       只用 dry-run 配置启动 MAVROS adapter。
 
-Real hardware layer:
-  mavros-state      Run only MAVROS against the FCU, without adapter or commands.
-  hardware-real     Run serial manager, servo node, MAVROS, and MAVROS adapter.
-  mavros-real       Run serial manager, MAVROS, and MAVROS adapter without servo.
-  servo-real        Run only the servo node against /dev/stm32_servo.
+真实硬件层:
+  mavros-state      只启动 MAVROS 连接飞控，不启动 adapter，不下发命令。
+  hardware-real     启动串口管理、舵机节点、MAVROS 和 MAVROS adapter。
+  mavros-real       启动串口管理、MAVROS 和 MAVROS adapter，不启动舵机。
+  servo-real        只启动真实舵机节点，默认设备 /dev/stm32_servo。
 
-Sensor, odometry, perception, and decision:
-  livox             Run Livox MID360 driver.
-  pointlio          Run Point-LIO only.
-  obstacle          Run obstacle segmentation only.
-  behavior          Run behavior_control only.
-  nav               Run Nav2 bringup only.
-  full              Run the current full drone.launch.py with RViz disabled.
+传感器、里程计、感知和决策:
+  livox             启动 Livox MID360 驱动。
+  pointlio          只启动 Point-LIO。
+  obstacle          只启动点云障碍物分割。
+  behavior          只启动 behavior_control。
+  nav               只启动 Nav2 bringup。
+  full              启动当前旧整机 drone.launch.py，默认关闭 RViz。
 
-Common environment overrides:
+常用环境变量覆盖:
   ROS_DOMAIN_ID=0
   ROS_LOCALHOST_ONLY=0
   FCU_URL=/dev/px4_fcu:230400
   DRONE_PARAMS=/path/to/drone.yaml
   ECHO_DRONE_WS=/home/sfx/echo_drone
 
-Examples:
+示例:
   ./run_echo_drone.sh check
   ./run_echo_drone.sh hardware-dry
   ./run_echo_drone.sh livox
@@ -68,24 +66,24 @@ die() {
   exit 1
 }
 
-# Source ROS and the built workspace with nounset temporarily disabled because
-# several ROS Foxy setup scripts still read optional unset shell variables.
+# source ROS 和工作区时临时关闭 nounset，因为 Foxy 的 setup 脚本会读取一些
+# 可选但未设置的 shell 变量。
 source_env() {
-  [[ -f "$ROS_SETUP" ]] || die "ROS setup not found: $ROS_SETUP"
+  [[ -f "$ROS_SETUP" ]] || die "ROS setup 不存在: $ROS_SETUP"
   # shellcheck source=/dev/null
   set +u
   source "$ROS_SETUP"
   set -u
 
-  [[ -f "$WS_SETUP" ]] || die "Workspace setup not found: $WS_SETUP; run './run_echo_drone.sh build' first"
+  [[ -f "$WS_SETUP" ]] || die "工作区 setup 不存在: $WS_SETUP; 请先运行 './run_echo_drone.sh build'"
   # shellcheck source=/dev/null
   set +u
   source "$WS_SETUP"
   set -u
 }
 
-# Show stable udev aliases first, then raw USB/ACM devices for WSL/USBIP bench
-# sessions where udev may not have created the aliases yet.
+# 优先显示稳定 udev 别名，再显示原始 USB/ACM 设备；WSL/USBIP 台架环境里
+# udev 规则可能尚未生效。
 print_devices() {
   local devices=(/dev/px4_fcu /dev/stm32_servo /dev/openmv_serial /dev/ttyUSB* /dev/ttyACM*)
   local found=0
@@ -100,11 +98,11 @@ print_devices() {
   shopt -u nullglob
 
   if [[ "$found" -eq 0 ]]; then
-    echo "No matching serial device found."
+    echo "未发现匹配的串口设备。"
   fi
 }
 
-# Use exec so Ctrl-C and process exit belong to the launched ROS command.
+# 用 exec 让 Ctrl-C 和退出码直接归属到被启动的 ROS 命令。
 run() {
   echo "+ $*"
   exec "$@"
@@ -120,7 +118,7 @@ case "$MODE" in
     usage
     ;;
 
-  # Non-commanding checks.
+  # 不会下发硬件命令的检查入口。
   check)
     source_env
     echo "Workspace: $WS_DIR"
@@ -138,7 +136,7 @@ case "$MODE" in
     ;;
 
   build)
-    [[ -f "$ROS_SETUP" ]] || die "ROS setup not found: $ROS_SETUP"
+    [[ -f "$ROS_SETUP" ]] || die "ROS setup 不存在: $ROS_SETUP"
     # shellcheck source=/dev/null
     set +u
     source "$ROS_SETUP"
@@ -152,8 +150,8 @@ case "$MODE" in
     run ros2 topic list
     ;;
 
-  # Hardware-layer dry-runs keep MAVROS adapter active but avoid FCU service
-  # calls, which makes them safe for no-prop/no-motor bench validation.
+  # 硬件层 dry-run 保持 MAVROS adapter 运行，但避免飞控服务调用，适合无桨、
+  # 无电机台架验证。
   hardware-dry)
     source_env
     run_launch robot_bring_up hardware.launch.py \
@@ -186,8 +184,7 @@ case "$MODE" in
     run_launch flight_control mavros_adapter.launch.py "${@:2}"
     ;;
 
-  # Real hardware-layer modes are split so the FCU heartbeat can be verified
-  # before any adapter or servo command path is enabled.
+  # 真实硬件入口拆开，先确认飞控心跳，再启用 adapter 或舵机命令链路。
   mavros-state)
     source_env
     print_devices
@@ -233,7 +230,7 @@ case "$MODE" in
     run_launch robot_bring_up servo.launch.py dry_run:=false "${@:2}"
     ;;
 
-  # Sensor, odometry, perception, decision, and full-stack slices.
+  # 传感器、里程计、感知、决策和整机切片入口。
   livox)
     source_env
     run_launch livox_ros_driver2 msg_MID360_launch.py "${@:2}"
