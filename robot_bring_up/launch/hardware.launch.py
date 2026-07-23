@@ -1,3 +1,11 @@
+"""Bring up only hardware-facing nodes for bench and flight tests.
+
+This launch file is the hardware layer boundary.  In dry_run mode it can start
+serial manager, servo node, and the MAVROS adapter without starting MAVROS
+against the FCU, which lets the operator verify ROS wiring before any flight
+controller service calls are possible.
+"""
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
 from launch.conditions import IfCondition
@@ -8,6 +16,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def _true_and_not_dry_run(flag_name):
+    """Launch a real hardware node only when its flag is true and dry_run=false."""
     return PythonExpression([
         "'", LaunchConfiguration(flag_name), "'.lower() == 'true' and '",
         LaunchConfiguration('dry_run'), "'.lower() != 'true'"
@@ -15,6 +24,7 @@ def _true_and_not_dry_run(flag_name):
 
 
 def _true_and_dry_run(flag_name):
+    """Emit dry-run notices when a real hardware node was intentionally skipped."""
     return PythonExpression([
         "'", LaunchConfiguration(flag_name), "'.lower() == 'true' and '",
         LaunchConfiguration('dry_run'), "'.lower() == 'true'"
@@ -31,6 +41,8 @@ def generate_launch_description():
     mavros_adapter_file = LaunchConfiguration('mavros_adapter_file')
     dry_run = LaunchConfiguration('dry_run')
 
+    # Central serial inventory; it is safe to start in dry-run for device
+    # discovery and config validation.
     serial_manager_node = Node(
         package='robot_serial_manager',
         executable='robot_serial_manager_node',
@@ -40,6 +52,8 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_serial_manager')),
     )
 
+    # Servo node has its own dry-run switch so the launch shape matches flight
+    # mode without moving any actuator during bench tests.
     servo_node = Node(
         package='servo_node',
         executable='servo_node',
@@ -50,6 +64,8 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_servo')),
     )
 
+    # Use the local Python MAVROS wrapper instead of the upstream XML launch so
+    # Foxy CLI substitutions stay predictable on x86 and ARM images.
     mavros_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(PathJoinSubstitution([
             FindPackageShare('flight_control'), 'launch',
@@ -64,6 +80,8 @@ def generate_launch_description():
         condition=IfCondition(_true_and_not_dry_run('use_mavros')),
     )
 
+    # The adapter may run in both dry-run and real modes.  In dry-run it only
+    # converts and republishes ROS topics; MAVROS service calls are suppressed.
     mavros_adapter_node = Node(
         package='flight_control',
         executable='mavros_adapter_node',
@@ -74,6 +92,8 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_mavros')),
     )
 
+    # Legacy pymavlink node remains as an explicit fallback, disabled by
+    # default, while the MAVROS path is validated.
     legacy_mavlink_node = Node(
         package='mavlink_control',
         executable='mavlink_control_node',

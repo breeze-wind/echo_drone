@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Single operator entrypoint for the refactored stack.  It keeps bench-safe
+# dry-run modes, hardware-only checks, and the old full launch under one script
+# so the onboard computer can be tested subsystem by subsystem.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS_DIR="${ECHO_DRONE_WS:-$SCRIPT_DIR}"
 ROS_SETUP="${ROS_SETUP:-/opt/ros/foxy/setup.bash}"
@@ -12,6 +15,8 @@ export ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 export ROS_LOCALHOST_ONLY="${ROS_LOCALHOST_ONLY:-0}"
 export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
 
+# Printed by help mode and kept in this file so commands and documentation do
+# not drift apart during the hardware bring-up.
 usage() {
   cat <<'EOF'
 Usage:
@@ -63,6 +68,8 @@ die() {
   exit 1
 }
 
+# Source ROS and the built workspace with nounset temporarily disabled because
+# several ROS Foxy setup scripts still read optional unset shell variables.
 source_env() {
   [[ -f "$ROS_SETUP" ]] || die "ROS setup not found: $ROS_SETUP"
   # shellcheck source=/dev/null
@@ -77,6 +84,8 @@ source_env() {
   set -u
 }
 
+# Show stable udev aliases first, then raw USB/ACM devices for WSL/USBIP bench
+# sessions where udev may not have created the aliases yet.
 print_devices() {
   local devices=(/dev/px4_fcu /dev/stm32_servo /dev/openmv_serial /dev/ttyUSB* /dev/ttyACM*)
   local found=0
@@ -95,6 +104,7 @@ print_devices() {
   fi
 }
 
+# Use exec so Ctrl-C and process exit belong to the launched ROS command.
 run() {
   echo "+ $*"
   exec "$@"
@@ -110,6 +120,7 @@ case "$MODE" in
     usage
     ;;
 
+  # Non-commanding checks.
   check)
     source_env
     echo "Workspace: $WS_DIR"
@@ -141,6 +152,8 @@ case "$MODE" in
     run ros2 topic list
     ;;
 
+  # Hardware-layer dry-runs keep MAVROS adapter active but avoid FCU service
+  # calls, which makes them safe for no-prop/no-motor bench validation.
   hardware-dry)
     source_env
     run_launch robot_bring_up hardware.launch.py \
@@ -173,6 +186,8 @@ case "$MODE" in
     run_launch flight_control mavros_adapter.launch.py "${@:2}"
     ;;
 
+  # Real hardware-layer modes are split so the FCU heartbeat can be verified
+  # before any adapter or servo command path is enabled.
   mavros-state)
     source_env
     print_devices
@@ -218,6 +233,7 @@ case "$MODE" in
     run_launch robot_bring_up servo.launch.py dry_run:=false "${@:2}"
     ;;
 
+  # Sensor, odometry, perception, decision, and full-stack slices.
   livox)
     source_env
     run_launch livox_ros_driver2 msg_MID360_launch.py "${@:2}"

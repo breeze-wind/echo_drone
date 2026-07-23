@@ -1,5 +1,69 @@
 # 无人机任务系统架构设计稿
 
+> 当前实装状态见本节，后面的 HSM/服务层内容是行为决策进一步重构的设计稿。
+> 现阶段主线优先保证 Foxy、MAVROS、串口统一管理和最小实机联调可用。
+
+## 0. 当前实装架构
+
+当前代码还没有完全改成 HSM，但硬件层和飞控链路已经先做了分层。
+
+```text
+Livox MID360
+    |
+    v
+Point-LIO ------------------> /robot/current_pose
+    |                              |
+    |                              v
+    |                       behavior_control
+    |                              |
+    v                              v
+/cloud_registered_body      /robot/target_pose or /cmd_vel
+    |                              |
+    v                              v
+obstacle_segmentation       flight_control/mavros_adapter
+    |                              |
+    v                              v
+/cloud_obstacle             MAVROS topics/services
+    |                              |
+    v                              v
+Nav2 / TEB ----------------> PX4 flight controller
+```
+
+运行入口分为三层：
+
+- `run_echo_drone.sh`：人工联调统一入口，封装环境变量、source 和常用 launch。
+- `robot_bring_up/launch/hardware.launch.py`：硬件层入口，管理串口检查、舵机、MAVROS 和 MAVROS adapter。
+- `robot_bring_up/launch/drone.launch.py`：旧整机入口，仍会一次性拉起 Livox、Point-LIO、Nav2、点云分割和 RViz，调试时不要优先使用。
+
+飞控链路当前为：
+
+```text
+behavior_control
+    |
+    | /robot/target_pose, /cmd_vel, /robot/nav_state
+    v
+flight_control/mavros_adapter_node
+    |
+    | /mavros/vision_pose/pose
+    | /mavros/setpoint_position/local
+    | /mavros/setpoint_velocity/cmd_vel
+    | /mavros/cmd/arming
+    | /mavros/set_mode
+    v
+MAVROS -> PX4
+```
+
+`mavlink_control` 仍保留在仓库里，但只作为 fallback，默认不启动。
+
+需要继续处理的架构债：
+
+- `drone.launch.py` 还把感知、里程计、导航、RViz 混在一个入口里，容易掩盖 CPU 或 TF 问题。
+- MAVROS 插件白名单/黑名单还没有在 Foxy 下最终定型，当前只读测试会出现 ODOM TF 刷屏。
+- TF 偏移分散在 launch、Point-LIO、MAVROS adapter 和行为层参数中，还需要单独收敛为一个 TF 管理包或统一配置。
+- `behavior_control` 仍是大 step 状态机，当前只新增了起飞后圆周运动截断逻辑，后续应按下方 HSM 方案继续拆分。
+
+---
+
 > 本文档记录 behavior_control 包重构的架构设计和技术决策。
 > 基于 2025 国机赛无人机代码，迁移目标 ROS2 Foxy (Jetson Nano NX ARM64)。
 >
@@ -567,4 +631,3 @@ elif odometry_backend == "r3live_lio":
 |---|---|---|
 | **Point-LIO** | ✅ 已有 ROS2 代码 | Foxy 兼容适配（CMakeLists 降 C++14, `SingleThreadedExecutor`） |
 | **R3LIVE LIO** | ⏳ ROS1 (catkin) 待移植 | 提取 LIO 核心 → ament_cmake 化 → ROS1→ROS2 API 替换 → 测试 |
-

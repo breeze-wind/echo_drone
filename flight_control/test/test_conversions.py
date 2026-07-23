@@ -1,3 +1,10 @@
+"""Executable checks for the legacy-to-MAVROS coordinate contract.
+
+These tests intentionally pin the old pymavlink sign and height offsets.  They
+act as regression documentation while the rest of the stack still publishes
+legacy `/robot/*` messages and the adapter converts them to MAVROS ENU topics.
+"""
+
 import math
 
 from flight_control.conversions import (

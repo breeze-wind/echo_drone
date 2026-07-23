@@ -8,6 +8,9 @@
 
 namespace
 {
+// 110 is reserved as the bench-test intercept step: once takeoff height is
+// reached, the node keeps publishing a circular target and does not advance
+// into the old target-search, drop, or gate-passing sequence.
 constexpr int kTakeoffCircleStep = 110;
 constexpr double kTwoPi = 6.28318530717958647692;
 constexpr double kMinCircleRadius = 0.05;
@@ -56,7 +59,7 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("offset_x_2", 0.1);
     this->declare_parameter("offset_y_2", 0.1);
     this->declare_parameter("offset_x_3", 0.1);
-    this->declare_parameter("offset_y_4", 0.1);
+    this->declare_parameter("offset_y_3", 0.1);
     this->declare_parameter<int>("/servo/servo", 0);
     this->declare_parameter("max_vel_x_passing", 0.6);
     this->declare_parameter("max_vel_y_passing", 1.5);
@@ -131,8 +134,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     }
 
     random_target_.resize(2);
-    random_tank_target_.reserve(2);
-    detected_target_.reserve(2);
+    random_tank_target_.resize(2);
+    detected_target_.resize(2);
 
     RCLCPP_INFO(this->get_logger(), "tank_position: %lf, %lf", tank_[0], tank_[1]);
     RCLCPP_INFO(this->get_logger(), "tent_position: %lf, %lf", tent_[0], tent_[1]);
@@ -376,6 +379,8 @@ void BehaviorControl::start_takeoff_circle_if_needed()
     if(takeoff_circle_started_)
         return;
 
+    // Lock the circle once so operator-visible motion is repeatable even if
+    // Point-LIO pose jitters later.  The first target lies on the current pose.
     takeoff_circle_start_time_ = this->now();
     takeoff_circle_center_x_ = current_x_ - takeoff_circle_radius_;
     takeoff_circle_center_y_ = current_y_;
@@ -389,6 +394,8 @@ void BehaviorControl::start_takeoff_circle_if_needed()
 
 void BehaviorControl::publish_takeoff_circle_target()
 {
+    // Invalid circle parameters degrade to a stationary hover target instead
+    // of advancing into the rest of the legacy mission.
     if(takeoff_circle_radius_ < kMinCircleRadius || takeoff_circle_speed_ < kMinCircleSpeed)
     {
         current_target_position_.transform.translation.x = current_x_;
@@ -401,6 +408,7 @@ void BehaviorControl::publish_takeoff_circle_target()
 
     start_takeoff_circle_if_needed();
 
+    // Constant linear speed is converted to angular progress by omega = v / r.
     double elapsed = (this->now() - takeoff_circle_start_time_).seconds();
     double angle_abs = std::fmod(takeoff_circle_speed_ / takeoff_circle_radius_ * elapsed, kTwoPi);
 
@@ -550,6 +558,7 @@ void BehaviorControl::step_timer_callback()
     {
         if(fabs(current_z_ - cruise_height_) <= 0.05)
         {
+            // 当前重构调试阶段的截断点：确认起飞后只进入圆周运动。
             if(takeoff_circle_enabled_)
                 current_step = kTakeoffCircleStep;
             else
@@ -558,6 +567,7 @@ void BehaviorControl::step_timer_callback()
     }
     else if(current_step == kTakeoffCircleStep) //起飞后持续执行匀速圆周运动
     {
+        // 不再推进 current_step，确保不会误入后续投掷/穿门流程。
         start_takeoff_circle_if_needed();
     }
     //在起飞点左右两侧移动，寻找随机靶
@@ -1018,6 +1028,8 @@ void BehaviorControl::mission_timer_callback()
     }
     else if(current_step == kTakeoffCircleStep)
     {
+        // 圆周目标走 /robot/target_pose，再由 flight_control/mavros_adapter
+        // 转成 MAVROS setpoint_position/local。
         publish_takeoff_circle_target();
     }
     else if(current_step == 111)

@@ -1,10 +1,16 @@
 mavros_adapter:
   ros__parameters:
+    # Safety gate: dry_run keeps arming and mode services as log-only actions.
     dry_run: true
+
+    # legacy_ned_compatible preserves the old pymavlink sign/height contract.
+    # mavros_enu can be used later after all upstream producers publish ENU.
     coordinate_mode: "legacy_ned_compatible"
     frame_id: "map"
     child_frame_id: "livox"
 
+    # Height and PID constants copied from the legacy flight-control node.
+    # Keep these visible while bench-testing Point-LIO height against FCU height.
     cruise_height: 0.6
     passing_door_height: 0.6
     height_feedback_z_offset: 0.39
@@ -12,21 +18,25 @@ mavros_adapter:
     vision_pose_z_offset: 0.31
     pid_height: 0.65
 
+    # Debug/status cadence and stale-input gates for setpoint output.
     status_period: 1.0
     setpoint_republish_period: 0.1
     setpoint_stale_timeout: 1.0
     pose_stale_timeout: 1.0
 
+    # Optional RC arming bridge.  The adapter never arms from RC if this is false.
     allow_rc_arming: true
     arm_retry_period: 1.0
     rc_arm_channels: [1, 2, 3, 4]
     rc_arm_low_threshold: 1100
     rc_arm_high_threshold: 1930
 
+    # Mode switching is deliberately off until the setpoint stream is verified.
     auto_set_mode: false
     desired_mode: "OFFBOARD"
     mode_retry_period: 1.0
 
+    # MAVROS-facing topics and services.
     mavros_state_topic: "/mavros/state"
     mavros_rc_topic: "/mavros/rc/in"
     mavros_arming_service: "/mavros/cmd/arming"
@@ -35,6 +45,7 @@ mavros_adapter:
     mavros_position_setpoint_topic: "/mavros/setpoint_position/local"
     mavros_velocity_setpoint_topic: "/mavros/setpoint_velocity/cmd_vel"
 
+    # Legacy workspace contracts retained for behavior_control and Point-LIO.
     current_pose_topic: "/robot/current_pose"
     target_pose_topic: "/robot/target_pose"
     cmd_vel_topic: "/cmd_vel"

@@ -1,5 +1,75 @@
 # 2025国机赛无人机代码
 
+## 当前架构速览
+
+当前仓库以 ROS2 Foxy 为目标环境，主线已经从 `pymavlink` 直连飞控逐步迁移到 MAVROS 适配层。
+
+核心链路：
+
+```text
+Livox MID360 -> Point-LIO -> /robot/current_pose
+                                |
+                                v
+behavior_control -> /robot/target_pose or /cmd_vel
+                                |
+                                v
+flight_control/mavros_adapter -> MAVROS -> PX4
+```
+
+硬件串口由 `robot_serial_manager` 统一检查，业务节点各自打开自己的设备：
+
+- 飞控串口由 MAVROS 独占，默认逻辑名是 `/dev/px4_fcu`，当前 WSL 联调实测设备为 `/dev/ttyACM0:230400`。
+- STM32 舵机串口由 `servo_node` 使用，默认逻辑名是 `/dev/stm32_servo`。
+- OpenMV 串口当前只登记在配置中，驱动还没有落地。
+
+推荐统一入口：
+
+```bash
+cd /home/sfx/echo_drone
+./run_echo_drone.sh check
+./run_echo_drone.sh hardware-dry
+FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state
+```
+
+更多 MAVROS 实测话题、未解决问题和完整启动命令见：
+
+- `docs/mavros_runtime_guide.md`
+- `docs/system_contract.md`
+- `docs/serial_hardware_management.md`
+- `docs/refactor_execution_checklist.md`
+
+## 当前包职责
+
+| 包/目录 | 职责 | 当前状态 |
+|---|---|---|
+| `robot_bring_up` | 总 launch、硬件层 launch、全局配置 | 主入口仍在整理中，`hardware.launch.py` 已接入 MAVROS adapter |
+| `flight_control` | MAVROS adapter，兼容旧 `/robot/*` 飞控接口 | 新增主线飞控适配层 |
+| `robot_serial_manager` | 串口设备检查与状态发布 | 只检查，不抢占业务串口 |
+| `servo_node` | STM32 舵机串口驱动 | 支持 dry-run、topic、service 和旧参数接口 |
+| `behavior_control` | 任务决策和目标发布 | 当前先截断为起飞后持续圆周运动，后续要重构状态机 |
+| `Point-LIO` | LiDAR-IMU 里程计 | 输出 `/Odometry`、`/robot/current_pose` 和点云 |
+| `obstacle_segmentation_tc` | 点云障碍物分割 | 输出 `/cloud_obstacle` 给 costmap |
+| `teb_local_planner` | 本地规划与 costmap converter | Foxy 兼容保留，后续需要降负载 |
+| `mavlink_control` | 旧 `pymavlink` 直连飞控 | 仅保留 fallback，默认不启动 |
+
+## 最小联调顺序
+
+1. `./run_echo_drone.sh check`
+2. `./run_echo_drone.sh hardware-dry`
+3. `FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state`
+4. `./run_echo_drone.sh livox`
+5. `./run_echo_drone.sh pointlio`
+6. `./run_echo_drone.sh obstacle`
+7. `./run_echo_drone.sh behavior`
+8. `FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-real`
+9. `FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh hardware-real`
+
+不要在 MAVROS 只读连接、TF 和 Point-LIO 输出没有确认前直接跑 `full` 做飞行联调。
+
+## 历史环境配置记录
+
+以下内容是原仓库保留下来的 NUC/Ubuntu 环境记录，部分命令仍写着 Humble 或旧 `pymavlink` 流程，重构后的 Foxy 主线以本 README 开头和 `docs/` 下文档为准。
+
 ## nuc环境配置
 
 参考notion中哨兵系统重装指南 https://www.notion.so/16c24a7052ae80909490d654ea911af2

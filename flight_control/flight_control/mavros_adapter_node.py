@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+"""Bridge legacy `/robot/*` flight-control topics onto MAVROS.
+
+The rest of this workspace still publishes the original contest-era topics and
+axis conventions.  This node is the transport boundary: it converts those
+messages into MAVROS vision-pose and setpoint topics, republishes MAVROS arming
+state back to `/robot/arm_state`, and keeps arming/mode service calls behind
+explicit dry-run and parameter gates for bench testing.
+"""
+
 import json
 
 import rclpy
@@ -22,9 +31,14 @@ from .conversions import (
 
 
 class MavrosAdapter(Node):
+    """Compatibility adapter between legacy behavior_control and MAVROS."""
+
     def __init__(self):
         super().__init__('mavros_adapter')
 
+        # Safety and coordinate-mode controls are read first because they
+        # decide whether this node may talk to MAVROS services and how axes are
+        # translated.
         self.dry_run = self._bool_param('dry_run', True)
         self.coordinate_mode = str(
             self._param('coordinate_mode', LEGACY_COORDINATE_MODE))
@@ -35,6 +49,8 @@ class MavrosAdapter(Node):
                 % (self.coordinate_mode, LEGACY_COORDINATE_MODE))
             self.coordinate_mode = LEGACY_COORDINATE_MODE
 
+        # Frame IDs and height offsets preserve the old pymavlink payload
+        # contract while the transport layer moves to MAVROS.
         self.frame_id = str(self._param('frame_id', 'map'))
         self.child_frame_id = str(self._param('child_frame_id', 'livox'))
 
@@ -49,6 +65,9 @@ class MavrosAdapter(Node):
             self._param('vision_pose_z_offset', 0.31))
         self.pid_height = float(self._param('pid_height', 0.65))
 
+        # Timers and stale gates make the node debuggable: status is published
+        # continuously, but setpoints are withheld when pose or command inputs
+        # are old.
         self.status_period = float(self._param('status_period', 1.0))
         self.setpoint_republish_period = float(
             self._param('setpoint_republish_period', 0.1))
@@ -57,6 +76,8 @@ class MavrosAdapter(Node):
         self.pose_stale_timeout = float(
             self._param('pose_stale_timeout', 1.0))
 
+        # RC arming is optional and throttled.  It only requests MAVROS arming
+        # after the configured four-channel gesture is observed.
         self.allow_rc_arming = self._bool_param('allow_rc_arming', True)
         self.arm_retry_period = float(self._param('arm_retry_period', 1.0))
         self.rc_arm_channels = list(
@@ -66,11 +87,15 @@ class MavrosAdapter(Node):
         self.rc_arm_high_threshold = int(
             self._param('rc_arm_high_threshold', 1930))
 
+        # Mode switching is disabled by default; OFFBOARD/GUIDED mode must be
+        # enabled deliberately after the setpoint stream is verified.
         self.auto_set_mode = self._bool_param('auto_set_mode', False)
         self.desired_mode = str(self._param('desired_mode', 'OFFBOARD'))
         self.mode_retry_period = float(
             self._param('mode_retry_period', 1.0))
 
+        # MAVROS endpoint names stay configurable because Foxy MAVROS packages
+        # differ slightly across installs and namespaces.
         self.mavros_state_topic = str(
             self._param('mavros_state_topic', '/mavros/state'))
         self.mavros_rc_topic = str(
@@ -89,6 +114,8 @@ class MavrosAdapter(Node):
             self._param('mavros_velocity_setpoint_topic',
                         '/mavros/setpoint_velocity/cmd_vel'))
 
+        # Legacy upstream/downstream topics used by behavior_control and
+        # Point-LIO.  These are the contracts this adapter keeps stable.
         current_pose_topic = str(
             self._param('current_pose_topic', '/robot/current_pose'))
         target_pose_topic = str(
@@ -106,15 +133,19 @@ class MavrosAdapter(Node):
         status_topic = str(
             self._param('status_topic', '/flight_control/status'))
 
+        # MAVROS-facing publishers.
         self.vision_pose_pub = self.create_publisher(
             PoseStamped, self.mavros_vision_pose_topic, 10)
         self.position_setpoint_pub = self.create_publisher(
             PoseStamped, self.mavros_position_setpoint_topic, 10)
         self.velocity_setpoint_pub = self.create_publisher(
             TwistStamped, self.mavros_velocity_setpoint_topic, 10)
+
+        # Legacy/debug publishers.
         self.arm_state_pub = self.create_publisher(Bool, arm_state_topic, 10)
         self.status_pub = self.create_publisher(String, status_topic, 10)
 
+        # Subscriptions from MAVROS, Point-LIO, behavior_control, and Nav2.
         self.state_sub = self.create_subscription(
             State, self.mavros_state_topic, self.state_callback, 10)
         self.rc_sub = self.create_subscription(
@@ -135,20 +166,26 @@ class MavrosAdapter(Node):
         self.turning_state_sub = self.create_subscription(
             Bool, turning_state_topic, self.turning_state_callback, 10)
 
+        # Service clients are created even in dry-run so availability can be
+        # inspected without allowing actual calls.
         self.arming_client = self.create_client(
             CommandBool, self.mavros_arming_service)
         self.set_mode_client = self.create_client(
             SetMode, self.mavros_set_mode_service)
 
+        # Cached MAVROS state.
         self.connected = False
         self.armed = False
         self.guided = False
         self.mode = ''
         self.system_status = 0
+
+        # Cached mission mode switches from behavior_control.
         self.if_nav = True
         self.current_passing_door = False
         self.if_turning = False
 
+        # Latest input samples and their ages are reported on status_topic.
         self.current_height_feedback = None
         self.current_fcu_height_feedback = None
         self.last_current_pose_time = None
@@ -159,12 +196,15 @@ class MavrosAdapter(Node):
         self.last_setpoint_kind = 'none'
         self.last_setpoint_time = None
 
+        # In-flight service-call bookkeeping prevents repeated arm/mode spam.
         self.ready_to_arm = False
         self.arm_request_inflight = False
         self.last_arm_request_time = 0.0
         self.mode_request_inflight = False
         self.last_mode_request_time = 0.0
 
+        # One timer republishes setpoints at a MAVROS-friendly rate; the other
+        # publishes a compact JSON status snapshot for debugging.
         self.status_timer = self.create_timer(
             self.status_period, self.status_timer_callback)
         self.setpoint_timer = self.create_timer(
@@ -192,11 +232,13 @@ class MavrosAdapter(Node):
         return self.get_clock().now().nanoseconds * 1e-9
 
     def _age(self, stamp_seconds):
+        """Return sample age in seconds, or None when no sample exists."""
         if stamp_seconds is None:
             return None
         return self._now_seconds() - stamp_seconds
 
     def state_callback(self, msg):
+        """Mirror MAVROS state and republish arming state for legacy nodes."""
         self.connected = bool(msg.connected)
         self.armed = bool(msg.armed)
         self.guided = bool(msg.guided)
@@ -212,6 +254,7 @@ class MavrosAdapter(Node):
         self.arm_state_pub.publish(arm_msg)
 
     def rc_callback(self, msg):
+        """Translate the optional RC arm gesture into a throttled arm request."""
         if not self.allow_rc_arming:
             return
 
@@ -220,6 +263,7 @@ class MavrosAdapter(Node):
             self._request_arm()
 
     def current_pose_callback(self, msg):
+        """Forward Point-LIO pose to MAVROS vision_pose after axis conversion."""
         self.current_height_feedback = (
             msg.transform.translation.z + self.height_feedback_z_offset)
         self.current_fcu_height_feedback = (
@@ -257,12 +301,14 @@ class MavrosAdapter(Node):
         self.vision_pose_pub.publish(pose)
 
     def cmd_vel_callback(self, msg):
+        """Cache Nav2 velocity commands and publish immediately in nav mode."""
         self.latest_cmd_vel = msg
         self.latest_cmd_vel_time = self._now_seconds()
         if self.if_nav:
             self._publish_velocity_setpoint()
 
     def target_pose_callback(self, msg):
+        """Cache direct position targets and publish immediately outside Nav2."""
         self.latest_target_pose = msg
         self.latest_target_pose_time = self._now_seconds()
         if not self.if_nav:
@@ -278,6 +324,7 @@ class MavrosAdapter(Node):
         self.if_turning = bool(msg.data)
 
     def setpoint_timer_callback(self):
+        """Republish the latest valid setpoint and gate optional MAVROS calls."""
         if self.if_nav:
             self._publish_velocity_setpoint()
         else:
@@ -290,6 +337,7 @@ class MavrosAdapter(Node):
             self._request_arm()
 
     def status_timer_callback(self):
+        """Publish a compact JSON status message for bench and flight logs."""
         arm_msg = Bool()
         arm_msg.data = self.armed
         self.arm_state_pub.publish(arm_msg)
@@ -327,6 +375,7 @@ class MavrosAdapter(Node):
         self.status_pub.publish(msg)
 
     def _publish_velocity_setpoint(self):
+        """Publish MAVROS velocity setpoints from cached `/cmd_vel` commands."""
         if self.latest_cmd_vel is None:
             return
         if self._is_stale(self.latest_cmd_vel_time,
@@ -373,6 +422,7 @@ class MavrosAdapter(Node):
         self._mark_setpoint('velocity')
 
     def _publish_position_setpoint(self):
+        """Publish MAVROS position setpoints from cached `/robot/target_pose`."""
         if self.latest_target_pose is None:
             return
         if self._is_stale(self.latest_target_pose_time,
@@ -415,11 +465,13 @@ class MavrosAdapter(Node):
         self.last_setpoint_time = self._now_seconds()
 
     def _is_stale(self, stamp_seconds, timeout_seconds):
+        """Return True when a cached input should no longer drive the FCU."""
         if stamp_seconds is None:
             return True
         return self._age(stamp_seconds) > timeout_seconds
 
     def _rc_arm_combo(self, channels):
+        """Check the configured four-channel low/high RC arming gesture."""
         if len(self.rc_arm_channels) != 4:
             return False
         indexes = [int(ch) - 1 for ch in self.rc_arm_channels]
@@ -435,6 +487,7 @@ class MavrosAdapter(Node):
         )
 
     def _request_arm(self):
+        """Request arming through MAVROS unless dry-run or safety gates block."""
         now = self._now_seconds()
         if now - self.last_arm_request_time < self.arm_retry_period:
             return
@@ -461,6 +514,7 @@ class MavrosAdapter(Node):
         future.add_done_callback(self._arm_response_callback)
 
     def _arm_response_callback(self, future):
+        """Log the asynchronous MAVROS arming response."""
         self.arm_request_inflight = False
         try:
             response = future.result()
@@ -476,6 +530,7 @@ class MavrosAdapter(Node):
                 % response.result)
 
     def _request_mode_if_needed(self):
+        """Request the desired MAVROS mode after a setpoint stream exists."""
         if not self.connected or self.mode == self.desired_mode:
             return
         if self.last_setpoint_time is None:
@@ -505,6 +560,7 @@ class MavrosAdapter(Node):
         future.add_done_callback(self._mode_response_callback)
 
     def _mode_response_callback(self, future):
+        """Log the asynchronous MAVROS set_mode response."""
         self.mode_request_inflight = False
         try:
             response = future.result()

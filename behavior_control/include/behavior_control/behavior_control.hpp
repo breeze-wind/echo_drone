@@ -32,6 +32,7 @@
 
 #include "robot_interfaces/msg/image_location.hpp"
 
+/// 任务决策节点，当前调试版本在起飞高度确认后会截断到匀速圆周运动。
 class BehaviorControl : public rclcpp::Node
 {
 public:
@@ -53,7 +54,9 @@ private:
     void ImageLocationCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg);
     /// 接收usb相机传来的随机靶信息
     void USBCameraInfoCallback(const robot_interfaces::msg::ImageLocation::SharedPtr msg);
+    /// 首次进入圆周调试状态时锁定圆心、起始时间和方向。
     void start_takeoff_circle_if_needed();
+    /// 按固定线速度向 /robot/target_pose 持续发布圆周上的目标点。
     void publish_takeoff_circle_target();
 
     /// 发布目标点位姿
@@ -225,13 +228,20 @@ private:
     double offset_x_3_;
     double offset_y_3_;
 
+    /// 起飞后圆周调试开关；关闭后才会进入旧的随机靶/投掷流程。
     bool takeoff_circle_enabled_;
+    /// 防止每次定时器回调都重置圆心和起始时间。
     bool takeoff_circle_started_;
+    /// 圆周半径，单位 m。
     double takeoff_circle_radius_;
+    /// 圆周线速度，单位 m/s。
     double takeoff_circle_speed_;
+    /// 运动方向，配置值会归一为 +1 或 -1。
     double takeoff_circle_direction_;
+    /// 进入圆周状态时根据当前位置锁定的圆心。
     double takeoff_circle_center_x_;
     double takeoff_circle_center_y_;
+    /// 圆周角度积分的起始时间。
     rclcpp::Time takeoff_circle_start_time_;
 
     //导航模式，0--正常导航，1--穿门时导航

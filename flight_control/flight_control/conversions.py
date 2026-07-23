@@ -1,5 +1,13 @@
-import math
+"""Coordinate helpers for bridging the legacy controller to MAVROS.
 
+The old pymavlink node wrote NED-like payloads directly to PX4 and mixed in a
+few sign/height offsets locally.  MAVROS accepts ROS ENU messages and converts
+them internally before sending MAVLink.  The helpers in this file intentionally
+apply the inverse transform so existing `/robot/*` producers can keep their old
+semantics while the transport moves to MAVROS.
+"""
+
+import math
 
 LEGACY_COORDINATE_MODE = 'legacy_ned_compatible'
 MAVROS_ENU_COORDINATE_MODE = 'mavros_enu'
@@ -16,14 +24,17 @@ def legacy_position_to_mavros_enu(x, y, z):
 
 
 def legacy_vision_pose_position(x, y, z, z_offset):
+    """Convert `/robot/current_pose` position into MAVROS vision-pose ENU."""
     return legacy_position_to_mavros_enu(x, y, z + z_offset)
 
 
 def legacy_target_position(x, y, z, reference_z_offset):
+    """Convert `/robot/target_pose` position into MAVROS local setpoint ENU."""
     return legacy_position_to_mavros_enu(x, y, z - reference_z_offset)
 
 
 def legacy_nav_velocity(cmd_x, cmd_y, current_height, target_height, pid_height):
+    """Preserve the old navigation velocity convention used by `/cmd_vel`."""
     vx_ned = cmd_x
     vy_ned = -cmd_y
     vz_ned = -pid_height * (target_height - current_height)
@@ -31,6 +42,7 @@ def legacy_nav_velocity(cmd_x, cmd_y, current_height, target_height, pid_height)
 
 
 def legacy_passing_door_velocity(cmd_x, cmd_y, current_height, target_height, pid_height):
+    """Preserve the old special velocity axes used while passing the door."""
     vx_ned = cmd_y
     vy_ned = cmd_x
     vz_ned = -pid_height * (target_height - current_height)
@@ -38,10 +50,12 @@ def legacy_passing_door_velocity(cmd_x, cmd_y, current_height, target_height, pi
 
 
 def mavros_enu_yaw_for_legacy_ned_yaw(yaw_ned):
+    """Return ENU yaw that MAVROS converts back to the legacy NED yaw."""
     return math.pi / 2.0 - yaw_ned
 
 
 def quaternion_from_euler_xyzw(roll, pitch, yaw):
+    """Build a geometry-msg-style quaternion tuple from roll, pitch, yaw."""
     half_roll = roll * 0.5
     half_pitch = pitch * 0.5
     half_yaw = yaw * 0.5
@@ -61,6 +75,7 @@ def quaternion_from_euler_xyzw(roll, pitch, yaw):
 
 
 def euler_from_quaternion_msg(quaternion_msg):
+    """Extract roll, pitch, yaw from a geometry_msgs Quaternion-like object."""
     x = quaternion_msg.x
     y = quaternion_msg.y
     z = quaternion_msg.z
@@ -84,5 +99,6 @@ def euler_from_quaternion_msg(quaternion_msg):
 
 
 def legacy_vision_orientation_to_mavros_enu(quaternion_msg):
+    """Convert old vision orientation into the ENU orientation MAVROS expects."""
     roll, pitch, yaw = euler_from_quaternion_msg(quaternion_msg)
     return quaternion_from_euler_xyzw(roll, pitch, math.pi / 2.0 + yaw)
