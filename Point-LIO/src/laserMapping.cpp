@@ -58,26 +58,28 @@ LaserMappingNode::LaserMappingNode(const rclcpp::NodeOptions &options) : Node("l
             ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
 
     //初始化发布者订阅者
+    const auto sensor_qos = rclcpp::SensorDataQoS();
+    const auto output_qos = rclcpp::QoS(rclcpp::KeepLast(10));
     callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     sub_option.callback_group = callback_group_;
     if (p_pre->lidar_type == AVIA) {
-        sub_pcl_livox_ = this->create_subscription<livox_ros_driver2::msg::CustomMsg>(lid_topic, 200000,
+        sub_pcl_livox_ = this->create_subscription<livox_ros_driver2::msg::CustomMsg>(lid_topic, sensor_qos,
             std::bind(&LaserMappingNode::livox_pcl_cbk, this, std::placeholders::_1), sub_option);
     } else {
-        sub_pcl_pc = this->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, 200000,
+        sub_pcl_pc = this->create_subscription<sensor_msgs::msg::PointCloud2>(lid_topic, sensor_qos,
             std::bind(&LaserMappingNode::standard_pcl_cbk, this, std::placeholders::_1), sub_option);
     }
-    sub_imu = this->create_subscription<sensor_msgs::msg::Imu>(imu_topic, 200000,
+    sub_imu = this->create_subscription<sensor_msgs::msg::Imu>(imu_topic, sensor_qos,
         std::bind(&LaserMappingNode::imu_cbk, this, std::placeholders::_1), sub_option);
-    pubLaserCloudFull = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 100000);
-    pubLaserCloudFull_body = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered_body", 100000);
-    pubLaserCloudObstacle = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_obstacle_new", 100000);
+    pubLaserCloudFull = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", output_qos);
+    pubLaserCloudFull_body = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered_body", output_qos);
+    pubLaserCloudObstacle = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_obstacle_new", output_qos);
     //pubLaserCloudEffect = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_effected", 100000);
-    pubLaserCloudMap = this->create_publisher<sensor_msgs::msg::PointCloud2>("/Laser_map", 100000);
-    pubOdomAftMapped = this->create_publisher<nav_msgs::msg::Odometry>(odom_topic, 100000);
-    pubPath = this->create_publisher<nav_msgs::msg::Path>("/path", 100000);
-    plane_pub = this->create_publisher<visualization_msgs::msg::Marker>("planner_normal", 1000);
-    current_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/current_pose", 10);
+    pubLaserCloudMap = this->create_publisher<sensor_msgs::msg::PointCloud2>("/Laser_map", output_qos);
+    pubOdomAftMapped = this->create_publisher<nav_msgs::msg::Odometry>(odom_topic, output_qos);
+    pubPath = this->create_publisher<nav_msgs::msg::Path>("/path", output_qos);
+    plane_pub = this->create_publisher<visualization_msgs::msg::Marker>("planner_normal", output_qos);
+    current_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/current_pose", output_qos);
     static_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     auto period_ms = std::chrono::milliseconds(static_cast<int64_t>(3000.0 / 100.0)); // 1ms
@@ -1037,8 +1039,8 @@ void LaserMappingNode::timer_callback()
         feats_down_world->resize(feats_down_size);
         Nearest_Points.resize(feats_down_size);
         t2 = omp_get_wtime();
-        crossmat_list.reserve(feats_down_size);
-        pbody_list.reserve(feats_down_size);
+        crossmat_list.resize(feats_down_size);
+        pbody_list.resize(feats_down_size);
         for (size_t i = 0; i < feats_down_body->size(); i++) //将点使用kf_output进行坐标变换,顺便计算交叉矩阵（？）crossmat。
         {
             V3D point_this(feats_down_body->points[i].x,

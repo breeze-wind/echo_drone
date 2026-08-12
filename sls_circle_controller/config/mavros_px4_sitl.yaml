@@ -1,0 +1,12 @@
+mavros:
+  ros__parameters:
+    # SITL 绕圈控制只保留必要插件，避免默认加载 extras 插件造成启动慢、日志刷屏和无关 TF 输出。
+    # 如果后续需要外部里程计或 vision pose，再按需把对应插件加回 allowlist。
+    plugin_allowlist:
+      - sys_status
+      - sys_time
+      - command
+      - local_position
+      - setpoint_position
+      - setpoint_raw
+      - imu

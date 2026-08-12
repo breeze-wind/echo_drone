@@ -39,7 +39,7 @@ FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state
 ./run_echo_drone.sh <模式> [额外 ros2 launch 参数...]
 ```
 
-脚本会自动 source `/opt/ros/foxy/setup.bash` 和当前工作区的 `install/setup.bash`，并设置默认 `ROS_DOMAIN_ID=0`、`ROS_LOCALHOST_ONLY=0`、`RMW_IMPLEMENTATION=rmw_fastrtps_cpp`。
+脚本会自动 source `/opt/ros/foxy/setup.bash` 和当前工作区的 `install/setup.bash`，并设置默认 `ROS_DOMAIN_ID=0`、`ROS_LOCALHOST_ONLY=1`、`RMW_IMPLEMENTATION=rmw_fastrtps_cpp`。
 
 常用环境变量：
 
@@ -48,14 +48,16 @@ FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state
 | `FCU_URL` | MAVROS 连接飞控的串口和波特率 | `/dev/px4_fcu:230400` 或 `/dev/ttyACM0:230400` |
 | `DRONE_PARAMS` | 覆盖主参数文件 | `/home/sfx/echo_drone/install/robot_bring_up/share/robot_bring_up/config/drone.yaml` |
 | `ECHO_DRONE_WS` | 覆盖工作区路径 | `/home/sfx/echo_drone` |
+| `PX4_DIR` | 指向 PX4-Autopilot 源码和 SITL 构建目录 | `/home/sfx/PX4-Autopilot` |
 | `ROS_DOMAIN_ID` | ROS2 域 ID | `0` |
-| `ROS_LOCALHOST_ONLY` | 是否限制本机通信 | `0` |
+| `ROS_LOCALHOST_ONLY` | 是否限制本机通信；WSL/MID360 本机调试默认开启，跨机通信时设为 `0` | `1` |
 
 脚本模式：
 
 | 模式 | 作用 | 风险级别 |
 |---|---|---|
 | `check` | 打印 ROS 环境、包列表和串口设备 | 只读 |
+| `field-precheck` | 打印现场要确认的串口、网络和配置文件位置 | 只读 |
 | `build` | 构建整个工作区 | 软件构建 |
 | `topics` | 打印当前 ROS 话题 | 只读 |
 | `hardware-dry` | 启动串口管理、舵机节点和 MAVROS adapter，但全部 dry-run | 低风险 |
@@ -63,14 +65,26 @@ FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state
 | `servo-dry` | 只启动舵机节点 dry-run | 低风险 |
 | `adapter-dry` | 只启动 MAVROS adapter，默认不调用飞控服务 | 低风险 |
 | `mavros-state` | 只启动 MAVROS 连接飞控，检查心跳和状态，不启动 adapter | 硬件只读 |
+| `mavros-check` | 限时启动 MAVROS 并采样 `/mavros/state` 和本地位置话题 | 硬件只读 |
 | `hardware-real` | 启动串口管理、舵机、MAVROS 和 adapter | 真实硬件 |
 | `mavros-real` | 启动串口管理、MAVROS 和 adapter，不启动舵机 | 真实硬件 |
 | `servo-real` | 只启动真实舵机节点 | 真实硬件 |
 | `livox` | 启动 Livox MID360 驱动 | 传感器 |
 | `pointlio` | 启动 Point-LIO，默认关闭 RViz | 里程计 |
+| `sensing` | 启动 Livox、Point-LIO 和感知静态 TF，不启动导航 | 传感器和里程计 |
+| `sensing-check` | 限时启动 sensing 并采样 Livox、Point-LIO、TF 话题 | 传感器和里程计 |
 | `obstacle` | 启动点云障碍物分割 | 感知 |
 | `behavior` | 启动任务决策节点 | 决策 |
 | `nav` | 启动 Nav2 bringup | 导航 |
+| `sls-circle-dry` | 只接 MAVROS 位姿并输出圆周控制调试话题，不写真实控制 | 低风险 |
+| `sls-circle-sim` | fake MAVROS 点质量闭环仿真，验证 QSF/圆周状态机 | 软件仿真 |
+| `sls-circle-gazebo` | Gazebo 力输入闭环，默认可视化 QSF 和风扰，`use_load_pose:=true` 打开完整负载反馈试验 | 软件仿真 |
+| `sls-px4-sitl` | 移植原版 PX4 SITL/Gazebo/MAVROS 多旋翼吊载闭环仿真 | 正式软件仿真 |
+| `sls-circle-mission-dry` | dry-run 验证起飞后绕圈状态机 | 低风险 |
+| `sls-takeoff-hold-dry` | dry-run 验证起飞后只定点悬停的状态机 | 低风险 |
+| `sls-takeoff-hold-real` | 真实发布起飞和定点位置 setpoint，不进入绕圈 | 真实硬件 |
+| `sls-circle-real` | 真实写 `/mavros/setpoint_raw/attitude`，不自动 OFFBOARD/解锁 | 真实飞行控制 |
+| `sls-circle-real-auto` | 自动请求 OFFBOARD 和解锁后写姿态 setpoint | 最高风险 |
 | `full` | 启动旧整机入口，默认关闭 RViz 和建图模式 | 高负载，谨慎 |
 
 额外 launch 参数会透传到对应入口，例如：
@@ -78,6 +92,9 @@ FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state
 ```bash
 ./run_echo_drone.sh pointlio rviz:=false
 FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state tgt_system:=1
+./run_echo_drone.sh sls-circle-gazebo gui:=false
+./run_echo_drone.sh sls-circle-sim mission_mode:=takeoff_then_hold
+PX4_DIR=/home/sfx/PX4-Autopilot ./run_echo_drone.sh sls-px4-sitl gui:=false start_controller:=false
 ```
 
 ## Launch 职责
@@ -106,6 +123,9 @@ FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state tgt_system:=1
 
 更多 MAVROS 实测话题、未解决问题和完整启动命令见：
 
+- `docs/field_hardware_flow.md`
+- `docs/sls_real_startup.md`
+- `docs/px4_sitl_gazebo.md`
 - `docs/mavros_runtime_guide.md`
 - `docs/system_contract.md`
 - `docs/serial_hardware_management.md`

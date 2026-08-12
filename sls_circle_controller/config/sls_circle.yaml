@@ -1,0 +1,156 @@
+sls_circle_controller:
+  ros__parameters:
+    # 安全开关：dry_run=true 时只发布调试目标；实控必须同时 dry_run=false 且 enable_real_setpoint=true。
+    dry_run: true
+    enable_real_setpoint: false
+
+    # MAVROS 和调试话题：实机/PX4 SITL 通过这些话题接入位置、状态和姿态 setpoint。
+    pose_topic: "/mavros/local_position/pose"
+    velocity_topic: "/mavros/local_position/velocity_local"
+    use_velocity_topic: true
+    velocity_stale_timeout: 0.5
+    load_pose_topic: "/sls_circle/load_pose"
+    use_load_pose: true
+    load_pose_stale_timeout: 0.5
+    state_topic: "/mavros/state"
+    real_attitude_topic: "/mavros/setpoint_raw/attitude"
+    debug_attitude_topic: "/sls_circle/debug/attitude_target"
+    takeoff_pose_topic: "/mavros/setpoint_position/local"
+    reference_pose_topic: "/sls_circle/reference_pose"
+    status_topic: "/sls_circle/status"
+    wind_estimate_topic: "/sls_circle/wind_estimate"
+    actual_wind_topic: "/sls_circle/wind_actual"
+    frame_id: "map"
+
+    # 控制循环和任务阶段：circle_only 直接绕圈，takeoff_then_circle 会先起飞再定点再绕圈。
+    control_rate: 100.0
+    pose_stale_timeout: 0.5
+    mission_mode: "circle_only"
+    preflight_setpoint_time: 2.0
+    takeoff_altitude: 1.0
+    takeoff_x: 0.0
+    takeoff_y: 0.0
+    use_current_xy_for_takeoff: true
+    takeoff_z_tolerance: 0.15
+    takeoff_settle_time: 2.0
+    post_takeoff_hold_time: 5.0
+    enable_takeoff_position_setpoint: true
+    enable_mavros_services: false
+    auto_offboard: false
+    auto_arm: false
+    set_mode_service: "/mavros/set_mode"
+    arming_service: "/mavros/cmd/arming"
+    offboard_mode: "OFFBOARD"
+    service_retry_period: 1.0
+
+    # 圆周参考轨迹：默认以起始位置为圆心高度，半径和角速度由下面两个参数控制。
+    use_current_pose_as_start: true
+    center_x: 0.0
+    center_y: 0.0
+    center_z: 1.0
+    center_z_from_pose: true
+    radius: 1.0
+    angular_velocity: 0.35
+    circle_loops: 0.0
+    phase: 0.0
+    yaw: 0.0
+
+    # 兜底 PD 控制参数：QSF 失败或 controller_mode=pd 时使用。
+    kp_xy: 1.8
+    kp_z: 2.5
+    kd_xy: 1.4
+    kd_z: 1.6
+    max_acc_xy: 2.5
+    max_acc_z: 2.0
+    max_total_acc: 4.0
+    max_tilt_deg: 25.0
+    gravity: 9.80665
+    hover_thrust: 0.5
+    min_thrust: 0.05
+    max_thrust: 0.85
+
+    # QSF/SLS 参数：质量、绳长和各轴增益必须与 ROS1/drown 版本和实机配置对齐。
+    require_connected: true
+    require_offboard: false
+    require_armed: false
+    controller_mode: "qsf"
+    mav_mass: 1.56
+    load_mass: 0.25
+    cable_length: 0.85
+    qsf_kp_x: 10.0
+    qsf_kv_x: 5.0
+    qsf_ka_x: 0.0
+    qsf_kj_x: 0.0
+    qsf_kp_y: 10.0
+    qsf_kv_y: 5.0
+    qsf_ka_y: 0.0
+    qsf_kj_y: 0.0
+    qsf_kp_z: 20.0
+    qsf_kv_z: 10.0
+    qsf_ki_x: 12.0
+    qsf_ki_y: 12.0
+    qsf_ki_z: 1.0
+    qsf_integral_limit: 10.0
+    qsf_reference_is_load: false
+    # 抗风估计与补偿：当前策略只允许水平 x/y 生效，z 轴扰动应在控制器内保持禁用或清零。
+    enable_anti_wind: true
+    wind_estimator_mode: "residual"
+    wind_observer_bandwidth: 4.0
+    wind_estimate_filter_tau: 0.2
+    wind_estimate_force_limit: 5.0
+    wind_compensation_gain: 0.0
+    wind_compensation_warmup_time: 10.0
+    wind_compensation_ramp_time: 4.0
+    wind_integral_gain: 0.0
+    wind_integral_limit: 5.0
+    enable_wind_debug_log: true
+    wind_debug_log_period: 1.0
+    status_period: 0.25
+
+fake_mavros_sim:
+  ros__parameters:
+    # 轻量点质量仿真：不依赖 Gazebo/PX4，只用于快速闭环检查。
+    pose_topic: "/mavros/local_position/pose"
+    state_topic: "/mavros/state"
+    attitude_target_topic: "/sls_circle/debug/attitude_target"
+    frame_id: "map"
+    publish_rate: 100.0
+    initial_x: 0.0
+    initial_y: 0.0
+    initial_z: 1.0
+    gravity: 9.80665
+    hover_thrust: 0.5
+    linear_drag: 0.18
+    wind_accel_x: 0.0
+    wind_accel_y: 0.0
+    wind_accel_z: 0.0
+    max_speed: 6.0
+    target_timeout: 0.5
+
+gazebo_mavros_bridge:
+  ros__parameters:
+    # Gazebo force 烟测桥接：把 Gazebo odom 伪装成 MAVROS pose，并把 attitude target 转成 Wrench。
+    odom_topic: "/sls_circle/gazebo_odom"
+    load_odom_topic: "/sls_circle/gazebo_load_odom"
+    pose_topic: "/mavros/local_position/pose"
+    velocity_topic: "/mavros/local_position/velocity_local"
+    load_pose_topic: "/sls_circle/load_pose"
+    state_topic: "/mavros/state"
+    attitude_target_topic: "/sls_circle/debug/attitude_target"
+    force_topic: "/sls_circle/gazebo_force"
+    wind_actual_topic: "/sls_circle/wind_actual"
+    frame_id: "map"
+    mass: 1.56
+    gravity: 9.80665
+    hover_thrust: 0.5
+    max_force: 60.0
+    state_rate: 100.0
+    # 代码内模拟风：默认只给水平风，wind_force_z 应保持 0。
+    enable_wind: true
+    wind_force_x: 0.2
+    wind_force_y: 0.1
+    wind_force_z: 0.0
+    wind_turbulence: 0.03
+    wind_change_rate: 0.3
+    enable_wind_debug_log: true
+    wind_debug_log_period: 1.0

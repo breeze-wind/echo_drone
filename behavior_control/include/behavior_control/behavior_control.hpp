@@ -22,6 +22,8 @@
 
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_ros/buffer.h>
@@ -31,6 +33,12 @@
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 
 #include "robot_interfaces/msg/image_location.hpp"
+#include "robot_interfaces/msg/mission_event.hpp"
+#include "robot_interfaces/msg/mission_status.hpp"
+#include "robot_interfaces/srv/jump_mission_state.hpp"
+#include "robot_interfaces/srv/shift_mission_state.hpp"
+#include "behavior_control/mission_graph.hpp"
+#include "behavior_control/mission_runtime.hpp"
 
 /// 任务决策节点，当前调试版本在起飞高度确认后会截断到匀速圆周运动。
 class BehaviorControl : public rclcpp::Node
@@ -58,6 +66,62 @@ private:
     void start_takeoff_circle_if_needed();
     /// 按固定线速度向 /robot/target_pose 持续发布圆周上的目标点。
     void publish_takeoff_circle_target();
+    /// 非阻塞发送 Nav2 目标；action server 未就绪时拒绝本次发送。
+    void send_navigation_goal(const nav2_msgs::action::NavigateToPose::Goal & goal);
+    /// 周期发布具体任务状态、执行器生命周期和健康标志。
+    void publish_mission_status();
+    /// 发布一次状态转移或调试操作事件。
+    void publish_mission_event(int from_step, int to_step, const std::string & reason);
+    /// 发布 Graphviz DOT 格式的完整决策有向图。
+    void publish_mission_graph();
+    /// 在位姿和必要 TF 有效时发布当前位置保持；无法安全保持时返回 false。
+    bool publish_safe_hold();
+    /// 重新开始任务前清空计数器和临时执行标志。
+    void reset_mission_context();
+    /// 将命名 start_state 或旧数字字符串解析成兼容 step。
+    int resolve_start_state(const std::string & value) const;
+    /// 以下三个函数集中维护“旧 step -> 命名状态/阶段/目标”的映射。
+    std::string mission_state_name(int step) const;
+    std::string mission_phase_name(int step) const;
+    std::string mission_target_name(int step) const;
+    /// /mission/start：从 idle/aborted 按配置起点重新启动。
+    void handle_start(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+    /// /mission/pause：停止状态推进和周期命令，条件允许时发布一次安全保持。
+    void handle_pause(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+    /// /mission/resume：从暂停点继续运行。
+    void handle_resume(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+    /// /mission/step_once：暂停状态下仅放行一个决策判断 tick。
+    void handle_step_once(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+    /// /mission/abort：中止任务并禁止后续周期命令。
+    void handle_abort(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+    /// /mission/dump_context：以 JSON 字符串导出当前调试上下文。
+    void handle_dump_context(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+    /// /mission/jump_to_state：按稳定 ID 绝对跳转。
+    void handle_jump_to_state(
+        const std::shared_ptr<robot_interfaces::srv::JumpMissionState::Request> request,
+        std::shared_ptr<robot_interfaces::srv::JumpMissionState::Response> response);
+    /// /mission/shift_state：沿调试顺序做 +1/-1 等相对跳转。
+    void handle_shift_state(
+        const std::shared_ptr<robot_interfaces::srv::ShiftMissionState::Request> request,
+        std::shared_ptr<robot_interfaces::srv::ShiftMissionState::Response> response);
+    /// 执行调试硬跳转；仅允许 dry-run 且 idle/paused。
+    bool apply_debug_jump(
+        int target_state_id, bool reset_context, const std::string & reason,
+        std::string & message);
+    /// 清理仅属于当前状态的计数器和临时动作标志。
+    void reset_state_local_context();
 
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
@@ -70,6 +134,11 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr obstacle_height_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr clear_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr camera_choose_pub_;
+    /// 新决策调试接口；/robot/mission_status 是设计稿中旧名称的兼容发布。
+    rclcpp::Publisher<robot_interfaces::msg::MissionStatus>::SharedPtr mission_status_pub_;
+    rclcpp::Publisher<robot_interfaces::msg::MissionStatus>::SharedPtr legacy_mission_status_pub_;
+    rclcpp::Publisher<robot_interfaces::msg::MissionEvent>::SharedPtr mission_event_pub_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mission_graph_pub_;
     /// 接收当前起飞状态
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr arm_state_sub_;
     /// 接收当前位姿
@@ -87,6 +156,17 @@ private:
     rclcpp::TimerBase::SharedPtr step_timer_;
     /// 执行任务计时器
     rclcpp::TimerBase::SharedPtr mission_timer_;
+    rclcpp::TimerBase::SharedPtr mission_status_timer_;
+    /// 以 1 Hz 发布动态图，使普通 volatile CLI 订阅者也能看到图和运行状态。
+    rclcpp::TimerBase::SharedPtr mission_graph_timer_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr mission_start_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr mission_pause_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr mission_resume_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr mission_step_once_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr mission_abort_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr mission_dump_context_service_;
+    rclcpp::Service<robot_interfaces::srv::JumpMissionState>::SharedPtr mission_jump_service_;
+    rclcpp::Service<robot_interfaces::srv::ShiftMissionState>::SharedPtr mission_shift_service_;
     std::chrono::milliseconds step_period_ms;
     std::chrono::milliseconds mission_period_ms;
 
@@ -182,6 +262,22 @@ private:
 
     /// 当前步骤
     int current_step;
+    /// start_state 解析后的旧 step，重新 start 时回到这里。
+    int configured_start_step_;
+    /// dry-run 下允许观察和单步，但禁止真实任务命令输出。
+    bool dry_run_;
+    /// 是否保持旧节点“启动即运行”的兼容行为。
+    bool autostart_;
+    /// launch/YAML 提供的命名起始状态或旧数字字符串。
+    std::string start_state_;
+    /// 独立于具体任务 step 的执行门控运行时。
+    behavior_control::MissionRuntime mission_runtime_;
+    /// 稳定状态 ID、正常有向边和调试顺序的统一注册表。
+    behavior_control::MissionGraph mission_graph_;
+    /// 当前具体任务状态的进入时间，用于计算 elapsed_sec。
+    rclcpp::Time state_enter_time_;
+    /// /mission/event 的单调递增序号。
+    uint64_t mission_event_sequence_{0};
 
     float eject_last_x;
     float eject_last_y;
@@ -250,6 +346,10 @@ private:
 
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    /// 必要相机外参是否可用；缺失时禁止真实任务命令。
+    bool tf_ready_{false};
+    /// 是否至少收到过一次有效当前位姿；防止暂停/中止时发布零点保持。
+    bool pose_received_{false};
 
     geometry_msgs::msg::TransformStamped map_to_livox;
     geometry_msgs::msg::TransformStamped livox_to_camera;

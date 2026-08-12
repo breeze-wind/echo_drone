@@ -2,19 +2,22 @@
 
 当前工作区的 Foxy 环境不能稳定解析上游 MAVROS XML launch 文件，因为其中
 仍有旧 launch 替换语法。这个 Python 包装只传入 PX4 心跳检查所需的串口
-URL、目标 ID 和协议参数，直接启动 `mavros_node`。
+URL、目标 ID、协议参数和本包内的最小 PX4 vision 插件配置，直接启动
+`mavros_node`。
 """
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    # 暂时不传入大插件配置；在目标 Foxy/ARM 镜像上确认插件过滤方案前，
-    # 只读状态检查保持简单。
+    mavros_config_file = LaunchConfiguration('config_file')
+
+    # 使用最小 PX4 vision 配置，避免默认加载所有 MAVROS extras。
     mavros_node = Node(
         package='mavros',
         executable='mavros_node',
@@ -22,6 +25,7 @@ def generate_launch_description():
         output='screen',
         respawn=False,
         parameters=[
+            mavros_config_file,
             {
                 'fcu_url': LaunchConfiguration('fcu_url'),
                 'target_system_id': ParameterValue(
@@ -33,6 +37,7 @@ def generate_launch_description():
                     value_type=int,
                 ),
                 'fcu_protocol': LaunchConfiguration('fcu_protocol'),
+                'gcs_url': LaunchConfiguration('gcs_url'),
             },
         ],
     )
@@ -59,6 +64,19 @@ def generate_launch_description():
             'fcu_protocol',
             default_value='v2.0',
             description='MAVROS 使用的 MAVLink 协议版本。',
+        ),
+        DeclareLaunchArgument(
+            'gcs_url',
+            default_value='',
+            description='MAVROS router 转发给 QGC/GCS 的 MAVLink URL，默认关闭。',
+        ),
+        DeclareLaunchArgument(
+            'config_file',
+            default_value=PathJoinSubstitution([
+                FindPackageShare('flight_control'), 'config',
+                'mavros_vision_px4.yaml',
+            ]),
+            description='MAVROS PX4 插件和坐标系配置文件。',
         ),
         mavros_node,
     ])

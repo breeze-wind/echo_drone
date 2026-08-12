@@ -7,7 +7,8 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 
-from launch_ros.actions import Node, SetUseSimTime
+from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -20,6 +21,7 @@ def generate_launch_description():
     config_path = LaunchConfiguration('config_path')
     rviz_use = LaunchConfiguration('rviz')
     rviz_cfg = LaunchConfiguration('rviz_cfg')
+    is_map = LaunchConfiguration('is_map')
 
     declare_config_path_cmd = DeclareLaunchArgument(
         'config_path', default_value=default_config_path,
@@ -33,10 +35,17 @@ def generate_launch_description():
         'rviz_cfg', default_value=default_rviz_config_path,
         description='RViz config file path'
     )
+    declare_is_map_cmd = DeclareLaunchArgument(
+        'is_map', default_value='false',
+        description='Use prior PCD map for Point-LIO initialization'
+    )
     point_lio_node = Node(
         package='point_lio',
         executable='pointlio_mapping',
-        parameters=[config_path],
+        parameters=[
+            config_path,
+            {'pcd_save.use_pcd_map_': ParameterValue(is_map, value_type=bool)},
+        ],
         output='screen',
         respawn=True,
         respawn_delay=1,
@@ -52,8 +61,9 @@ def generate_launch_description():
     ld.add_action(declare_config_path_cmd)
     ld.add_action(declare_rviz_cmd)
     ld.add_action(declare_rviz_config_path_cmd)
+    ld.add_action(declare_is_map_cmd)
 
     ld.add_action(point_lio_node)
-    # ld.add_action(rviz_node)
+    ld.add_action(rviz_node)
 
     return ld

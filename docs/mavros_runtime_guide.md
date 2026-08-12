@@ -18,7 +18,7 @@
 
 ```bash
 cd /home/sfx/echo_drone
-FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state
+./run_echo_drone.sh mavros-state
 ```
 
 实测成功日志：
@@ -264,13 +264,13 @@ cd /home/sfx/echo_drone
 只启动 MAVROS，不启动 adapter，不发控制指令：
 
 ```bash
-FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state
+./run_echo_drone.sh mavros-state
 ```
 
-如果设备名不同：
+如果设备名固定且不想依赖自动探测，在 `.echo_drone.env` 中写入：
 
 ```bash
-FCU_URL=/dev/ttyUSB0:230400 ./run_echo_drone.sh mavros-state
+FCU_URL=/dev/ttyUSB0:230400
 ```
 
 等价原始 launch：
@@ -286,13 +286,13 @@ ros2 launch flight_control mavros_state.launch.py fcu_url:=/dev/ttyACM0:230400
 启动串口管理器、MAVROS 和 MAVROS adapter，但不启动舵机：
 
 ```bash
-FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-real
+./run_echo_drone.sh mavros-real
 ```
 
 启动串口管理器、舵机、MAVROS 和 MAVROS adapter：
 
 ```bash
-FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh hardware-real
+./run_echo_drone.sh hardware-real
 ```
 
 只启动真实舵机节点：
@@ -351,12 +351,12 @@ ros2 launch robot_bring_up hardware.launch.py dry_run:=false use_mavros:=true us
 
 1. `./run_echo_drone.sh check`
 2. `./run_echo_drone.sh hardware-dry`
-3. `FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-state`
+3. `./run_echo_drone.sh mavros-state`
 4. `./run_echo_drone.sh livox`
 5. `./run_echo_drone.sh pointlio`
 6. `./run_echo_drone.sh obstacle`
 7. `./run_echo_drone.sh behavior`
-8. `FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh mavros-real`
-9. `FCU_URL=/dev/ttyACM0:230400 ./run_echo_drone.sh hardware-real`
+8. `./run_echo_drone.sh mavros-real`
+9. `./run_echo_drone.sh hardware-real`
 
 不要在 `mavros-state` 和 TF 检查未通过前直接跑 `full` 做飞行联调。

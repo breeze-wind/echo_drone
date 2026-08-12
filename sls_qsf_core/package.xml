@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <!-- QSF/SLS 生成算法共享库包，给 C++ 控制器和 Python wrapper 提供统一 C ABI。 -->
+  <name>sls_qsf_core</name>
+  <version>0.1.0</version>
+  <description>Scalar shared-library wrapper for the drown QSF/SLS controllers.</description>
+  <maintainer email="sfx@example.com">sfx</maintainer>
+  <license>Academic generated source from drown; wrapper Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

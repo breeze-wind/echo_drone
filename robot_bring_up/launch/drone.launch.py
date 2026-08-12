@@ -61,7 +61,7 @@ def generate_launch_description():
     )
     livox_driver_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            [livox_driver_path, "/launch_ROS2", "/msg_MID360_launch.py"]
+            [livox_driver_path, "/launch_ROS2", "/msg_MID360s_launch.py"]
         ),
     )
     point_lio_launch = IncludeLaunchDescription(
@@ -114,7 +114,9 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         name='livox_to_mavlink_body_broadcaster',
-        arguments=['0.0', '0.0', '-0.08',  '1.0', '0.0', '0.0', '0.0','livox', 'mavlink_body']
+        # Keep the original 180deg roll axis conversion and add a +45deg yaw
+        # correction for the MID360s mounting offset.
+        arguments=['0.0', '0.0', '-0.08',  '0.9238795', '0.3826834', '0.0', '0.0','livox', 'mavlink_body']
     )
     livox_to_camera = Node(
         package='tf2_ros',

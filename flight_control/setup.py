@@ -11,7 +11,10 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/config',
-            ['config/mavros_adapter.yaml']),
+            [
+                'config/mavros_adapter.yaml',
+                'config/mavros_vision_px4.yaml',
+            ]),
         ('share/' + package_name + '/launch',
             [
                 'launch/mavros_adapter.launch.py',

@@ -154,26 +154,29 @@ robot_tf_manager/
 
 ### 4.1 状态机基本要求
 
-- [ ] 状态命名替代数字 step。
-- [ ] 保留旧 step 到新状态的映射表，便于比对。
-- [ ] 状态转移必须产生日志事件。
-- [ ] `tick()` 不允许阻塞等待 service/action。
-- [ ] service/action 均异步处理。
+- [ ] 状态命名替代数字 step（已建立命名图和稳定 ID，旧执行分支尚未完全迁出）。
+- [x] 保留旧 step 到新状态的映射表，便于比对。
+- [x] 状态转移必须产生日志事件。
+- [x] `tick()` 不允许阻塞等待 service/action。
+- [x] service/action 均异步处理。
 - [ ] 所有目标点、投掷偏置、舵机序号从配置读取。
 - [ ] 决策层不再直接维护 TF 矩阵，改用 `robot_tf_manager` 或标准 TF 查询封装。
 
 ### 4.2 调试接口
 
-- [ ] 发布 `/mission/status`：state、target、phase、elapsed、flags。
-- [ ] 发布 `/mission/event`：from_state、to_state、reason、timestamp。
-- [ ] 服务 `/mission/start`。
-- [ ] 服务 `/mission/pause`。
-- [ ] 服务 `/mission/resume`。
-- [ ] 服务 `/mission/step_once`。
-- [ ] 服务 `/mission/abort`。
-- [ ] 服务 `/mission/dump_context`。
-- [ ] 参数 `dry_run`：不发真实飞控/舵机，只发布调试事件。
-- [ ] 参数 `start_state`：允许从指定阶段开始调试。
+- [x] 发布 `/mission/status`：state、target、phase、elapsed、flags、state_id 和候选后继。
+- [x] 发布 `/mission/event`：from_state、to_state、reason、timestamp 和前后 state_id。
+- [x] 发布 `/mission/graph_dot`：Graphviz DOT 格式有向图。
+- [x] 服务 `/mission/start`。
+- [x] 服务 `/mission/pause`。
+- [x] 服务 `/mission/resume`。
+- [x] 服务 `/mission/step_once`。
+- [x] 服务 `/mission/abort`。
+- [x] 服务 `/mission/dump_context`。
+- [x] 服务 `/mission/jump_to_state`：dry-run 下按唯一 ID 硬跳。
+- [x] 服务 `/mission/shift_state`：dry-run 下按调试顺序做 +1/-1 跳转。
+- [x] 参数 `dry_run`：不发真实飞控/舵机，只发布调试事件。
+- [x] 参数 `start_state`：允许从指定阶段开始调试。
 - [ ] 参数 `target_override`：允许只调某一个目标。
 
 ### 4.3 模块拆分

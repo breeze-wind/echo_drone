@@ -4,7 +4,9 @@
 
 #include "behavior_control/behavior_control.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <sstream>
 
 namespace
 {
@@ -18,7 +20,6 @@ constexpr double kMinCircleSpeed = 0.01;
 
 BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 {
-    current_step = 1;
     RCLCPP_INFO(this->get_logger(), "%s node create", name.c_str());
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -74,6 +75,11 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("takeoff_circle_radius", 0.5);
     this->declare_parameter("takeoff_circle_speed", 0.2);
     this->declare_parameter("takeoff_circle_direction", 1.0);
+    // 决策运行时参数：dry_run 控制输出安全门，autostart 控制初始生命周期，
+    // start_state 支持命名状态或旧数字 step，便于分阶段回归调试。
+    this->declare_parameter("dry_run", false);
+    this->declare_parameter("autostart", true);
+    this->declare_parameter("start_state", std::string("legacy_default"));
 
     this->get_parameter<std::vector<double>>("tank_position", tank_);
     this->get_parameter<std::vector<double>>("tent_position", tent_);
@@ -124,7 +130,14 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter("takeoff_circle_radius", takeoff_circle_radius_);
     this->get_parameter("takeoff_circle_speed", takeoff_circle_speed_);
     this->get_parameter("takeoff_circle_direction", takeoff_circle_direction_);
+    this->get_parameter("dry_run", dry_run_);
+    this->get_parameter("autostart", autostart_);
+    this->get_parameter("start_state", start_state_);
     takeoff_circle_direction_ = takeoff_circle_direction_ >= 0.0 ? 1.0 : -1.0;
+    configured_start_step_ = resolve_start_state(start_state_);
+    current_step = configured_start_step_;
+    mission_runtime_ = behavior_control::MissionRuntime(autostart_);
+    state_enter_time_ = this->now();
 
     if (!if_hit_tank_)
     {
@@ -200,13 +213,25 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     camera_frame_ = "camera_link";
     target_frame_ = "target_position";
 
-    livox_to_camera = tf_buffer_->lookupTransform("livox", "camera_link", rclcpp::Time(),
-                                    rclcpp::Duration::from_seconds(0.5));
+    livox_to_camera_affine = Eigen::Affine3d::Identity();
+    try
+    {
+        livox_to_camera = tf_buffer_->lookupTransform("livox", "camera_link", rclcpp::Time(),
+                                        rclcpp::Duration::from_seconds(0.0));
+        livox_to_camera_affine = tf2::transformToEigen(livox_to_camera);
+        tf_ready_ = true;
+    }
+    catch(const tf2::TransformException & ex)
+    {
+        RCLCPP_WARN(
+            this->get_logger(),
+            "livox -> camera_link TF is not ready; real mission commands remain gated: %s",
+            ex.what());
+    }
     // RCLCPP_INFO(this->get_logger(), "-----------------+++++++++++++++livox_to_camera x y z: %lf, %lf, %lf",
     //     livox_to_camera.transform.translation.x, livox_to_camera.transform.translation.y, livox_to_camera.transform.translation.z);
-    livox_to_camera_affine = tf2::transformToEigen(livox_to_camera);
-    Eigen::Affine3d map_to_livox_affine = Eigen::Affine3d::Identity(); //map->雷达
-    Eigen::Affine3d map_to_camera_affine = Eigen::Affine3d::Identity();
+    map_to_livox_affine = Eigen::Affine3d::Identity(); //map->雷达
+    map_to_camera_affine = Eigen::Affine3d::Identity();
 
     camera_pt_.header.frame_id = "camera_link";
     camera_pt_.point.z = 0.0;
@@ -225,10 +250,10 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     mission_period_ms = std::chrono::milliseconds(static_cast<int64_t>(100));
 
     navigate_to_pose_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "navigate_to_pose");
-    if (!this->navigate_to_pose_client_->wait_for_action_server()) {
-        RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
-        rclcpp::shutdown();
-    }
+    // 决策节点启动不再同步等待 Nav2。实际发送目标前再检查 server 是否就绪，
+    // 避免缺少导航子系统时整个调试接口无法启动。
+    if (!this->navigate_to_pose_client_->action_server_is_ready())
+        RCLCPP_WARN(this->get_logger(), "navigate_to_pose action server is not ready yet");
     navigate_to_pose_action_ = nav2_msgs::action::NavigateToPose::Goal();
     navigate_to_pose_action_.pose.pose.position.x = 0.0;
     navigate_to_pose_action_.pose.pose.position.y = 0.0;
@@ -247,6 +272,11 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     obstacle_height_pub_ = this->create_publisher<std_msgs::msg::Float64>("/robot/obstacle_height", 10);
     clear_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/clear_state", 10);
     camera_choose_pub_ = this->create_publisher<std_msgs::msg::Bool>("/camera/choose", 10);
+    mission_status_pub_ = this->create_publisher<robot_interfaces::msg::MissionStatus>("/mission/status", 10);
+    legacy_mission_status_pub_ = this->create_publisher<robot_interfaces::msg::MissionStatus>("/robot/mission_status", 10);
+    mission_event_pub_ = this->create_publisher<robot_interfaces::msg::MissionEvent>("/mission/event", 50);
+    mission_graph_pub_ = this->create_publisher<std_msgs::msg::String>(
+        "/mission/graph_dot", rclcpp::QoS(1).transient_local().reliable());
     arm_state_sub_ = this->create_subscription<std_msgs::msg::Bool>("/robot/arm_state", 10,
         std::bind(&BehaviorControl::ArmStateCallback, this, std::placeholders::_1));
     current_pose_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/robot/current_pose",
@@ -259,22 +289,457 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     servo_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/servo_node/set_parameters");
     controller_server_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/controller_server/set_parameters");
     local_costmap_parameter_client_ = this->create_client<rcl_interfaces::srv::SetParameters>("/local_costmap/local_costmap/set_parameters");
-    //等待服务可用
-    while (!servo_parameter_client_->wait_for_service(std::chrono::seconds(1)))
-    {
-        RCLCPP_WARN(this->get_logger(), "servo_parameter service not available, waiting...");
-    }
-    while (!controller_server_parameter_client_->wait_for_service(std::chrono::seconds(1)))
-    {
-        RCLCPP_WARN(this->get_logger(), "controller_server_parameter service not available, waiting...");
-    }
-    while (!local_costmap_parameter_client_->wait_for_service(std::chrono::seconds(1)))
-    {
-        RCLCPP_WARN(this->get_logger(), "local_costmap_parameter service not available, waiting...");
-    }
+
+    mission_start_service_ = this->create_service<std_srvs::srv::Trigger>(
+        "/mission/start", std::bind(&BehaviorControl::handle_start, this,
+        std::placeholders::_1, std::placeholders::_2));
+    mission_pause_service_ = this->create_service<std_srvs::srv::Trigger>(
+        "/mission/pause", std::bind(&BehaviorControl::handle_pause, this,
+        std::placeholders::_1, std::placeholders::_2));
+    mission_resume_service_ = this->create_service<std_srvs::srv::Trigger>(
+        "/mission/resume", std::bind(&BehaviorControl::handle_resume, this,
+        std::placeholders::_1, std::placeholders::_2));
+    mission_step_once_service_ = this->create_service<std_srvs::srv::Trigger>(
+        "/mission/step_once", std::bind(&BehaviorControl::handle_step_once, this,
+        std::placeholders::_1, std::placeholders::_2));
+    mission_abort_service_ = this->create_service<std_srvs::srv::Trigger>(
+        "/mission/abort", std::bind(&BehaviorControl::handle_abort, this,
+        std::placeholders::_1, std::placeholders::_2));
+    mission_dump_context_service_ = this->create_service<std_srvs::srv::Trigger>(
+        "/mission/dump_context", std::bind(&BehaviorControl::handle_dump_context, this,
+        std::placeholders::_1, std::placeholders::_2));
+    mission_jump_service_ = this->create_service<robot_interfaces::srv::JumpMissionState>(
+        "/mission/jump_to_state", std::bind(&BehaviorControl::handle_jump_to_state, this,
+        std::placeholders::_1, std::placeholders::_2));
+    mission_shift_service_ = this->create_service<robot_interfaces::srv::ShiftMissionState>(
+        "/mission/shift_state", std::bind(&BehaviorControl::handle_shift_state, this,
+        std::placeholders::_1, std::placeholders::_2));
 
     step_timer_ = this->create_wall_timer(step_period_ms, std::bind(&BehaviorControl::step_timer_callback, this));
     mission_timer_ = this->create_wall_timer(mission_period_ms, std::bind(&BehaviorControl::mission_timer_callback, this));
+    mission_status_timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(200), std::bind(&BehaviorControl::publish_mission_status, this));
+    mission_graph_timer_ = this->create_wall_timer(
+        std::chrono::seconds(1), std::bind(&BehaviorControl::publish_mission_graph, this));
+
+    publish_mission_event(current_step, current_step, autostart_ ? "autostart" : "initialized_idle");
+    publish_mission_graph();
+}
+
+int BehaviorControl::resolve_start_state(const std::string & value) const
+{
+    // legacy_default 保持历史启动行为：从 step 1（等待达到巡航高度）开始。
+    if(value.empty() || value == "legacy_default")
+        return 1;
+
+    const auto * named_node = mission_graph_.node_by_name(value);
+    if(named_node != nullptr)
+        return named_node->legacy_step;
+
+    try
+    {
+        const int numeric_step = std::stoi(value);
+        const auto * legacy_node = mission_graph_.node_by_legacy_step(numeric_step);
+        if(legacy_node != nullptr)
+            return legacy_node->legacy_step;
+    }
+    catch(const std::exception &)
+    {
+    }
+
+    RCLCPP_WARN(this->get_logger(), "Unknown start_state '%s'; using legacy_default (step 1)", value.c_str());
+    return 1;
+}
+
+std::string BehaviorControl::mission_state_name(int step) const
+{
+    // 此映射是数字状态机迁移期间的兼容边界。后续每迁出一个状态，
+    // 仍保留对应 legacy_step，便于新旧 rosbag 和事件日志逐项对比。
+    const auto * node = mission_graph_.node_by_legacy_step(step);
+    return node == nullptr ? "unknown" : node->name;
+}
+
+std::string BehaviorControl::mission_phase_name(int step) const
+{
+    if(step == 0 || step == 1 || step == 300)
+        return "startup";
+    if(step == kTakeoffCircleStep)
+        return "circle";
+    if(step == 21 || step == 31 || step == 41 || step == 51 || step == 61 || step == 101 ||
+       step == 71 || step == 73 || step == 74 || step == 75 || step == 91 || step == 92 ||
+       step == 93 || step == 111 || step == 113)
+        return "navigate";
+    if(step == 22 || step == 32 || step == 42 || step == 52 || step == 62 || step == 102)
+        return "raise";
+    if(step == 23 || step == 33 || step == 43 || step == 53 || step == 63 || step == 103 ||
+       step == 112 || step == 114)
+        return "detect";
+    if(step == 24 || step == 34 || step == 44 || step == 54 || step == 64 || step == 104)
+        return "eject";
+    if(step == 72)
+        return "turn";
+    if(step == 81 || step == 82)
+        return "land";
+    return "unknown";
+}
+
+std::string BehaviorControl::mission_target_name(int step) const
+{
+    if(step >= 21 && step <= 24 && target_sequence_.size() > 0)
+        return target_sequence_[0];
+    if(step >= 31 && step <= 34 && target_sequence_.size() > 1)
+        return target_sequence_[1];
+    if(step >= 41 && step <= 44 && target_sequence_.size() > 2)
+        return target_sequence_[2];
+    if(step >= 51 && step <= 54 && target_sequence_.size() > 3)
+        return target_sequence_[3];
+    if(step >= 61 && step <= 64)
+        return "random_tank";
+    if((step >= 91 && step <= 93) || (step >= 101 && step <= 104) ||
+       (step >= 111 && step <= 114))
+        return "random";
+    if(step >= 71 && step <= 75)
+        return "door";
+    if(step == 81 || step == 82)
+        return "landing";
+    if(step == kTakeoffCircleStep)
+        return "takeoff_circle";
+    return "";
+}
+
+void BehaviorControl::publish_mission_status()
+{
+    // 状态话题只负责观测，不会触发任何任务动作。
+    robot_interfaces::msg::MissionStatus msg;
+    const auto * node = mission_graph_.node_by_legacy_step(current_step);
+    msg.stamp = this->now();
+    msg.legacy_step = current_step;
+    msg.state_id = node == nullptr ? -1 : node->state_id;
+    msg.state = mission_state_name(current_step);
+    msg.phase = mission_phase_name(current_step);
+    msg.target = mission_target_name(current_step);
+    msg.execution_state = mission_runtime_.state_name();
+    msg.elapsed_sec = std::max(0.0, (this->now() - state_enter_time_).seconds());
+    msg.dry_run = dry_run_;
+    msg.armed = arming_state;
+    msg.navigation_active = if_nav;
+    if(if_find_random_target_)
+        msg.flags.push_back("random_target_found");
+    if(if_find_random_tank_target_)
+        msg.flags.push_back("random_tank_found");
+    if(current_passing_door_)
+        msg.flags.push_back("passing_door");
+    if(if_turning)
+        msg.flags.push_back("turning");
+    if(!tf_ready_)
+        msg.flags.push_back("tf_missing");
+    if(!pose_received_)
+        msg.flags.push_back("pose_missing");
+    msg.outgoing_state_ids = mission_graph_.outgoing_state_ids(msg.state_id);
+    const auto * previous = mission_graph_.shift_state(msg.state_id, -1);
+    const auto * next = mission_graph_.shift_state(msg.state_id, 1);
+    msg.debug_previous_state_id = previous == nullptr ? -1 : previous->state_id;
+    msg.debug_next_state_id = next == nullptr ? -1 : next->state_id;
+    mission_status_pub_->publish(msg);
+    legacy_mission_status_pub_->publish(msg);
+}
+
+void BehaviorControl::publish_mission_event(
+    int from_step, int to_step, const std::string & reason)
+{
+    // 同状态事件用于记录 pause/resume/dump 等控制操作；真正的状态转移则
+    // 同时携带前后 step 和命名状态。
+    robot_interfaces::msg::MissionEvent msg;
+    msg.stamp = this->now();
+    msg.sequence = ++mission_event_sequence_;
+    msg.from_legacy_step = from_step;
+    msg.to_legacy_step = to_step;
+    const auto * from_node = mission_graph_.node_by_legacy_step(from_step);
+    const auto * to_node = mission_graph_.node_by_legacy_step(to_step);
+    msg.from_state_id = from_node == nullptr ? -1 : from_node->state_id;
+    msg.to_state_id = to_node == nullptr ? -1 : to_node->state_id;
+    msg.from_state = mission_state_name(from_step);
+    msg.to_state = mission_state_name(to_step);
+    msg.reason = reason;
+    msg.execution_state = mission_runtime_.state_name();
+    mission_event_pub_->publish(msg);
+    RCLCPP_INFO(
+        this->get_logger(), "mission event #%lu: %s(%d) -> %s(%d), reason=%s, execution=%s",
+        static_cast<unsigned long>(msg.sequence), msg.from_state.c_str(), from_step,
+        msg.to_state.c_str(), to_step, reason.c_str(), msg.execution_state.c_str());
+    // 状态变化后立即刷新图；1 Hz 定时器负责后加入的普通 volatile 订阅者。
+    publish_mission_graph();
+}
+
+void BehaviorControl::publish_mission_graph()
+{
+    std_msgs::msg::String graph;
+    const auto * current = mission_graph_.node_by_legacy_step(current_step);
+    graph.data = mission_graph_.to_dot(
+        current == nullptr ? -1 : current->state_id, mission_runtime_.state_name());
+    mission_graph_pub_->publish(graph);
+}
+
+void BehaviorControl::reset_mission_context()
+{
+    current_step = configured_start_step_;
+    reset_state_local_context();
+    state_enter_time_ = this->now();
+}
+
+void BehaviorControl::reset_state_local_context()
+{
+    detection_cnt = 0;
+    eject_cnt = 0;
+    turning_cnt = 0;
+    passing_cnt_1_ = 0;
+    passing_cnt_2_ = 0;
+    servo_index_ = 0;
+    last_servo_index_ = 0;
+    if_nav = false;
+    current_passing_door_ = false;
+    if_turning = false;
+    if_landing = false;
+    takeoff_circle_started_ = false;
+}
+
+bool BehaviorControl::publish_safe_hold()
+{
+    // 不用默认零值冒充当前位置。只有实飞模式、必要 TF 和真实位姿都有效时，
+    // 才允许发布一次当前位置保持目标。
+    if(dry_run_ || !tf_ready_ || !pose_received_)
+        return false;
+
+    current_target_position_.header.stamp = this->now();
+    current_target_position_.header.frame_id = map_frame_;
+    current_target_position_.transform.translation.x = current_x_;
+    current_target_position_.transform.translation.y = current_y_;
+    current_target_position_.transform.translation.z = current_z_;
+    target_pose_pub_->publish(current_target_position_);
+
+    std_msgs::msg::Bool disabled;
+    disabled.data = false;
+    nav_state_pub_->publish(disabled);
+    passing_door_state_pub_->publish(disabled);
+    turning_state_pub_->publish(disabled);
+    if_nav = false;
+    current_passing_door_ = false;
+    if_turning = false;
+    return true;
+}
+
+void BehaviorControl::send_navigation_goal(
+    const nav2_msgs::action::NavigateToPose::Goal & goal)
+{
+    // action 调用保持异步；Nav2 尚未启动时丢弃本次目标并节流告警，
+    // 不能在决策 tick 中同步等待 server。
+    if(dry_run_)
+        return;
+    if(!navigate_to_pose_client_->action_server_is_ready())
+    {
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(), *this->get_clock(), 5000,
+            "navigate_to_pose action server is unavailable; goal was not sent");
+        return;
+    }
+    navigate_to_pose_client_->async_send_goal(goal);
+}
+
+void BehaviorControl::handle_start(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+    (void)request;
+    if(!dry_run_ && !tf_ready_)
+    {
+        response->success = false;
+        response->message = "mission start rejected: livox -> camera_link TF is missing";
+        return;
+    }
+    const int previous_step = current_step;
+    response->success = mission_runtime_.start();
+    if(response->success)
+    {
+        reset_mission_context();
+        response->message = "mission started at " + mission_state_name(current_step);
+        publish_mission_event(previous_step, current_step, "start_requested");
+    }
+    else
+        response->message = "mission start rejected while execution_state=" + mission_runtime_.state_name();
+}
+
+void BehaviorControl::handle_pause(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+    (void)request;
+    response->success = mission_runtime_.pause();
+    response->message = response->success ? "mission paused" : "mission is not running";
+    if(response->success)
+    {
+        const bool hold_published = publish_safe_hold();
+        response->message = hold_published ?
+            "mission paused; current-position hold published" :
+            "mission paused; command output stopped (hold unavailable in dry-run or without pose/TF)";
+        publish_mission_event(current_step, current_step, "pause_requested");
+    }
+}
+
+void BehaviorControl::handle_resume(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+    (void)request;
+    response->success = mission_runtime_.resume();
+    response->message = response->success ? "mission resumed" : "mission is not paused";
+    if(response->success)
+        publish_mission_event(current_step, current_step, "resume_requested");
+}
+
+void BehaviorControl::handle_step_once(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+    (void)request;
+    response->success = mission_runtime_.request_step_once();
+    response->message = response->success ? "one decision tick queued" : "step_once requires a paused mission";
+    if(response->success)
+        publish_mission_event(current_step, current_step, "step_once_requested");
+}
+
+void BehaviorControl::handle_abort(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+    (void)request;
+    response->success = mission_runtime_.abort();
+    response->message = response->success ? "mission aborted" : "mission already aborted";
+    if(response->success)
+    {
+        const bool hold_published = publish_safe_hold();
+        response->message += hold_published ?
+            "; current-position hold published" :
+            "; command output stopped (hold unavailable in dry-run or without pose/TF)";
+        publish_mission_event(current_step, current_step, "abort_requested");
+    }
+}
+
+void BehaviorControl::handle_dump_context(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+    (void)request;
+    const auto * current_node = mission_graph_.node_by_legacy_step(current_step);
+    std::ostringstream json;
+    json << std::boolalpha
+         << "{\"execution_state\":\"" << mission_runtime_.state_name()
+         << "\",\"state\":\"" << mission_state_name(current_step)
+         << "\",\"legacy_step\":" << current_step
+         << ",\"state_id\":" << (current_node == nullptr ? -1 : current_node->state_id)
+         << ",\"phase\":\"" << mission_phase_name(current_step)
+         << "\",\"target\":\"" << mission_target_name(current_step)
+         << "\",\"dry_run\":" << dry_run_
+         << ",\"tf_ready\":" << tf_ready_
+         << ",\"pose_received\":" << pose_received_
+         << ",\"armed\":" << arming_state
+         << ",\"current_pose\":{"
+         << "\"x\":" << current_x_ << ",\"y\":" << current_y_ << ",\"z\":" << current_z_ << "}"
+         << ",\"if_nav\":" << if_nav
+         << ",\"random_target_found\":" << if_find_random_target_
+         << ",\"random_tank_found\":" << if_find_random_tank_target_
+         << ",\"event_sequence\":" << mission_event_sequence_ << "}";
+    response->success = true;
+    response->message = json.str();
+    publish_mission_event(current_step, current_step, "context_dumped");
+}
+
+bool BehaviorControl::apply_debug_jump(
+    int target_state_id, bool reset_context, const std::string & reason,
+    std::string & message)
+{
+    if(!dry_run_)
+    {
+        message = "hard jump rejected: dry_run must be true";
+        return false;
+    }
+
+    const auto execution_state = mission_runtime_.state();
+    if(execution_state != behavior_control::MissionExecutionState::kIdle &&
+       execution_state != behavior_control::MissionExecutionState::kPaused)
+    {
+        message = "hard jump requires idle or paused execution state";
+        return false;
+    }
+
+    const auto * target_node = mission_graph_.node_by_id(target_state_id);
+    if(target_node == nullptr)
+    {
+        message = "unknown state_id=" + std::to_string(target_state_id);
+        return false;
+    }
+
+    const int previous_step = current_step;
+    if(reset_context)
+        reset_state_local_context();
+    current_step = target_node->legacy_step;
+    state_enter_time_ = this->now();
+
+    // idle 下的硬跳同时更新下一次 /mission/start 的起点；paused 下只改变当前停点。
+    if(execution_state == behavior_control::MissionExecutionState::kIdle)
+        configured_start_step_ = current_step;
+
+    publish_mission_event(previous_step, current_step, reason);
+    message = "jumped to state_id=" + std::to_string(target_node->state_id) +
+        " state=" + target_node->name;
+    return true;
+}
+
+void BehaviorControl::handle_jump_to_state(
+    const std::shared_ptr<robot_interfaces::srv::JumpMissionState::Request> request,
+    std::shared_ptr<robot_interfaces::srv::JumpMissionState::Response> response)
+{
+    response->success = apply_debug_jump(
+        request->state_id, request->reset_context, "operator_jump_absolute", response->message);
+    const auto * resulting_node = mission_graph_.node_by_legacy_step(current_step);
+    response->resulting_state_id = resulting_node == nullptr ? -1 : resulting_node->state_id;
+    response->resulting_state = mission_state_name(current_step);
+}
+
+void BehaviorControl::handle_shift_state(
+    const std::shared_ptr<robot_interfaces::srv::ShiftMissionState::Request> request,
+    std::shared_ptr<robot_interfaces::srv::ShiftMissionState::Response> response)
+{
+    const auto * current_node = mission_graph_.node_by_legacy_step(current_step);
+    if(request->delta == 0)
+    {
+        response->success = false;
+        response->message = "delta must not be zero";
+    }
+    else if(current_node == nullptr)
+    {
+        response->success = false;
+        response->message = "current legacy step is not registered in mission graph";
+    }
+    else
+    {
+        const auto * target = mission_graph_.shift_state(current_node->state_id, request->delta);
+        if(target == nullptr)
+        {
+            response->success = false;
+            response->message = "relative jump exceeds debug-order boundary";
+        }
+        else
+        {
+            response->success = apply_debug_jump(
+                target->state_id, request->reset_context,
+                request->delta > 0 ? "operator_jump_forward" : "operator_jump_backward",
+                response->message);
+        }
+    }
+
+    const auto * resulting_node = mission_graph_.node_by_legacy_step(current_step);
+    response->resulting_state_id = resulting_node == nullptr ? -1 : resulting_node->state_id;
+    response->resulting_state = mission_state_name(current_step);
 }
 
 void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg)
@@ -282,6 +747,7 @@ void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformSta
     current_x_ = msg->transform.translation.x;
     current_y_ = msg->transform.translation.y;
     current_z_ = msg->transform.translation.z + 0.39;
+    pose_received_ = true;
 
     map_to_livox.header.stamp = msg->header.stamp;
     map_to_livox.header.frame_id = "map";
@@ -293,6 +759,21 @@ void BehaviorControl::CurrentPoseCallback(const geometry_msgs::msg::TransformSta
     map_to_livox.transform.rotation.y = msg->transform.rotation.y;
     map_to_livox.transform.rotation.z = msg->transform.rotation.z;
     map_to_livox.transform.rotation.w = msg->transform.rotation.w;
+
+    if(!tf_ready_)
+    {
+        try
+        {
+            livox_to_camera = tf_buffer_->lookupTransform(
+                "livox", "camera_link", rclcpp::Time(), rclcpp::Duration::from_seconds(0.0));
+            livox_to_camera_affine = tf2::transformToEigen(livox_to_camera);
+            tf_ready_ = true;
+            publish_mission_event(current_step, current_step, "required_tf_available");
+        }
+        catch(const tf2::TransformException &)
+        {
+        }
+    }
 
     map_to_livox_affine = tf2::transformToEigen(map_to_livox);
     map_to_camera_affine = map_to_livox_affine * livox_to_camera_affine;
@@ -359,7 +840,7 @@ void BehaviorControl::USBCameraInfoCallback(const robot_interfaces::msg::ImageLo
             }
 
             //
-            for (int i = 0; i < target_positions_.size(); i++)
+            for (std::size_t i = 0; i < target_positions_.size(); i++)
             {
                 RCLCPP_INFO(this->get_logger(), "1111111111111111111111111");
                 if ((random_tank_target_[0] - target_positions_[target_sequence_[i]][0])*(random_tank_target_[0] - target_positions_[target_sequence_[i]][0]) +
@@ -488,7 +969,7 @@ void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLo
                 RCLCPP_WARN(this->get_logger(), "TF transform failed in ImageLocationCallback: %s", ex.what());
             }
             //
-            for (int i = 0; i < target_positions_.size(); i++)
+            for (std::size_t i = 0; i < target_positions_.size(); i++)
             {
                 if ((random_tank_target_[0] - target_positions_[target_sequence_[i]][0])*(random_tank_target_[0] - target_positions_[target_sequence_[i]][0]) +
                     (random_tank_target_[1] - target_positions_[target_sequence_[i]][1])*(random_tank_target_[1] - target_positions_[target_sequence_[i]][1]) <= 1.0)
@@ -538,6 +1019,11 @@ void BehaviorControl::ImageLocationCallback(const robot_interfaces::msg::ImageLo
 
 void BehaviorControl::step_timer_callback()
 {
+    // running 时持续放行；paused 时只有 /mission/step_once 能放行一次。
+    if(!mission_runtime_.consume_decision_tick())
+        return;
+
+    const int previous_step = current_step;
     RCLCPP_INFO(this->get_logger(), "---------->current step: %d", current_step);
     if(current_step == 0) //等待飞控解锁
     {
@@ -587,7 +1073,8 @@ void BehaviorControl::step_timer_callback()
             {
                 std_msgs::msg::Bool camera_choose_msg;
                 camera_choose_msg.data = true;
-                camera_choose_pub_->publish(camera_choose_msg);
+                if(!dry_run_)
+                    camera_choose_pub_->publish(camera_choose_msg);
                 RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>使用d435<<<<<<<<<<<<<<<<<<<");
             }
         }
@@ -616,7 +1103,8 @@ void BehaviorControl::step_timer_callback()
             {
                 std_msgs::msg::Bool camera_choose_msg;
                 camera_choose_msg.data = true;
-                camera_choose_pub_->publish(camera_choose_msg);
+                if(!dry_run_)
+                    camera_choose_pub_->publish(camera_choose_msg);
                 RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>使用d435<<<<<<<<<<<<<<<<<<<");
             }
         }
@@ -629,7 +1117,8 @@ void BehaviorControl::step_timer_callback()
             {
                 std_msgs::msg::Bool camera_choose_msg;
                 camera_choose_msg.data = true;
-                camera_choose_pub_->publish(camera_choose_msg);
+                if(!dry_run_)
+                    camera_choose_pub_->publish(camera_choose_msg);
                 RCLCPP_INFO(this->get_logger(), ">>>>>>>>>>>>>>>>>>>使用d435<<<<<<<<<<<<<<<<<<<");
             }
         }
@@ -800,6 +1289,8 @@ void BehaviorControl::step_timer_callback()
         {
             current_step = 61; //找到2个随机靶
             RCLCPP_INFO(this->get_logger(), "----------找到2个随机靶--------");
+            state_enter_time_ = this->now();
+            publish_mission_event(previous_step, current_step, "random_targets_found");
             return;
         }
         if(fabs(current_x_ - random_target_search_1_[0]) < 0.15)
@@ -813,6 +1304,8 @@ void BehaviorControl::step_timer_callback()
         if(if_find_random_target_ && if_find_random_tank_target_)
         {
             current_step = 61; //找到2个随机靶
+            state_enter_time_ = this->now();
+            publish_mission_event(previous_step, current_step, "random_targets_found");
             return;
         }
         if(fabs(current_x_ - random_target_search_2_[0]) < 0.15)
@@ -951,13 +1444,15 @@ void BehaviorControl::step_timer_callback()
         {
             std_msgs::msg::Bool clear_state_msg;
             clear_state_msg.data = true;
-            clear_state_pub_->publish(clear_state_msg);
+            if(!dry_run_)
+                clear_state_pub_->publish(clear_state_msg);
         }
         if (turning_cnt >= turning_cnt_threshold_)
         {
             std_msgs::msg::Bool clear_state_msg;
             clear_state_msg.data = false;
-            clear_state_pub_->publish(clear_state_msg);
+            if(!dry_run_)
+                clear_state_pub_->publish(clear_state_msg);
 
             turning_cnt = 0;
             current_step = 74;
@@ -988,10 +1483,29 @@ void BehaviorControl::step_timer_callback()
                 current_step = 81; //进入降落起点状态
             }
     }
+
+    if(current_step != previous_step)
+    {
+        // 旧代码仍直接修改 current_step，因此在单次判断结束后统一检测转移，
+        // 为每次变化补齐命名事件和状态进入时间。
+        state_enter_time_ = this->now();
+        publish_mission_event(previous_step, current_step, "legacy_transition_condition_met");
+    }
 }
 
 void BehaviorControl::mission_timer_callback()
 {
+    // 暂停、中止、idle 和 dry-run 都不允许进入旧动作发布分支。
+    if(!mission_runtime_.commands_enabled() || dry_run_)
+        return;
+    if(!tf_ready_)
+    {
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(), *this->get_clock(), 5000,
+            "mission command output is gated until livox -> camera_link TF is available");
+        return;
+    }
+
     RCLCPP_INFO(this->get_logger(), "+++++++++++++++++tank position: %lf, %lf+++++++++++++++++",
         random_tank_target_[0], random_tank_target_[1]);
     RCLCPP_INFO(this->get_logger(), "+++++++++++++++if_find_random_tank_target: %d+++++++++++++++++",if_find_random_tank_target_);
@@ -1098,7 +1612,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "第一个目标点: %lf, %lf", target_positions_[target_sequence_[0]][0],
                             target_positions_[target_sequence_[0]][1]);
@@ -1188,7 +1702,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "第二个目标点: %lf, %lf", target_positions_[target_sequence_[1]][0],
                             target_positions_[target_sequence_[1]][1]);
@@ -1274,7 +1788,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "第三个目标点: %lf, %lf", target_positions_[target_sequence_[2]][0],
                             target_positions_[target_sequence_[2]][1]);
@@ -1360,7 +1874,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "第四个目标点: %lf, %lf", target_positions_[target_sequence_[3]][0],
 					target_positions_[target_sequence_[3]][1]);
@@ -1451,7 +1965,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "tank目标点: %lf, %lf", random_tank_target_[0], random_tank_target_[1]);
     }
@@ -1564,7 +2078,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "第一个搜索点: %lf, %lf", random_target_search_1_[0], random_target_search_1_[1]);
     }
@@ -1579,7 +2093,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "第二个搜索点: %lf, %lf", random_target_search_2_[0], random_target_search_2_[1]);
     }
@@ -1594,7 +2108,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "第三个搜索点: %lf, %lf", random_target_search_3_[0], random_target_search_3_[1]);
     }
@@ -1615,7 +2129,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         RCLCPP_INFO(this->get_logger(), "---------随机靶: %lf, %lf", random_target_[0], random_target_[1]);
     }
@@ -1729,7 +2243,7 @@ void BehaviorControl::mission_timer_callback()
             action_goal.pose.pose.orientation.y = 0.0;
             action_goal.pose.pose.orientation.z = 0.0;
             action_goal.pose.pose.orientation.w = 1.0;
-            navigate_to_pose_client_->async_send_goal(action_goal);
+            send_navigation_goal(action_goal);
             RCLCPP_INFO(this->get_logger(), "穿门起点: %lf, %lf", passing_door_src_1_[0], passing_door_src_1_[1]);
         }
         else{
@@ -1744,7 +2258,7 @@ void BehaviorControl::mission_timer_callback()
             action_goal.pose.pose.orientation.y = 0.0;
             action_goal.pose.pose.orientation.z = 0.0;
             action_goal.pose.pose.orientation.w = 1.0;
-            navigate_to_pose_client_->async_send_goal(action_goal);
+            send_navigation_goal(action_goal);
             RCLCPP_INFO(this->get_logger(), "返回起点，current x y: %lf, %lf", current_x_, current_y_);
         }
         if_nav = true;
@@ -1780,7 +2294,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         current_passing_door_ = true;
         if_turning = false;
@@ -1797,7 +2311,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.y = 0.0;
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
-        navigate_to_pose_client_->async_send_goal(action_goal);
+        send_navigation_goal(action_goal);
         if_nav = true;
         current_passing_door_ = true;
         if_turning = false;
@@ -1866,6 +2380,16 @@ void BehaviorControl::ArmStateCallback(const std_msgs::msg::Bool::SharedPtr msg)
 
 void BehaviorControl::set_parameter()
 {
+    if(dry_run_)
+        return;
+    if(!servo_parameter_client_->service_is_ready())
+    {
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(), *this->get_clock(), 5000,
+            "servo parameter service is unavailable; eject command was not sent");
+        return;
+    }
+
     // 构建请求
     auto servo_server_request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
 
@@ -1904,6 +2428,17 @@ void BehaviorControl::handle_parameter_response(
 
 void BehaviorControl::change_mode()
 {
+    if(dry_run_)
+        return;
+    if(!controller_server_parameter_client_->service_is_ready() ||
+       !local_costmap_parameter_client_->service_is_ready())
+    {
+        RCLCPP_WARN_THROTTLE(
+            this->get_logger(), *this->get_clock(), 5000,
+            "Nav2 parameter services are unavailable; door profile was not changed");
+        return;
+    }
+
     /* 修改FollowPath中的参数 */
     // 构建请求
     auto controller_server_request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();

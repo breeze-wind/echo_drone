@@ -1,0 +1,9 @@
+# 沿调试顺序移动的距离；常用值为 +1（下一节点）或 -1（上一节点）。
+int32 delta
+# true 时重置当前状态的计数器和临时动作标志。
+bool reset_context
+---
+bool success
+string message
+int32 resulting_state_id
+string resulting_state

@@ -103,7 +103,7 @@ class MavrosAdapter(Node):
             self._param('mavros_set_mode_service', '/mavros/set_mode'))
         self.mavros_vision_pose_topic = str(
             self._param('mavros_vision_pose_topic',
-                        '/mavros/vision_pose/pose'))
+                        '/mavros/mavros/pose'))
         self.mavros_position_setpoint_topic = str(
             self._param('mavros_position_setpoint_topic',
                         '/mavros/setpoint_position/local'))

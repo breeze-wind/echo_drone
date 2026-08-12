@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <!-- 当前主 SLS/QSF 控制器包，实机和 PX4 SITL 优先使用这个 C++ 节点。 -->
+  <name>sls_circle_controller_cpp</name>
+  <version>0.1.0</version>
+  <description>C++ MAVROS SLS circle and takeoff-hold controller for Echo Drone.</description>
+  <maintainer email="sfx@example.com">sfx</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>mavros_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>sls_qsf_core</depend>
+  <depend>std_msgs</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

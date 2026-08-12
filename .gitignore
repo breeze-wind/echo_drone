@@ -5,6 +5,8 @@ install/
 log/
 __pycache__/
 *.pyc
+.echo_drone.env
+.echo_drone.env.local
 .pcd
 .png
 maps

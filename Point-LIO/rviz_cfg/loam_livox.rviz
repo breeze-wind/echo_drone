@@ -35,11 +35,8 @@ Panels:
       - /Current View1
     Name: Views
     Splitter Ratio: 0.5
-  - Class: rviz_common/Time
-    Experimental: false
-    Name: Time
-    SyncMode: 0
-    SyncSource: ""
+  - Class: nav2_rviz_plugins/Navigation 2
+    Name: Navigation 2
 Visualization Manager:
   Class: ""
   Displays:
@@ -150,7 +147,7 @@ Visualization Manager:
           Color: 255; 0; 0
           Color Transformer: FlatColor
           Decay Time: 0
-          Enabled: false
+          Enabled: true
           Invert Rainbow: false
           Max Color: 255; 255; 255
           Max Intensity: 4096
@@ -171,9 +168,55 @@ Visualization Manager:
             Value: /Laser_map
           Use Fixed Frame: true
           Use rainbow: true
-          Value: false
-      Enabled: false
+          Value: true
+      Enabled: true
       Name: mapping
+    - Class: rviz_common/Group
+      Displays:
+        - Alpha: 0.699999988079071
+          Class: rviz_default_plugins/Map
+          Color Scheme: costmap
+          Draw Behind: false
+          Enabled: true
+          Name: Local Costmap
+          Topic:
+            Depth: 1
+            Durability Policy: Transient Local
+            Filter size: 10
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /local_costmap/costmap
+          Update Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /local_costmap/costmap_updates
+          Use Timestamp: false
+          Value: true
+        - Alpha: 0.30000001192092896
+          Class: rviz_default_plugins/Map
+          Color Scheme: costmap
+          Draw Behind: false
+          Enabled: true
+          Name: Global Costmap
+          Topic:
+            Depth: 1
+            Durability Policy: Transient Local
+            Filter size: 10
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /global_costmap/costmap
+          Update Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /global_costmap/costmap_updates
+          Use Timestamp: false
+          Value: true
+      Enabled: true
+      Name: costmap
     - Class: rviz_common/Group
       Displays:
         - Angle Tolerance: 0.009999999776482582
@@ -224,7 +267,7 @@ Visualization Manager:
       Radius: 0.10000000149011612
       Reference Frame: <Fixed Frame>
       Value: true
-    - Alpha: 0
+    - Alpha: 1
       Buffer Length: 2
       Class: rviz_default_plugins/Path
       Color: 25; 255; 255
@@ -234,7 +277,7 @@ Visualization Manager:
       Length: 0.30000001192092896
       Line Style: Billboards
       Line Width: 0.20000000298023224
-      Name: Path
+      Name: Point-LIO Path
       Offset:
         X: 0
         Y: 0
@@ -251,6 +294,34 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /path
+      Value: true
+    - Alpha: 1
+      Buffer Length: 2
+      Class: rviz_default_plugins/Path
+      Color: 255; 80; 0
+      Enabled: true
+      Head Diameter: 0
+      Head Length: 0
+      Length: 0.30000001192092896
+      Line Style: Billboards
+      Line Width: 0.15000000596046448
+      Name: Nav2 Plan
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 80; 0
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.4000000059604645
+      Shaft Length: 0.4000000059604645
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /plan
       Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: false
@@ -356,13 +427,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /initialpose
-    - Class: rviz_default_plugins/SetGoal
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /move_base_simple/goal
+    - Class: nav2_rviz_plugins/GoalTool
     - Class: rviz_default_plugins/PublishPoint
       Single click: true
       Topic:
@@ -394,7 +459,7 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.009999999776482582
       Pitch: 0.6047963500022888
-      Target Frame: global
+      Target Frame: map
       Value: Orbit (rviz_default_plugins)
       Yaw: 4.200369358062744
     Saved: ~

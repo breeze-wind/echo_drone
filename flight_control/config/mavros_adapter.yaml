@@ -40,7 +40,9 @@ mavros_adapter:
     mavros_rc_topic: "/mavros/rc/in"
     mavros_arming_service: "/mavros/cmd/arming"
     mavros_set_mode_service: "/mavros/set_mode"
-    mavros_vision_pose_topic: "/mavros/vision_pose/pose"
+    # 当前 Foxy MAVROS 节点把 vision_pose 插件的私有 ~/pose 暴露成
+    # /mavros/mavros/pose；/mavros/vision_pose/pose 在这套环境里没有端点。
+    mavros_vision_pose_topic: "/mavros/mavros/pose"
     mavros_position_setpoint_topic: "/mavros/setpoint_position/local"
     mavros_velocity_setpoint_topic: "/mavros/setpoint_velocity/cmd_vel"
 

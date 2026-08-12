@@ -11,6 +11,7 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -37,8 +38,13 @@ def generate_launch_description():
 
     ports_file = LaunchConfiguration('ports_file')
     servo_file = LaunchConfiguration('servo_file')
+    mavros_config_file = LaunchConfiguration('mavros_config_file')
+    mavros_gcs_url = LaunchConfiguration('gcs_url')
     mavros_adapter_file = LaunchConfiguration('mavros_adapter_file')
     dry_run = LaunchConfiguration('dry_run')
+    dry_run_bool = ParameterValue(dry_run, value_type=bool)
+    adapter_dry_run = LaunchConfiguration('adapter_dry_run')
+    adapter_dry_run_bool = ParameterValue(adapter_dry_run, value_type=bool)
 
     # 统一串口清单节点；dry-run 下可安全用于设备发现和配置校验。
     serial_manager_node = Node(
@@ -46,7 +52,7 @@ def generate_launch_description():
         executable='robot_serial_manager_node',
         name='robot_serial_manager',
         output='screen',
-        parameters=[ports_file, {'dry_run': dry_run}],
+        parameters=[ports_file, {'dry_run': dry_run_bool}],
         condition=IfCondition(LaunchConfiguration('use_serial_manager')),
     )
 
@@ -56,7 +62,7 @@ def generate_launch_description():
         executable='servo_node',
         name='servo_node',
         output='screen',
-        parameters=[servo_file, {'dry_run': dry_run}],
+        parameters=[servo_file, {'dry_run': dry_run_bool}],
         respawn=True,
         condition=IfCondition(LaunchConfiguration('use_servo')),
     )
@@ -73,18 +79,20 @@ def generate_launch_description():
             'tgt_system': LaunchConfiguration('target_system'),
             'tgt_component': LaunchConfiguration('target_component'),
             'fcu_protocol': LaunchConfiguration('fcu_protocol'),
+            'config_file': mavros_config_file,
+            'gcs_url': mavros_gcs_url,
         }.items(),
         condition=IfCondition(_true_and_not_dry_run('use_mavros')),
     )
 
-    # adapter 在 dry-run 和真实模式都可运行；dry-run 下只转换和转发 ROS
-    # 话题，MAVROS 服务调用会被抑制。
+    # adapter 在 dry-run 和真实模式都可运行。adapter_dry_run 可单独保持
+    # 服务调用抑制，同时允许 MAVROS 真实连接飞控接收 vision pose。
     mavros_adapter_node = Node(
         package='flight_control',
         executable='mavros_adapter_node',
         name='mavros_adapter',
         output='screen',
-        parameters=[mavros_adapter_file, {'dry_run': dry_run}],
+        parameters=[mavros_adapter_file, {'dry_run': adapter_dry_run_bool}],
         respawn=True,
         condition=IfCondition(LaunchConfiguration('use_mavros')),
     )
@@ -127,8 +135,20 @@ def generate_launch_description():
             description='MAVROS adapter 节点参数文件。',
         ),
         DeclareLaunchArgument(
+            'mavros_config_file',
+            default_value=PathJoinSubstitution([
+                FindPackageShare('flight_control'), 'config',
+                'mavros_vision_px4.yaml'
+            ]),
+            description='MAVROS PX4 vision 插件和坐标系配置文件。',
+        ),
+        DeclareLaunchArgument(
             'dry_run', default_value='true',
             description='是否进入 dry-run；true 时不启动真实 MAVROS 连接。'),
+        DeclareLaunchArgument(
+            'adapter_dry_run',
+            default_value=dry_run,
+            description='是否只抑制 MAVROS adapter 的服务调用；默认跟随 dry_run。'),
         DeclareLaunchArgument(
             'use_serial_manager', default_value='true',
             description='是否启动串口管理节点。'),
@@ -147,6 +167,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'fcu_url', default_value='/dev/px4_fcu:230400',
             description='MAVROS 连接飞控的串口 URL。'),
+        DeclareLaunchArgument(
+            'gcs_url', default_value='',
+            description='MAVROS router 转发给 QGC/GCS 的 MAVLink URL，默认关闭。'),
         DeclareLaunchArgument(
             'target_system', default_value='1',
             description='MAVROS 目标系统 ID。'),

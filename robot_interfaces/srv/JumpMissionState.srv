@@ -1,0 +1,9 @@
+# 要跳转到的稳定状态 ID，可从 /mission/status 或 /mission/graph_dot 查询。
+int32 state_id
+# true 时重置当前状态的计数器和临时动作标志。
+bool reset_context
+---
+bool success
+string message
+int32 resulting_state_id
+string resulting_state

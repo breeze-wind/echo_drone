@@ -4,19 +4,21 @@ from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import PathJoinSubstitution
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     """launch内容描述函数，由ros2 launch 扫描调用"""
     params_file = LaunchConfiguration('params_file')
     dry_run = LaunchConfiguration('dry_run')
+    dry_run_bool = ParameterValue(dry_run, value_type=bool)
 
     node_01 = Node(
         package="servo_node",
         executable="servo_node",
         output="screen",
         name="servo_node",
-        parameters=[params_file, {'dry_run': dry_run}],
+        parameters=[params_file, {'dry_run': dry_run_bool}],
         respawn=True # 重启
     )
     # 创建LaunchDescription对象launch_description,用于描述launch文件

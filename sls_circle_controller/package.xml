@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <!-- Python 仿真辅助包：提供 launch、fake MAVROS、Gazebo 桥接和 PX4 SITL 资源。 -->
+  <name>sls_circle_controller</name>
+  <version>0.1.0</version>
+  <description>ROS2 MAVROS circle controller and bench simulator for Echo Drone.</description>
+  <maintainer email="sfx@example.com">sfx</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>ament_index_python</depend>
+  <depend>geometry_msgs</depend>
+  <depend>gazebo_ros</depend>
+  <depend>mavros_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rclpy</depend>
+  <depend>sls_qsf_core</depend>
+  <depend>std_msgs</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
