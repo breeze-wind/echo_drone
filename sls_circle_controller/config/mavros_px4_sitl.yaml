@@ -10,3 +10,19 @@ mavros:
       - setpoint_position
       - setpoint_raw
       - imu
+
+    # MAVROS 2 的 setpoint_raw 插件默认把 AttitudeTarget.thrust 忽略为零。
+    # PX4 SITL 与本控制器都使用 0..1 的归一化推力，必须显式启用 1:1 缩放。
+    setpoint_raw/thrust_scaling: 1.0
+
+# mavros_node 还会创建 UAS 子节点 /mavros/mavros；setpoint_raw 插件正运行在
+# 这个节点上，因此也要将同一参数精确传给它。
+/mavros/mavros:
+  ros__parameters:
+    thrust_scaling: 1.0
+
+# 不同 Foxy MAVROS 构建对插件是否使用子节点存在差异；标准构建会将
+# setpoint_raw 放在这个精确节点。二者都使用相同的 0..1 推力缩放。
+/mavros/mavros/setpoint_raw:
+  ros__parameters:
+    thrust_scaling: 1.0

@@ -14,6 +14,8 @@ from flight_control.conversions import (
     legacy_vision_pose_position,
     mavros_enu_yaw_for_legacy_ned_yaw,
     ned_xyz_to_mavros_enu,
+    body_velocity_to_map_enu,
+    limit_planar_velocity,
 )
 
 
@@ -48,6 +50,24 @@ def test_legacy_passing_door_velocity_preserves_old_payload():
         legacy_passing_door_velocity(0.5, -0.2, 0.7, 0.6, 0.65),
         (0.5, -0.2, -0.065),
     )
+
+
+def test_body_velocity_to_map_enu_rotates_with_yaw():
+    assert_tuple_close(
+        body_velocity_to_map_enu(1.0, 0.0, math.pi / 2.0),
+        (0.0, 1.0),
+    )
+    assert_tuple_close(
+        body_velocity_to_map_enu(0.0, 1.0, math.pi / 2.0),
+        (-1.0, 0.0),
+    )
+
+
+def test_limit_planar_velocity_limits_vector_norm():
+    vx, vy = limit_planar_velocity(0.65, -0.65, 0.3)
+    assert math.isclose(math.hypot(vx, vy), 0.3, rel_tol=1e-9)
+    assert vx > 0.0
+    assert vy < 0.0
 
 
 def test_legacy_yaw_is_inverse_of_mavros_ned_conversion():

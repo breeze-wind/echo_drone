@@ -68,6 +68,8 @@ private:
     void publish_takeoff_circle_target();
     /// 非阻塞发送 Nav2 目标；action server 未就绪时拒绝本次发送。
     void send_navigation_goal(const nav2_msgs::action::NavigateToPose::Goal & goal);
+    /// 当前是否把最终任务目标直接交给 SLS 速度控制器，而非 Nav2 action。
+    bool use_sls_goal_navigation() const;
     /// 周期发布具体任务状态、执行器生命周期和健康标志。
     void publish_mission_status();
     /// 发布一次状态转移或调试操作事件。
@@ -126,6 +128,10 @@ private:
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_pub_;
+    /// sls_goal 模式专用：发布最终目标给 SLS，避免复用 RViz 的 /goal_pose。
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr sls_nav_goal_pub_;
+    /// 显式仲裁桥接器的速度输入源；true 时只接收 SLS 的速度参考。
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr sls_goal_control_pub_;
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigate_to_pose_client_;
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal navigate_to_pose_goal_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr nav_state_pub_;
@@ -270,6 +276,12 @@ private:
     bool autostart_;
     /// launch/YAML 提供的命名起始状态或旧数字字符串。
     std::string start_state_;
+    /// nav2（默认）或 sls_goal（最终目标由 SLS 转成速度 setpoint）。
+    std::string navigation_execution_mode_;
+    /// SLS 最终目标输入话题；仅 sls_goal 模式使用。
+    std::string sls_nav_goal_topic_;
+    /// SLS 最终目标控制是否在当前任务状态生效。
+    bool sls_goal_control_active_{false};
     /// 独立于具体任务 step 的执行门控运行时。
     behavior_control::MissionRuntime mission_runtime_;
     /// 稳定状态 ID、正常有向边和调试顺序的统一注册表。

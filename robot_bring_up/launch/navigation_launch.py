@@ -46,6 +46,7 @@ def generate_launch_description():
         ('/tf', 'tf'),
         ('/tf_static', 'tf_static'),
     ]
+    recovery_remappings = remappings + [('cmd_vel', '/nav/recovery_cmd_vel')]
 
     param_substitutions = {
         'use_sim_time': use_sim_time,
@@ -87,9 +88,9 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'default_bt_xml_filename',
             default_value=os.path.join(
-                get_package_share_directory('nav2_bt_navigator'),
+                get_package_share_directory('robot_bring_up'),
                 'behavior_trees',
-                'navigate_w_replanning_and_recovery.xml'),
+                'navigate_drone_replanning.xml'),
             description='Full path to the behavior tree xml file to use'),
 
         DeclareLaunchArgument(
@@ -147,7 +148,7 @@ def generate_launch_description():
             respawn_delay=2.0,
             parameters=[configured_params],
             arguments=['--ros-args', '--log-level', log_level],
-            remappings=remappings),
+            remappings=recovery_remappings),
 
         Node(
             package='nav2_bt_navigator',

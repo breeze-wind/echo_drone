@@ -6,8 +6,10 @@
       - sys_status
       - sys_time
       - command
-      - local_position
       - vision_pose
+      # ODOMETRY 使用独立 in/out 端点，供 SLS 读取 PX4 融合结果；避免启用
+      # local_position 后与 vision_pose 共用 ~/pose 产生的回灌。
+      - odometry
       - setpoint_position
       - setpoint_velocity
       - rc_io
@@ -46,6 +48,14 @@
         frame_id: "map"
         child_frame_id: "vision_estimate"
         rate_limit: 10.0
+
+    # MAVROS 2.4.0 runs odometry as the separate /mavros/odometry node.  Its
+    # parameters are named fcu.odom_*, not odometry.fcu.odom_*.  The wildcard
+    # node selector above therefore has to provide fcu at this root level.
+    # Explicitly override the upstream 2.4.0 child-frame default typo ("map").
+    fcu:
+      odom_parent_id_des: "map"
+      odom_child_id_des: "base_link"
 
     setpoint_position:
       tf:

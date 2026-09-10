@@ -31,6 +31,8 @@ setup(
     entry_points={
         'console_scripts': [
             'mavros_adapter_node = flight_control.mavros_adapter_node:main',
+            'mavros_ambiguous_topic_splitter = '
+            'flight_control.mavros_ambiguous_topic_splitter:main',
         ],
     },
 )

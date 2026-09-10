@@ -5,6 +5,7 @@
 #include "behavior_control/behavior_control.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <sstream>
 
@@ -80,6 +81,10 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter("dry_run", false);
     this->declare_parameter("autostart", true);
     this->declare_parameter("start_state", std::string("legacy_default"));
+    // 导航执行器默认仍使用 Nav2。sls_goal 是显式试验模式：只把最终目标
+    // 交给 SLS 速度控制器，因而不会得到 Nav2 的实时局部避障。
+    this->declare_parameter("navigation_execution_mode", std::string("nav2"));
+    this->declare_parameter("sls_nav_goal_topic", std::string("/sls_circle/nav_goal"));
 
     this->get_parameter<std::vector<double>>("tank_position", tank_);
     this->get_parameter<std::vector<double>>("tent_position", tent_);
@@ -133,6 +138,18 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter("dry_run", dry_run_);
     this->get_parameter("autostart", autostart_);
     this->get_parameter("start_state", start_state_);
+    this->get_parameter("navigation_execution_mode", navigation_execution_mode_);
+    this->get_parameter("sls_nav_goal_topic", sls_nav_goal_topic_);
+    std::transform(
+        navigation_execution_mode_.begin(), navigation_execution_mode_.end(),
+        navigation_execution_mode_.begin(), ::tolower);
+    if(navigation_execution_mode_ != "nav2" && navigation_execution_mode_ != "sls_goal")
+    {
+        RCLCPP_WARN(this->get_logger(),
+            "Unknown navigation_execution_mode '%s'; using nav2",
+            navigation_execution_mode_.c_str());
+        navigation_execution_mode_ = "nav2";
+    }
     takeoff_circle_direction_ = takeoff_circle_direction_ >= 0.0 ? 1.0 : -1.0;
     configured_start_step_ = resolve_start_state(start_state_);
     current_step = configured_start_step_;
@@ -266,6 +283,9 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 
     target_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/target_pose", 10);
     goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal_pose", 10);
+    sls_nav_goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(sls_nav_goal_topic_, 10);
+    sls_goal_control_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+        "/robot/sls_goal_control_active", 10);
     nav_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/nav_state", 10);
     passing_door_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/passing_door_state", 10);
     turning_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/turning_state", 10);
@@ -324,6 +344,12 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
 
     publish_mission_event(current_step, current_step, autostart_ ? "autostart" : "initialized_idle");
     publish_mission_graph();
+    if(use_sls_goal_navigation())
+    {
+        RCLCPP_WARN(this->get_logger(),
+            "navigation_execution_mode=sls_goal: final goals go to %s; Nav2 local obstacle avoidance is bypassed",
+            sls_nav_goal_topic_.c_str());
+    }
 }
 
 int BehaviorControl::resolve_start_state(const std::string & value) const
@@ -497,6 +523,7 @@ void BehaviorControl::reset_state_local_context()
     servo_index_ = 0;
     last_servo_index_ = 0;
     if_nav = false;
+    sls_goal_control_active_ = false;
     current_passing_door_ = false;
     if_turning = false;
     if_landing = false;
@@ -520,6 +547,7 @@ bool BehaviorControl::publish_safe_hold()
     std_msgs::msg::Bool disabled;
     disabled.data = false;
     nav_state_pub_->publish(disabled);
+    sls_goal_control_pub_->publish(disabled);
     passing_door_state_pub_->publish(disabled);
     turning_state_pub_->publish(disabled);
     if_nav = false;
@@ -528,9 +556,24 @@ bool BehaviorControl::publish_safe_hold()
     return true;
 }
 
+bool BehaviorControl::use_sls_goal_navigation() const
+{
+    return navigation_execution_mode_ == "sls_goal";
+}
+
 void BehaviorControl::send_navigation_goal(
     const nav2_msgs::action::NavigateToPose::Goal & goal)
 {
+    if(use_sls_goal_navigation())
+    {
+        // SLS 只需要最终目标。header.stamp 在这里刷新，便于下游拒绝陈旧目标；
+        // 不复用 /goal_pose，避免与 RViz/Nav2 的人工目标入口混淆。
+        auto sls_goal = goal.pose;
+        sls_goal.header.stamp = this->now();
+        sls_nav_goal_pub_->publish(sls_goal);
+        sls_goal_control_active_ = true;
+        return;
+    }
     // action 调用保持异步；Nav2 尚未启动时丢弃本次目标并节流告警，
     // 不能在决策 tick 中同步等待 server。
     if(dry_run_)
@@ -1506,6 +1549,11 @@ void BehaviorControl::mission_timer_callback()
         return;
     }
 
+    // 每个命令周期先撤销 SLS 源，只有本周期确实给出最终目标时才在
+    // send_navigation_goal() 中重新置位。这使抬升、识别、投放等状态不会
+    // 继续使用上一个导航目标。
+    sls_goal_control_active_ = false;
+
     RCLCPP_INFO(this->get_logger(), "+++++++++++++++++tank position: %lf, %lf+++++++++++++++++",
         random_tank_target_[0], random_tank_target_[1]);
     RCLCPP_INFO(this->get_logger(), "+++++++++++++++if_find_random_tank_target: %d+++++++++++++++++",if_find_random_tank_target_);
@@ -1613,7 +1661,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "第一个目标点: %lf, %lf", target_positions_[target_sequence_[0]][0],
                             target_positions_[target_sequence_[0]][1]);
     }
@@ -1703,7 +1751,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "第二个目标点: %lf, %lf", target_positions_[target_sequence_[1]][0],
                             target_positions_[target_sequence_[1]][1]);
     }
@@ -1789,7 +1837,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "第三个目标点: %lf, %lf", target_positions_[target_sequence_[2]][0],
                             target_positions_[target_sequence_[2]][1]);
     }
@@ -1875,7 +1923,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "第四个目标点: %lf, %lf", target_positions_[target_sequence_[3]][0],
 					target_positions_[target_sequence_[3]][1]);
     }
@@ -1966,7 +2014,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "tank目标点: %lf, %lf", random_tank_target_[0], random_tank_target_[1]);
     }
     else if(current_step == 62)
@@ -2079,7 +2127,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "第一个搜索点: %lf, %lf", random_target_search_1_[0], random_target_search_1_[1]);
     }
     else if(current_step == 92)
@@ -2094,7 +2142,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "第二个搜索点: %lf, %lf", random_target_search_2_[0], random_target_search_2_[1]);
     }
     else if(current_step == 93)
@@ -2109,7 +2157,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "第三个搜索点: %lf, %lf", random_target_search_3_[0], random_target_search_3_[1]);
     }
 
@@ -2130,7 +2178,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         RCLCPP_INFO(this->get_logger(), "---------随机靶: %lf, %lf", random_target_[0], random_target_[1]);
     }
     else if(current_step == 102)
@@ -2261,7 +2309,7 @@ void BehaviorControl::mission_timer_callback()
             send_navigation_goal(action_goal);
             RCLCPP_INFO(this->get_logger(), "返回起点，current x y: %lf, %lf", current_x_, current_y_);
         }
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         if_turning = false;
     }
     else if(current_step == 72)
@@ -2295,7 +2343,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         current_passing_door_ = true;
         if_turning = false;
         RCLCPP_INFO(this->get_logger(), "穿门中间点: %lf, %lf", passing_door_src_2_[0], passing_door_src_2_[1]);
@@ -2312,7 +2360,7 @@ void BehaviorControl::mission_timer_callback()
         action_goal.pose.pose.orientation.z = 0.0;
         action_goal.pose.pose.orientation.w = 1.0;
         send_navigation_goal(action_goal);
-        if_nav = true;
+        if_nav = !use_sls_goal_navigation();
         current_passing_door_ = true;
         if_turning = false;
         RCLCPP_INFO(this->get_logger(), "穿门终点: %lf, %lf", passing_door_des_[0], passing_door_des_[1]);
@@ -2358,6 +2406,9 @@ void BehaviorControl::mission_timer_callback()
     std_msgs::msg::Bool nav_state_msg;
     nav_state_msg.data = if_nav;
     nav_state_pub_->publish(nav_state_msg);
+    std_msgs::msg::Bool sls_goal_control_msg;
+    sls_goal_control_msg.data = sls_goal_control_active_;
+    sls_goal_control_pub_->publish(sls_goal_control_msg);
     // RCLCPP_INFO(this->get_logger(), "<<<<<<<<<<<<<<<<<<<<<<< if_nav: %d", if_nav);
     std_msgs::msg::Bool passing_door_state_msg;
     passing_door_state_msg.data = current_passing_door_;

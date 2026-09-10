@@ -58,6 +58,8 @@ usage() {
   mavros-check      限时启动 MAVROS 并采样 /mavros/state。
   mavros-baud-scan  只读扫描常见串口波特率，找到能收到 heartbeat 的配置。
   mavros-point-check 检查 Point-LIO -> adapter -> MAVROS 位姿链路。
+  local-position-monitor 持续检查送入 PX4 的视觉位姿（Foxy 实际订阅端点）。
+  fcu-position-monitor 检查 PX4 本地位置端点（最小 vision 配置下可能禁用）。
   hardware-real     启动串口管理、舵机节点、MAVROS 和 MAVROS adapter。
   mavros-real       启动串口管理、MAVROS 和 MAVROS adapter，不启动舵机。
   mavros-vision     启动串口管理、MAVROS 和 dry-run adapter，不启动舵机。
@@ -66,8 +68,12 @@ usage() {
 实机 SLS 快捷启动:
   real-hold         起飞后只定点悬停，不进入绕圈，不自动解锁。
   real-point        只发位置点，不启用 QSF/抗风扰，不自动解锁。
+  real-position-circle 全程只发PX4位置环圆轨迹，不启用SLS/PD姿态控制，不自动解锁。
+  position-circle     real-position-circle 的简洁入口。
   real-swing        起飞后 QSF 绕圈，只做绳摆抑制，不自动解锁。
+  sls-circle        real-swing 的简洁入口，使用 SLS/QSF 姿态和推力控制。
   real-wind         起飞后 QSF 绕圈，同时做绳摆和抗风扰，不自动解锁。
+  real-wind-hold    起飞稳定后使用QSF/SLS抗风定点悬停，不自动解锁。
   real-circle       real-wind 的兼容短入口，不自动解锁。
   real-point-auto   只发位置点，并自动请求 OFFBOARD/解锁。
   real-swing-auto   QSF 绳摆抑制，并自动请求 OFFBOARD/解锁。
@@ -93,10 +99,15 @@ usage() {
                     可加 CLEAN_FASTDDS_SHM=1，在确认没有 ROS 进程后清理 DDS 残留共享内存。
   mission-graph     实时渲染决策拓扑，在浏览器显示 ID、边和当前运行状态。
   nav               只启动 Nav2 bringup。
+  behavior-sls-goal 决策改为直接把最终目标点发给 SLS；默认不进入起飞后绕圈。
   sls-circle-dry    只启动 SLS 圆周控制器 dry-run，不写真实 MAVROS 控制话题。
-  sls-circle-sim    启动 fake MAVROS 点质量仿真和 SLS 圆周控制器。
-  sls-circle-gazebo 启动 Gazebo 力输入烟测和 SLS 圆周控制器。
+  sls-nav-goal      SLS 接收最终目标点，计算速度 setpoint；由 MAVROS adapter 转发给飞控。
+  sls-rviz-goal     RViz 的 2D Goal Pose（/goal_pose）直接交给 SLS，不启动行为状态机。
+  sls-circle-sim    无 PX4、无 Gazebo：启动 fake MAVROS 点质量仿真和 SLS 圆周控制器。
+  sls-circle-gazebo 无 PX4 的 Gazebo 闭环仿真：Gazebo bridge 模拟 MAVROS 状态和执行器。
+  sls-wind-gui      打开 Gazebo 水平风力方向/大小调节面板。
   sls-px4-sitl      启动移植自原版的 PX4 SITL/Gazebo/MAVROS/SLS 闭环仿真。
+  sls-px4-hover-cal PX4 SITL 定推力悬停标定；仅仿真，需显式给 controller_hover_thrust。
   sls-circle-mission-dry dry-run 检查起飞后绕圈状态机。
   sls-takeoff-hold-dry dry-run 检查起飞后定点悬停状态机。
   sls-real-check   只读采样 MAVROS、位姿、SLS 状态和 setpoint 话题。
@@ -140,6 +151,7 @@ usage() {
   ./run_echo_drone.sh mavros-check
   ./run_echo_drone.sh mavros-point-check
   ./run_echo_drone.sh mavros-baud-scan
+  ./run_echo_drone.sh local-position-monitor
   ./run_echo_drone.sh sensing-check
   ./run_echo_drone.sh livox
   ./run_echo_drone.sh pointlio rviz:=false
@@ -149,11 +161,21 @@ usage() {
   ./run_echo_drone.sh rviz
   ./run_echo_drone.sh rviz-soft
   ./run_echo_drone.sh nav-test append
+  # 无 PX4 的快速点质量闭环（不启动 Gazebo）
   ./run_echo_drone.sh sls-circle-sim
-  ./run_echo_drone.sh sls-circle-gazebo
+  # 无 PX4 的 Gazebo 闭环：先验证基础 PD 悬停/轨迹，不加风扰
+  ./run_echo_drone.sh sls-circle-gazebo gui:=true controller_mode:=pd enable_anti_wind:=false enable_wind:=false
+  # 无 PX4 的 Gazebo 抗风验证：显式打开补偿增益；在另一终端运行 sls-wind-gui 调节风向和大小
+  ./run_echo_drone.sh sls-circle-gazebo gui:=true controller_mode:=pd enable_anti_wind:=true wind_compensation_gain:=0.7 enable_wind:=true
+  ./run_echo_drone.sh sls-wind-gui
   ./run_echo_drone.sh sls-circle-gazebo use_load_pose:=true gui:=false
   PX4_DIR=/home/sfx/PX4-Autopilot ./run_echo_drone.sh sls-px4-sitl
+  # PX4 SITL 定推力标定：逐次改 0.56 / 0.58 / 0.60 / 0.62，观察垂向速度
+  ./run_echo_drone.sh sls-px4-hover-cal controller_hover_thrust:=0.58
   ./run_echo_drone.sh sls-circle-dry
+  # 新的目标点直达 SLS 链路：三终端分别启动视觉位姿桥、SLS 和决策。
+  ./run_echo_drone.sh mavros-vision
+  ./run_echo_drone.sh sls-rviz-goal
   ./run_echo_drone.sh sls-circle-mission-dry
   ./run_echo_drone.sh sls-takeoff-hold-dry
   ./run_echo_drone.sh sls-real-check
@@ -496,7 +518,19 @@ normalize_mode() {
       export CONFIRM_SLS_AUTO_TAKEOFF=I_UNDERSTAND
       MODE="sls-point-real-auto"
       ;;
+    real-position-circle|sls-position-circle-real-go)
+      export CONFIRM_SLS_REAL_CONTROL=I_UNDERSTAND
+      MODE="sls-position-circle-real"
+      ;;
+    position-circle)
+      export CONFIRM_SLS_REAL_CONTROL=I_UNDERSTAND
+      MODE="sls-position-circle-real"
+      ;;
     real-swing|sls-swing-real-go)
+      export CONFIRM_SLS_REAL_CONTROL=I_UNDERSTAND
+      MODE="sls-swing-real"
+      ;;
+    sls-circle)
       export CONFIRM_SLS_REAL_CONTROL=I_UNDERSTAND
       MODE="sls-swing-real"
       ;;
@@ -513,6 +547,10 @@ normalize_mode() {
       export CONFIRM_SLS_REAL_CONTROL=I_UNDERSTAND
       export CONFIRM_SLS_AUTO_TAKEOFF=I_UNDERSTAND
       MODE="sls-swing-wind-real-auto"
+      ;;
+    real-wind-hold|sls-wind-hold-real-go)
+      export CONFIRM_SLS_REAL_CONTROL=I_UNDERSTAND
+      MODE="sls-wind-hold-real"
       ;;
     real-hold|sls-takeoff-hold-real-go)
       export CONFIRM_SLS_REAL_CONTROL=I_UNDERSTAND
@@ -740,6 +778,28 @@ case "$MODE" in
     echo "Full check logs: ${tmp_dir}"
     ;;
 
+  local-position-monitor|local-position-check|vision-position-monitor)
+    source_env
+    python3 "${WS_DIR}/tools/local_position_monitor.py" \
+      --topic "${LOCAL_POSITION_TOPIC:-/mavros/mavros/pose}" \
+      --min-rate "${LOCAL_POSITION_MIN_RATE:-5.0}" \
+      --stale-timeout "${LOCAL_POSITION_STALE_TIMEOUT:-1.0}" \
+      --report-period "${LOCAL_POSITION_REPORT_PERIOD:-1.0}" \
+      --window "${LOCAL_POSITION_RATE_WINDOW:-5.0}" \
+      "${@:2}"
+    ;;
+
+  fcu-position-monitor|fcu-position-check)
+    source_env
+    python3 "${WS_DIR}/tools/local_position_monitor.py" \
+      --topic "${FCU_POSITION_TOPIC:-/mavros/local_position/pose}" \
+      --min-rate "${LOCAL_POSITION_MIN_RATE:-5.0}" \
+      --stale-timeout "${LOCAL_POSITION_STALE_TIMEOUT:-1.0}" \
+      --report-period "${LOCAL_POSITION_REPORT_PERIOD:-1.0}" \
+      --window "${LOCAL_POSITION_RATE_WINDOW:-5.0}" \
+      "${@:2}"
+    ;;
+
   mavros-baud-scan|mavros-scan)
     source_env
     print_devices
@@ -953,6 +1013,16 @@ case "$MODE" in
     run_launch behavior_control behavior_control.launch.py params_file:="$DRONE_PARAMS" "${@:2}"
     ;;
 
+  # 最终目标点不交给 Nav2，而是交给 SLS 求解速度参考；飞控桥负责唯一的 MAVROS 速度输出。
+  behavior-sls-goal)
+    source_env
+    run_launch behavior_control behavior_control.launch.py \
+      params_file:="$DRONE_PARAMS" \
+      navigation_execution_mode:=sls_goal \
+      takeoff_circle_enabled:=false \
+      "${@:2}"
+    ;;
+
   mission-dry)
     source_env
     clean_fastdds_shm_if_requested
@@ -985,6 +1055,36 @@ case "$MODE" in
       "${@:2}"
     ;;
 
+  # 仅输出内部 /sls_circle/nav_velocity_setpoint；不直接写 MAVROS 姿态或位置话题。
+  sls-nav-goal)
+    source_env
+    run_launch sls_circle_controller sls_circle.launch.py \
+      dry_run:=false \
+      enable_real_setpoint:=false \
+      mission_mode:=nav_goal_velocity \
+      require_connected:=true \
+      "${@:2}"
+    ;;
+
+  # RViz 默认 SetGoal 工具发布 PoseStamped 到 /goal_pose；SLS 目标有效时自行激活
+  # adapter 的唯一速度输出源，因此此模式不需要 behavior_control。RViz 目标只发
+  # 一次，故保留一小时；下一次点击会覆盖旧目标。
+  sls-rviz-goal)
+    source_env
+    run_launch sls_circle_controller sls_circle.launch.py \
+      dry_run:=false \
+      enable_real_setpoint:=false \
+      mission_mode:=nav_goal_velocity \
+      nav_goal_topic:=/goal_pose \
+      nav_goal_stale_timeout:=3600.0 \
+      publish_sls_goal_control_active:=true \
+      require_connected:=true \
+      # 先预发布位置/姿态 setpoint，再由遥控器切 OFFBOARD 和解锁。
+      require_offboard:=false \
+      require_armed:=false \
+      "${@:2}"
+    ;;
+
   sls-circle-sim)
     source_env
     run_launch sls_circle_controller sls_circle_sim.launch.py "${@:2}"
@@ -996,10 +1096,26 @@ case "$MODE" in
     run_launch sls_circle_controller sls_circle_gazebo.launch.py "${@:2}"
     ;;
 
+  sls-wind-gui)
+    source_env
+    ros2 run sls_circle_controller wind_control_gui "${@:2}"
+    ;;
+
   sls-px4-sitl)
     source_env
     prepare_gazebo_env
     run_launch sls_circle_controller px4_sitl_sls.launch.py "${@:2}"
+    ;;
+
+  sls-px4-hover-cal)
+    source_env
+    prepare_gazebo_env
+    run_launch sls_circle_controller px4_sitl_sls.launch.py \
+      mission_mode:=takeoff_then_hold \
+      controller_mode:=thrust_calibration \
+      enable_anti_wind:=false \
+      enable_sitl_thrust_calibration:=true \
+      "${@:2}"
     ;;
 
   sls-circle-mission-dry)
@@ -1009,6 +1125,8 @@ case "$MODE" in
       enable_real_setpoint:=false \
       mission_mode:=takeoff_then_circle \
       controller_mode:=qsf \
+      qsf_position_z_control:=true \
+      hover_thrust:=0.35 \
       enable_anti_wind:=true \
       post_takeoff_hold_time:=5.0 \
       "${@:2}"
@@ -1059,6 +1177,10 @@ case "$MODE" in
     run_launch sls_circle_controller sls_circle.launch.py \
       dry_run:=false \
       enable_real_setpoint:=false \
+      pose_topic:="${SLS_REAL_POSE_TOPIC}" \
+      use_velocity_topic:=false \
+      takeoff_pose_topic:=/mavros/mavros/local \
+      arming_service:=/mavros/mavros/arming \
       mission_mode:=takeoff_then_hold \
       controller_mode:=pd \
       enable_anti_wind:=false \
@@ -1078,6 +1200,10 @@ case "$MODE" in
     run_launch sls_circle_controller sls_circle.launch.py \
       dry_run:=false \
       enable_real_setpoint:=false \
+      pose_topic:="${SLS_REAL_POSE_TOPIC}" \
+      use_velocity_topic:=false \
+      takeoff_pose_topic:=/mavros/mavros/local \
+      arming_service:=/mavros/mavros/arming \
       mission_mode:=takeoff_then_hold \
       controller_mode:=pd \
       enable_anti_wind:=false \
@@ -1092,20 +1218,56 @@ case "$MODE" in
       "${@:2}"
     ;;
 
+  sls-position-circle-real)
+    require_sls_real_control "$MODE" "持续写 /mavros/mavros/local 位置圆轨迹"
+    source_env
+    run_launch sls_circle_controller sls_circle.launch.py \
+      dry_run:=false \
+      enable_real_setpoint:=true \
+      pose_topic:="${SLS_REAL_POSE_TOPIC}" \
+      use_velocity_topic:=false \
+      takeoff_pose_topic:=/mavros/mavros/local \
+      mission_mode:=takeoff_then_circle \
+      controller_mode:=position \
+      publish_sls_goal_control_active:=true \
+      control_rate:=20.0 \
+      takeoff_altitude:=0.6 \
+      post_takeoff_hold_time:=3.0 \
+      radius:=0.5 \
+      angular_velocity:=0.2 \
+      circle_loops:=1.0 \
+      enable_anti_wind:=false \
+      wind_compensation_gain:=0.0 \
+      use_load_pose:=false \
+      require_connected:=true \
+      require_offboard:=false \
+      require_armed:=false \
+      enable_mavros_services:=false \
+      auto_offboard:=false \
+      auto_arm:=false \
+      "${@:2}"
+    ;;
+
   sls-swing-real)
     require_sls_real_control "$MODE" "写 /mavros/setpoint_position/local 和 /mavros/setpoint_raw/attitude"
     source_env
     run_launch sls_circle_controller sls_circle.launch.py \
       dry_run:=false \
       enable_real_setpoint:=true \
+      pose_topic:="${SLS_REAL_POSE_TOPIC}" \
+      use_velocity_topic:=false \
+      takeoff_pose_topic:=/mavros/mavros/local \
       mission_mode:=takeoff_then_circle \
       controller_mode:=qsf \
+      qsf_position_z_control:=true \
+      hover_thrust:=0.35 \
+      publish_sls_goal_control_active:=true \
       enable_anti_wind:=false \
       wind_compensation_gain:=0.0 \
       post_takeoff_hold_time:=5.0 \
       require_connected:=true \
-      require_offboard:=true \
-      require_armed:=true \
+      require_offboard:=false \
+      require_armed:=false \
       enable_mavros_services:=false \
       "${@:2}"
     ;;
@@ -1119,6 +1281,8 @@ case "$MODE" in
       enable_real_setpoint:=true \
       mission_mode:=takeoff_then_circle \
       controller_mode:=qsf \
+      qsf_position_z_control:=true \
+      hover_thrust:=0.35 \
       enable_anti_wind:=false \
       wind_compensation_gain:=0.0 \
       post_takeoff_hold_time:=5.0 \
@@ -1134,11 +1298,18 @@ case "$MODE" in
   sls-swing-wind-real)
     require_sls_real_control "$MODE" "写 /mavros/setpoint_position/local 和 /mavros/setpoint_raw/attitude"
     source_env
+    # 先预发布 setpoint，再由遥控器切入 OFFBOARD/解锁，避免 OFFBOARD 前无 setpoint 的死循环。
     run_launch sls_circle_controller sls_circle.launch.py \
       dry_run:=false \
       enable_real_setpoint:=true \
+      pose_topic:="${SLS_REAL_POSE_TOPIC}" \
+      use_velocity_topic:=false \
+      takeoff_pose_topic:=/mavros/mavros/local \
       mission_mode:=takeoff_then_circle \
       controller_mode:=qsf \
+      qsf_position_z_control:=true \
+      hover_thrust:=0.35 \
+      publish_sls_goal_control_active:=true \
       enable_anti_wind:=true \
       wind_estimator_mode:=residual \
       wind_compensation_gain:=1.0 \
@@ -1146,8 +1317,8 @@ case "$MODE" in
       wind_compensation_ramp_time:=5.0 \
       post_takeoff_hold_time:=5.0 \
       require_connected:=true \
-      require_offboard:=true \
-      require_armed:=true \
+      require_offboard:=false \
+      require_armed:=false \
       enable_mavros_services:=false \
       "${@:2}"
     ;;
@@ -1173,6 +1344,37 @@ case "$MODE" in
       enable_mavros_services:=true \
       auto_offboard:=true \
       auto_arm:=true \
+      "${@:2}"
+    ;;
+
+  sls-wind-hold-real)
+    require_sls_real_control "$MODE" "先发位置起飞点，稳定后写QSF/SLS抗风姿态和推力setpoint"
+    source_env
+    # 先预发布 setpoint，再由遥控器切入 OFFBOARD/解锁，避免 OFFBOARD 前无 setpoint 的死循环。
+    run_launch sls_circle_controller sls_circle.launch.py \
+      dry_run:=false \
+      enable_real_setpoint:=true \
+      pose_topic:="${SLS_REAL_POSE_TOPIC}" \
+      use_velocity_topic:=false \
+      takeoff_pose_topic:=/mavros/mavros/local \
+      mission_mode:=takeoff_then_wind_hold \
+      controller_mode:=qsf \
+      publish_sls_goal_control_active:=true \
+      takeoff_altitude:=0.6 \
+      takeoff_settle_time:=2.0 \
+      post_takeoff_hold_time:=3.0 \
+      enable_anti_wind:=true \
+      wind_estimator_mode:=residual \
+      wind_compensation_gain:=1.0 \
+      wind_compensation_warmup_time:=5.0 \
+      wind_compensation_ramp_time:=5.0 \
+      use_load_pose:=false \
+      require_connected:=true \
+      require_offboard:=false \
+      require_armed:=false \
+      enable_mavros_services:=false \
+      auto_offboard:=false \
+      auto_arm:=false \
       "${@:2}"
     ;;
 

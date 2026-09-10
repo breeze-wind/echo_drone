@@ -162,8 +162,14 @@
     <child>battery</child>
     <parent>px4vision::base_link</parent>
   </joint>   -->
-  <!-- 历史 SLS force 插件声明，当前 ROS2 主路径主要通过 MAVROS setpoint 控制 PX4 SITL。 -->
-  <plugin name="sls_force_control" filename="libgazebo_sls_force_control_plugin.so"/>
+  <!-- GUI 风力只作为 Gazebo 外扰；姿态和电机仍由 PX4 SITL 闭环控制。 -->
+  <plugin name="px4_gazebo_wind_force" filename="libgazebo_ros_force.so">
+    <ros>
+      <remapping>gazebo_ros_force:=/sls_circle/px4_wind_force</remapping>
+    </ros>
+    <link_name>px4vision_ancl::base_link</link_name>
+    <force_frame>world</force_frame>
+  </plugin>
 
 
   </model>

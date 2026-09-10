@@ -139,11 +139,17 @@ gazebo_mavros_bridge:
     attitude_target_topic: "/sls_circle/debug/attitude_target"
     force_topic: "/sls_circle/gazebo_force"
     wind_actual_topic: "/sls_circle/wind_actual"
+    wind_command_topic: "/sls_circle/wind_command"
     frame_id: "map"
-    mass: 1.56
+    # Gazebo force 作用于机体并承担机体、0.01 kg 吊绳和 0.25 kg 负载总重量。
+    mass: 1.82
     gravity: 9.80665
     hover_thrust: 0.5
     max_force: 60.0
+    # 简化仿真没有 PX4 姿态内环，桥接器用受限四元数 PD 力矩保持机体姿态。
+    attitude_kp: 1.2
+    attitude_kd: 0.30
+    max_torque: 1.0
     state_rate: 100.0
     # 代码内模拟风：默认只给水平风，wind_force_z 应保持 0。
     enable_wind: true
@@ -152,5 +158,6 @@ gazebo_mavros_bridge:
     wind_force_z: 0.0
     wind_turbulence: 0.03
     wind_change_rate: 0.3
+    wind_command_force_limit: 5.0
     enable_wind_debug_log: true
     wind_debug_log_period: 1.0

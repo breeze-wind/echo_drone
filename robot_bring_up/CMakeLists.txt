@@ -23,6 +23,6 @@ endif()
 ament_package()
 
 install(
-  DIRECTORY launch config maps
+  DIRECTORY launch config maps behavior_trees
   DESTINATION share/${PROJECT_NAME}
 )

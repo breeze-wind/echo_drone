@@ -103,13 +103,6 @@ def generate_launch_description():
         name='map_to_odom_broadcaster',
         arguments=['0.0', '0.0', '0.39',  '0.0', '0.0', '0.0', '1.0','map', 'odom']
     )
-    # livox_raw -> livox: x'=-y, y'=x, z'=z (+90deg rotation about z)
-    livox_raw_to_livox = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='livox_raw_to_livox_broadcaster',
-        arguments=['0.0', '0.0', '0.0',  '0.0', '0.0', '0.7071068', '0.7071068','livox_raw', 'livox']
-    )
     livox_to_mavlink_body = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -129,7 +122,6 @@ def generate_launch_description():
     # 我尝试下来，在lio启动时，系统不能负载太高，因此，选择在lio启动后再启动其他节点，这个时间可以根据实际情况调整
     list = [
         map_to_odom,
-        livox_raw_to_livox,
         livox_driver_launch,
         declare_launch_gazebo,
         declare_yaml_path,

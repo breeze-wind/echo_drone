@@ -47,7 +47,8 @@ def generate_launch_description():
             'data_src': 0,
             'publish_freq': 10.0,
             'output_data_type': 0,
-            'frame_id': 'livox_frame',
+            # MID360S and Point-LIO now use the same aligned LiDAR frame.
+            'frame_id': 'livox',
             'user_config_path': livox_config,
             'cmdline_input_bd_code': 'livox0000000001',
         }],
@@ -122,18 +123,6 @@ def generate_launch_description():
             '0.0', '0.0', '0.39',
             '0.0', '0.0', '0.0', '1.0',
             'map', 'odom',
-        ],
-        condition=IfCondition(launch_static_tf),
-    )
-
-    livox_raw_to_livox = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='livox_raw_to_livox_broadcaster',
-        arguments=[
-            '0.0', '0.0', '0.0',
-            '0.0', '0.0', '0.7071068', '0.7071068',
-            'livox_raw', 'livox',
         ],
         condition=IfCondition(launch_static_tf),
     )
@@ -221,7 +210,6 @@ def generate_launch_description():
             description='是否让 Point-LIO 使用先验 PCD map 初始化。',
         ),
         map_to_odom,
-        livox_raw_to_livox,
         livox_to_mavlink_body,
         livox_to_camera,
         livox_driver_launch,

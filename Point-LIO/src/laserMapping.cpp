@@ -592,7 +592,12 @@ bool LaserMappingNode::sync_packages(MeasureGroup &meas)
     }
     if (last_timestamp_imu < lidar_end_time)//imu时间早于lidar时间
     {
-        RCLCPP_ERROR(get_logger(), "lidar_end_time < last_timestamp_imu");
+        // This is a normal synchronization wait: the newest IMU sample has
+        // not reached the end of the current lidar scan yet.  Do not emit an
+        // ERROR on every retry, especially on resource-constrained Jetson.
+        RCLCPP_DEBUG_THROTTLE(
+            get_logger(), *get_clock(), 1000,
+            "waiting for IMU to reach lidar_end_time");
         return false;
     }
     if (p_imu->imu_need_init_) //imu需要初始化

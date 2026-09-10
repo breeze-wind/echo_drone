@@ -48,6 +48,25 @@ def legacy_passing_door_velocity(cmd_x, cmd_y, current_height, target_height, pi
     return ned_xyz_to_mavros_enu(vx_ned, vy_ned, vz_ned)
 
 
+def body_velocity_to_map_enu(vx_body, vy_body, yaw_enu):
+    """把 ROS FLU 机体系水平速度旋转到 map ENU。"""
+    cos_yaw = math.cos(yaw_enu)
+    sin_yaw = math.sin(yaw_enu)
+    return (
+        cos_yaw * vx_body - sin_yaw * vy_body,
+        sin_yaw * vx_body + cos_yaw * vy_body,
+    )
+
+
+def limit_planar_velocity(vx, vy, max_speed):
+    """按向量模长限制水平速度，避免两个轴同时饱和后超出总限速。"""
+    speed = math.hypot(vx, vy)
+    if max_speed <= 0.0 or speed <= max_speed:
+        return vx, vy
+    scale = max_speed / speed
+    return vx * scale, vy * scale
+
+
 def mavros_enu_yaw_for_legacy_ned_yaw(yaw_ned):
     """返回会被 MAVROS 转回旧 NED 航向角的 ENU 航向角。"""
     return math.pi / 2.0 - yaw_ned

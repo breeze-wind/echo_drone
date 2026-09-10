@@ -216,6 +216,9 @@ def _setup(context):
             'target_system_id': int(LaunchConfiguration('tgt_system').perform(context)),
             'target_component_id': int(LaunchConfiguration('tgt_component').perform(context)),
             'fcu_protocol': LaunchConfiguration('fcu_protocol'),
+            # setpoint_raw 的归一化推力（0..1）必须显式开启，否则 MAVROS 会丢弃
+            # AttitudeTarget.thrust，PX4 随后会因 OFFBOARD 指令失效进入 failsafe。
+            'setpoint_raw/thrust_scaling': 1.0,
         })
         actions.append(Node(
             package='mavros',
@@ -240,6 +243,13 @@ def _setup(context):
                 '-p', 'enable_real_setpoint:=' + LaunchConfiguration('enable_real_setpoint').perform(context),
                 '-p', 'mission_mode:=' + LaunchConfiguration('mission_mode').perform(context),
                 '-p', 'controller_mode:=' + LaunchConfiguration('controller_mode').perform(context),
+                # 当前 Foxy MAVROS 2 将 FCU 位姿/速度发布到二级 mavros 命名空间；
+                # /mavros/local_position/pose 在该版本反而是插件的输入端，不能用于状态反馈。
+                '-p', 'pose_topic:=' + LaunchConfiguration('mavros_pose_topic').perform(context),
+                '-p', 'velocity_topic:=' + LaunchConfiguration('mavros_velocity_topic').perform(context),
+                '-p', 'takeoff_pose_topic:=' + LaunchConfiguration('mavros_position_setpoint_topic').perform(context),
+                '-p', 'real_attitude_topic:=' + LaunchConfiguration('mavros_attitude_setpoint_topic').perform(context),
+                '-p', 'arming_service:=' + LaunchConfiguration('mavros_arming_service').perform(context),
                 '-p', 'enable_anti_wind:=' + LaunchConfiguration('enable_anti_wind').perform(context),
                 '-p', 'require_connected:=' + LaunchConfiguration('require_connected').perform(context),
                 '-p', 'require_offboard:=' + LaunchConfiguration('require_offboard').perform(context),
@@ -248,6 +258,11 @@ def _setup(context):
                 '-p', 'auto_offboard:=' + LaunchConfiguration('auto_offboard').perform(context),
                 '-p', 'auto_arm:=' + LaunchConfiguration('auto_arm').perform(context),
                 '-p', 'post_takeoff_hold_time:=' + LaunchConfiguration('post_takeoff_hold_time').perform(context),
+                # 仅 SITL：带吊载模型的实际悬停归一化推力高于裸机默认值。
+                '-p', 'hover_thrust:=' + LaunchConfiguration('controller_hover_thrust').perform(context),
+                # 定推力悬停标定是 SITL 专用诊断，默认关闭且需要显式确认。
+                '-p', 'allow_fixed_thrust_calibration:=' +
+                LaunchConfiguration('enable_sitl_thrust_calibration').perform(context),
             ],
         ))
 
@@ -256,12 +271,15 @@ def _setup(context):
 
 def generate_launch_description():
     package_share = Path(get_package_share_directory('sls_circle_controller'))
+    local_px4 = Path.home() / 'PX4-Autopilot'
+    default_px4_root = os.environ.get(
+        'PX4_DIR', str(local_px4) if local_px4.exists() else '')
     default_params = str(package_share / 'config' / 'sls_circle.yaml')
     default_mavros_config = str(package_share / 'config' / 'mavros_px4_sitl.yaml')
 
     return LaunchDescription([
         # PX4/Gazebo 资源路径参数。
-        DeclareLaunchArgument('px4_root', default_value=os.environ.get('PX4_DIR', '')),
+        DeclareLaunchArgument('px4_root', default_value=default_px4_root),
         DeclareLaunchArgument('px4_bin', default_value=os.environ.get('PX4_BIN', '')),
         DeclareLaunchArgument('px4_etc', default_value=os.environ.get('PX4_ETC', '')),
         DeclareLaunchArgument('px4_model_path', default_value=os.environ.get('PX4_GAZEBO_MODEL_PATH', '')),
@@ -269,7 +287,7 @@ def generate_launch_description():
         DeclareLaunchArgument('extra_model_path', default_value=''),
         DeclareLaunchArgument('extra_plugin_path', default_value=''),
         # PX4 SITL 和 Gazebo 模型参数。
-        DeclareLaunchArgument('px4_sim_model', default_value='quadrotor_x'),
+        DeclareLaunchArgument('px4_sim_model', default_value='gazebo-classic_iris'),
         DeclareLaunchArgument('px4_estimator', default_value='ekf2'),
         DeclareLaunchArgument('world', default_value=''),
         DeclareLaunchArgument('model_variant', default_value='px4vision_sls'),
@@ -277,7 +295,8 @@ def generate_launch_description():
         DeclareLaunchArgument('entity_name', default_value='px4vision_0'),
         DeclareLaunchArgument('x', default_value='0.0'),
         DeclareLaunchArgument('y', default_value='0.0'),
-        DeclareLaunchArgument('z', default_value='0.0'),
+        # 吊载低于机体约 0.75 m，z=0 会让负载初始时穿入地面。
+        DeclareLaunchArgument('z', default_value='1.0'),
         DeclareLaunchArgument('roll', default_value='0.0'),
         DeclareLaunchArgument('pitch', default_value='0.0'),
         DeclareLaunchArgument('yaw', default_value='0.0'),
@@ -296,6 +315,21 @@ def generate_launch_description():
         DeclareLaunchArgument('tgt_system', default_value='1'),
         DeclareLaunchArgument('tgt_component', default_value='1'),
         DeclareLaunchArgument('fcu_protocol', default_value='v2.0'),
+        DeclareLaunchArgument(
+            'mavros_pose_topic',
+            default_value='/mavros/mavros/pose'),
+        DeclareLaunchArgument(
+            'mavros_velocity_topic',
+            default_value='/mavros/mavros/velocity_local'),
+        DeclareLaunchArgument(
+            'mavros_position_setpoint_topic',
+            default_value='/mavros/mavros/local'),
+        DeclareLaunchArgument(
+            'mavros_attitude_setpoint_topic',
+            default_value='/mavros/mavros/attitude'),
+        DeclareLaunchArgument(
+            'mavros_arming_service',
+            default_value='/mavros/mavros/arming'),
         DeclareLaunchArgument('params_file', default_value=default_params),
         # 控制器默认是真实 setpoint 语义，PX4 SITL 下会尝试 OFFBOARD/ARM 并执行起飞绕圈。
         DeclareLaunchArgument('controller_dry_run', default_value='false'),
@@ -310,5 +344,11 @@ def generate_launch_description():
         DeclareLaunchArgument('auto_offboard', default_value='true'),
         DeclareLaunchArgument('auto_arm', default_value='true'),
         DeclareLaunchArgument('post_takeoff_hold_time', default_value='5.0'),
+        DeclareLaunchArgument(
+            'controller_hover_thrust', default_value='0.50',
+            description='仅 PX4 SITL 控制器的归一化悬停推力，不影响实机默认参数。'),
+        DeclareLaunchArgument(
+            'enable_sitl_thrust_calibration', default_value='false',
+            description='仅 PX4 SITL：允许 controller_mode=thrust_calibration 输出固定推力。'),
         OpaqueFunction(function=_setup),
     ])

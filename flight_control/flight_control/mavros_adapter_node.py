@@ -19,8 +19,9 @@ from std_msgs.msg import Bool, String
 from .conversions import (
     LEGACY_COORDINATE_MODE,
     MAVROS_ENU_COORDINATE_MODE,
-    legacy_nav_velocity,
-    legacy_passing_door_velocity,
+    body_velocity_to_map_enu,
+    euler_from_quaternion_msg,
+    limit_planar_velocity,
     legacy_target_position,
     legacy_vision_orientation_to_mavros_enu,
     legacy_vision_pose_position,
@@ -60,8 +61,12 @@ class MavrosAdapter(Node):
         self.fcu_reference_z_offset = float(
             self._param('fcu_reference_z_offset', 0.08))
         self.vision_pose_z_offset = float(
-            self._param('vision_pose_z_offset', 0.31))
+            self._param('vision_pose_z_offset', 0.0))
         self.pid_height = float(self._param('pid_height', 0.65))
+        self.nav_max_horizontal_speed = float(
+            self._param('nav_max_horizontal_speed', 0.3))
+        self.nav_max_yaw_rate = float(
+            self._param('nav_max_yaw_rate', 0.3))
 
         # 定时器和过期门限用于调试：状态持续发布，但位姿或命令过期时
         # 不再向 MAVROS 发布 setpoint。
@@ -70,6 +75,8 @@ class MavrosAdapter(Node):
             self._param('setpoint_republish_period', 0.1))
         self.setpoint_stale_timeout = float(
             self._param('setpoint_stale_timeout', 1.0))
+        self.sls_control_lease_timeout = float(
+            self._param('sls_control_lease_timeout', 0.5))
         self.pose_stale_timeout = float(
             self._param('pose_stale_timeout', 1.0))
 
@@ -118,6 +125,12 @@ class MavrosAdapter(Node):
         target_pose_topic = str(
             self._param('target_pose_topic', '/robot/target_pose'))
         cmd_vel_topic = str(self._param('cmd_vel_topic', '/cmd_vel'))
+        sls_velocity_setpoint_topic = str(
+            self._param('sls_velocity_setpoint_topic',
+                        '/sls_circle/nav_velocity_setpoint'))
+        sls_goal_control_topic = str(
+            self._param('sls_goal_control_topic',
+                        '/robot/sls_goal_control_active'))
         nav_state_topic = str(
             self._param('nav_state_topic', '/robot/nav_state'))
         passing_door_state_topic = str(
@@ -155,6 +168,11 @@ class MavrosAdapter(Node):
             self.target_pose_callback, 10)
         self.cmd_vel_sub = self.create_subscription(
             Twist, cmd_vel_topic, self.cmd_vel_callback, 10)
+        self.sls_velocity_setpoint_sub = self.create_subscription(
+            TwistStamped, sls_velocity_setpoint_topic,
+            self.sls_velocity_setpoint_callback, 10)
+        self.sls_goal_control_sub = self.create_subscription(
+            Bool, sls_goal_control_topic, self.sls_goal_control_callback, 10)
         self.nav_state_sub = self.create_subscription(
             Bool, nav_state_topic, self.nav_state_callback, 10)
         self.passing_door_state_sub = self.create_subscription(
@@ -178,19 +196,26 @@ class MavrosAdapter(Node):
 
         # 从 behavior_control 缓存的任务模式开关。
         self.if_nav = True
+        self.sls_goal_control_active = False
+        self.last_sls_goal_control_time = None
         self.current_passing_door = False
         self.if_turning = False
 
         # 最近输入样本及其年龄会发布到 status_topic，便于调试。
         self.current_height_feedback = None
         self.current_fcu_height_feedback = None
+        self.current_map_yaw = None
         self.last_current_pose_time = None
         self.latest_cmd_vel = None
         self.latest_cmd_vel_time = None
+        self.latest_sls_velocity_setpoint = None
+        self.latest_sls_velocity_setpoint_time = None
         self.latest_target_pose = None
         self.latest_target_pose_time = None
         self.last_setpoint_kind = 'none'
         self.last_setpoint_time = None
+        self.last_velocity_gate_reason = 'not_started'
+        self.last_velocity_output = [0.0, 0.0, 0.0, 0.0]
 
         # 服务调用状态用于避免重复刷屏式请求解锁或切模式。
         self.ready_to_arm = False
@@ -294,24 +319,40 @@ class MavrosAdapter(Node):
         pose.pose.position.x = x
         pose.pose.position.y = y
         pose.pose.position.z = z
+        _, _, self.current_map_yaw = euler_from_quaternion_msg(
+            pose.pose.orientation)
         self.vision_pose_pub.publish(pose)
 
     def cmd_vel_callback(self, msg):
         """缓存 Nav2 速度命令，并在导航模式下立即发布。"""
         self.latest_cmd_vel = msg
         self.latest_cmd_vel_time = self._now_seconds()
-        if self.if_nav:
+        if self.if_nav and not self.sls_goal_control_active:
             self._publish_velocity_setpoint()
 
     def target_pose_callback(self, msg):
         """缓存直接位置目标，并在非 Nav2 模式下立即发布。"""
         self.latest_target_pose = msg
         self.latest_target_pose_time = self._now_seconds()
-        if not self.if_nav:
+        if not self.if_nav and not self.sls_goal_control_active:
             self._publish_position_setpoint()
 
     def nav_state_callback(self, msg):
         self.if_nav = bool(msg.data)
+
+    def sls_goal_control_callback(self, msg):
+        """选择 SLS 最终目标速度源，避免与 Nav2 /cmd_vel 并发写飞控。"""
+        self.sls_goal_control_active = bool(msg.data)
+        self.last_sls_goal_control_time = self._now_seconds()
+        if self.sls_goal_control_active:
+            self._publish_sls_velocity_setpoint()
+
+    def sls_velocity_setpoint_callback(self, msg):
+        """缓存 SLS 的 ENU 速度参考；实际 MAVROS 输出仍由本桥接节点统一完成。"""
+        self.latest_sls_velocity_setpoint = msg
+        self.latest_sls_velocity_setpoint_time = self._now_seconds()
+        if self.sls_goal_control_active:
+            self._publish_sls_velocity_setpoint()
 
     def passing_door_state_callback(self, msg):
         self.current_passing_door = bool(msg.data)
@@ -321,7 +362,18 @@ class MavrosAdapter(Node):
 
     def setpoint_timer_callback(self):
         """重发最近有效 setpoint，并控制可选 MAVROS 服务调用。"""
-        if self.if_nav:
+        if (
+            self.sls_goal_control_active
+            and self._is_stale(
+                self.last_sls_goal_control_time,
+                self.sls_control_lease_timeout)
+        ):
+            # The external controller must renew its ownership lease.  If it
+            # exits or crashes, do not leave the adapter permanently muted.
+            self.sls_goal_control_active = False
+        if self.sls_goal_control_active:
+            self._publish_sls_velocity_setpoint()
+        elif self.if_nav:
             self._publish_velocity_setpoint()
         else:
             self._publish_position_setpoint()
@@ -348,6 +400,9 @@ class MavrosAdapter(Node):
             'mode': self.mode,
             'system_status': self.system_status,
             'nav_state': self.if_nav,
+            'sls_goal_control_active': self.sls_goal_control_active,
+            'last_sls_goal_control_age': self._age(
+                self.last_sls_goal_control_time),
             'passing_door': self.current_passing_door,
             'turning': self.if_turning,
             'ready_to_arm': self.ready_to_arm,
@@ -355,9 +410,14 @@ class MavrosAdapter(Node):
             'mode_request_inflight': self.mode_request_inflight,
             'last_current_pose_age': self._age(self.last_current_pose_time),
             'last_cmd_vel_age': self._age(self.latest_cmd_vel_time),
+            'last_sls_velocity_setpoint_age': self._age(
+                self.latest_sls_velocity_setpoint_time),
             'last_target_pose_age': self._age(self.latest_target_pose_time),
             'last_setpoint_kind': self.last_setpoint_kind,
             'last_setpoint_age': self._age(self.last_setpoint_time),
+            'last_velocity_gate_reason': self.last_velocity_gate_reason,
+            'latest_cmd_vel': self._twist_debug(self.latest_cmd_vel),
+            'last_velocity_output': self.last_velocity_output,
             'topics': {
                 'vision_pose': self.mavros_vision_pose_topic,
                 'position_setpoint': self.mavros_position_setpoint_topic,
@@ -371,39 +431,46 @@ class MavrosAdapter(Node):
         self.status_pub.publish(msg)
 
     def _publish_velocity_setpoint(self):
-        """根据缓存的 `/cmd_vel` 发布 MAVROS 速度 setpoint。"""
-        if self.latest_cmd_vel is None:
-            return
-        if self._is_stale(self.latest_cmd_vel_time,
-                          self.setpoint_stale_timeout):
-            return
+        """发布 MAVROS 速度 setpoint，并在 Nav2 空闲时维持零速度预热流。"""
         if self._is_stale(self.last_current_pose_time,
                           self.pose_stale_timeout):
+            self.last_velocity_gate_reason = 'pose_stale'
             return
 
-        cmd = self.latest_cmd_vel
-        if self.current_passing_door:
-            target_height = self.passing_door_height
-            current_height = self.current_height_feedback
-            if self.coordinate_mode == LEGACY_COORDINATE_MODE:
-                vx, vy, vz = legacy_passing_door_velocity(
-                    cmd.linear.x, cmd.linear.y, current_height,
-                    target_height, self.pid_height)
-            else:
-                vx = cmd.linear.x
-                vy = cmd.linear.y
-                vz = self.pid_height * (target_height - current_height)
+        cmd_active = (
+            self.latest_cmd_vel is not None
+            and not self._is_stale(
+                self.latest_cmd_vel_time, self.setpoint_stale_timeout)
+        )
+        cmd = self.latest_cmd_vel if cmd_active else Twist()
+
+        # Nav2 尚未收到目标或命令过期时，持续发布全零速度。这样 PX4 在遥控器
+        # 切入 OFFBOARD 前已有稳定 setpoint 流，同时不会自行爬升或水平移动。
+        if not cmd_active:
+            vx, vy, vz = 0.0, 0.0, 0.0
+            self.last_velocity_gate_reason = 'cmd_vel_missing_or_stale'
         else:
-            target_height = self.cruise_height
-            current_height = self.current_fcu_height_feedback
-            if self.coordinate_mode == LEGACY_COORDINATE_MODE:
-                vx, vy, vz = legacy_nav_velocity(
-                    cmd.linear.x, cmd.linear.y, current_height,
-                    target_height, self.pid_height)
+            # Nav2 Twist follows ROS base-frame semantics (x forward, y left),
+            # while MAVROS setpoint_velocity is configured as LOCAL_NED and
+            # consumes ROS map-ENU values. Rotate by the external-vision yaw
+            # before publishing; treating body velocity as map velocity makes
+            # commands turn with the wrong heading.
+            if self.current_map_yaw is None:
+                self.last_velocity_gate_reason = 'yaw_unavailable'
+                return
+            vx, vy = body_velocity_to_map_enu(
+                cmd.linear.x, cmd.linear.y, self.current_map_yaw)
+            vx, vy = limit_planar_velocity(
+                vx, vy, self.nav_max_horizontal_speed)
+
+            if self.current_passing_door:
+                target_height = self.passing_door_height
+                current_height = self.current_height_feedback
             else:
-                vx = cmd.linear.x
-                vy = cmd.linear.y
-                vz = self.pid_height * (target_height - current_height)
+                target_height = self.cruise_height
+                current_height = self.current_fcu_height_feedback
+            vz = self.pid_height * (target_height - current_height)
+            self.last_velocity_gate_reason = 'active'
 
         setpoint = TwistStamped()
         setpoint.header.stamp = self.get_clock().now().to_msg()
@@ -413,9 +480,14 @@ class MavrosAdapter(Node):
         setpoint.twist.linear.z = vz
         setpoint.twist.angular.x = 0.0
         setpoint.twist.angular.y = 0.0
-        setpoint.twist.angular.z = 0.0
+        setpoint.twist.angular.z = max(
+            -self.nav_max_yaw_rate,
+            min(self.nav_max_yaw_rate, cmd.angular.z if cmd_active else 0.0),
+        )
+        self.last_velocity_output = [
+            vx, vy, vz, setpoint.twist.angular.z]
         self.velocity_setpoint_pub.publish(setpoint)
-        self._mark_setpoint('velocity')
+        self._mark_setpoint('velocity' if cmd_active else 'velocity_idle')
 
     def _publish_position_setpoint(self):
         """根据缓存的 `/robot/target_pose` 发布 MAVROS 位置 setpoint。"""
@@ -456,9 +528,43 @@ class MavrosAdapter(Node):
         self.position_setpoint_pub.publish(setpoint)
         self._mark_setpoint('position')
 
+    def _publish_sls_velocity_setpoint(self):
+        """将 SLS 的 ENU 速度参考转发到 MAVROS，且不套用遗留 NED 转换。"""
+        if self._is_stale(self.last_current_pose_time,
+                          self.pose_stale_timeout):
+            return
+        if self._is_stale(self.latest_sls_velocity_setpoint_time,
+                          self.setpoint_stale_timeout):
+            return
+
+        source = self.latest_sls_velocity_setpoint
+        setpoint = TwistStamped()
+        setpoint.header.stamp = self.get_clock().now().to_msg()
+        setpoint.header.frame_id = self.frame_id
+        setpoint.twist.linear.x = source.twist.linear.x
+        setpoint.twist.linear.y = source.twist.linear.y
+        setpoint.twist.linear.z = source.twist.linear.z
+        setpoint.twist.angular.x = 0.0
+        setpoint.twist.angular.y = 0.0
+        setpoint.twist.angular.z = 0.0
+        self.velocity_setpoint_pub.publish(setpoint)
+        self._mark_setpoint('sls_goal_velocity')
+
     def _mark_setpoint(self, kind):
         self.last_setpoint_kind = kind
         self.last_setpoint_time = self._now_seconds()
+
+    @staticmethod
+    def _twist_debug(msg):
+        """Return a compact JSON-safe [vx, vy, vz, yaw_rate] snapshot."""
+        if msg is None:
+            return None
+        return [
+            msg.linear.x,
+            msg.linear.y,
+            msg.linear.z,
+            msg.angular.z,
+        ]
 
     def _is_stale(self, stamp_seconds, timeout_seconds):
         """判断缓存输入是否已经过期，不应继续驱动飞控。"""

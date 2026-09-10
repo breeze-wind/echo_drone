@@ -54,6 +54,10 @@ setup(
             'sls_circle_controller.fake_mavros_sim_node:main',
             'gazebo_mavros_bridge_node = '
             'sls_circle_controller.gazebo_mavros_bridge_node:main',
+            'gazebo_stability_validator = '
+            'sls_circle_controller.gazebo_stability_validator:main',
+            'wind_control_gui = '
+            'sls_circle_controller.wind_control_gui:main',
         ],
     },
 )

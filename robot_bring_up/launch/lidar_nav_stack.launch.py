@@ -18,9 +18,9 @@ def generate_launch_description():
     default_params = os.path.join(robot_bringup_path, 'config', 'drone.yaml')
     default_costmap_params = os.path.join(robot_bringup_path, 'config', 'sensing_costmap.yaml')
     default_bt_xml = os.path.join(
-        get_package_share_directory('nav2_bt_navigator'),
+        robot_bringup_path,
         'behavior_trees',
-        'navigate_w_replanning_and_recovery.xml',
+        'navigate_drone_replanning.xml',
     )
 
     params_file = LaunchConfiguration('params_file')
@@ -43,6 +43,7 @@ def generate_launch_description():
         ('/tf', 'tf'),
         ('/tf_static', 'tf_static'),
     ]
+    recovery_remappings = remappings + [('cmd_vel', '/nav/recovery_cmd_vel')]
 
     nav_params = [
         params_file,
@@ -123,7 +124,7 @@ def generate_launch_description():
             respawn_delay=2.0,
             parameters=nav_params,
             arguments=['--ros-args', '--log-level', log_level],
-            remappings=remappings),
+            remappings=recovery_remappings),
 
         Node(
             package='nav2_bt_navigator',

@@ -14,13 +14,18 @@ mavros_adapter:
     passing_door_height: 0.6
     height_feedback_z_offset: 0.39
     fcu_reference_z_offset: 0.08
-    vision_pose_z_offset: 0.31
+    vision_pose_z_offset: 0.0
     pid_height: 0.65
+    # Nav2 输出为 livox/base_link 机体系速度；adapter 会按当前视觉 yaw
+    # 旋转到 map ENU，并按向量模长限速后交给 MAVROS。
+    nav_max_horizontal_speed: 0.3
+    nav_max_yaw_rate: 0.3
 
     # 调试状态发布周期，以及 setpoint 输出的输入过期门限。
     status_period: 1.0
     setpoint_republish_period: 0.1
     setpoint_stale_timeout: 1.0
+    sls_control_lease_timeout: 0.5
     pose_stale_timeout: 1.0
 
     # 可选 RC 解锁桥；设为 false 时 adapter 不会根据 RC 请求解锁。
@@ -38,13 +43,14 @@ mavros_adapter:
     # 面向 MAVROS 的话题和服务。
     mavros_state_topic: "/mavros/state"
     mavros_rc_topic: "/mavros/rc/in"
-    mavros_arming_service: "/mavros/cmd/arming"
+    mavros_arming_service: "/mavros/mavros/arming"
     mavros_set_mode_service: "/mavros/set_mode"
-    # 当前 Foxy MAVROS 节点把 vision_pose 插件的私有 ~/pose 暴露成
-    # /mavros/mavros/pose；/mavros/vision_pose/pose 在这套环境里没有端点。
+    # Point-LIO 外部视觉输入：此 Foxy MAVROS 2.4 版本的 vision_pose 插件订阅
+    # /mavros/mavros/pose。local_position 插件会在相同私有名下发布 pose，不能
+    # 与它同时启用，否则 PX4 融合输出会被回灌成外部视觉输入。
     mavros_vision_pose_topic: "/mavros/mavros/pose"
-    mavros_position_setpoint_topic: "/mavros/setpoint_position/local"
-    mavros_velocity_setpoint_topic: "/mavros/setpoint_velocity/cmd_vel"
+    mavros_position_setpoint_topic: "/mavros/mavros/local"
+    mavros_velocity_setpoint_topic: "/mavros/mavros/cmd_vel"
 
     # 为 behavior_control 和 Point-LIO 保留的旧工作区接口。
     current_pose_topic: "/robot/current_pose"

@@ -144,7 +144,7 @@ laser_mapping:
             time_lag_imu_to_lidar: 0.0 # Time offset between LiDAR and IMU calibrated by other algorithms, e.g., LI-Init (find in Readme)
             # the timesample of IMU is transferred from the current timeline to LiDAR's timeline by subtracting this value
             map_frame: "odom"
-            odom_frame: "livox_raw"
+            odom_frame: "livox"
 
         preprocess:
             lidar_type: 1
@@ -185,7 +185,9 @@ laser_mapping:
         odometry:
             publish_odometry_without_downsample: false
         publish:
-            path_en: false #
+            # Publish the actual 3-D Point-LIO trajectory on /path for RViz.
+            # This is visualization-only and is not fed back into PX4/Nav2.
+            path_en: true
             scan_publish_en: true
             scan_bodyframe_pub_en: true
 
@@ -207,10 +209,21 @@ laser_mapping:
 controller_server:
     ros__parameters:
         odom_topic: "/Odometry"
-        controller_frequency: 15.0 # 运行控制器的频率 (赫兹)。
+        # TEB was repeatedly missing 10 Hz while Point-LIO and the point-cloud
+        # costmaps were active.  The MAVROS adapter republishes the latest safe
+        # setpoint, so a 5 Hz Nav2 planning loop is sufficient here.
+        controller_frequency: 5.0
+        progress_checker_plugin: "progress_checker"
         controller_plugin_types: ["teb_local_planner::TebLocalPlannerROS"]
         goal_checker_plugins: ["general_goal_checker"] # "precise_goal_checker"
         controller_plugins: ["FollowPath"]
+        progress_checker:
+            plugin: "nav2_controller::SimpleProgressChecker"
+            # A slow flying vehicle can legitimately hover while the global
+            # path/costmap is being refreshed.  Do not abort FollowPath after
+            # the short ground-robot default timeout.
+            required_movement_radius: 0.03
+            movement_time_allowance: 120.0
         general_goal_checker:
             stateful: True
             plugin: "nav2_controller::SimpleGoalChecker"
@@ -220,9 +233,9 @@ controller_server:
             plugin: teb_local_planner::TebLocalPlannerROS
 
             teb_autosize: 1.0
-            dt_ref: 0.15 # 所需的轨迹时间分辨率#3.17
-            dt_hysteresis: 0.02 # 根据当前时间分辨率自动调整大小的滞后，建议使用dt_ref的 10%#3.17
-            max_samples: 500
+            dt_ref: 0.4 # 所需的轨迹时间分辨率#3.17
+            dt_hysteresis: 0.04 # 根据当前时间分辨率自动调整大小的滞后，建议使用dt_ref的 10%#3.17
+            max_samples: 120
             min_samples: 3 # 最小采样数,大于2
             global_plan_overwrite_orientation: True # 覆盖全局规划器提供的局部子目标的方向（因为它们通常仅提供 2D 路径）
             allow_init_with_backwards_motion: False
@@ -234,20 +247,20 @@ controller_server:
             force_reinit_new_goal_angular: 0.78 #3.17
             min_resolution_collision_check_angular: 3.14159265 #3.17
             # control_look_ahead_poses:  TODO
-            exact_arc_length: True # 如果为 true，则规划器在速度、加速度和转弯速率计算中使用精确的弧长（-> 增加 CPU 时间），否则使用欧几里德近似。
+            exact_arc_length: False # 降低嵌入式平台上的TEB计算量，避免控制周期超时
             # feasibility_check_lookahead_distance:  TODO
             feasibility_check_no_poses: 1 # 指定每个采样间隔应检查预测计划上的哪个位姿的可行性。 3.17
             publish_feedback: False # 发布包含完整轨迹和活动障碍物列表的规划器反馈（应仅在评估或调试时启用）。3.17
 
             # Robot
 
-            max_vel_x: 0.65 # 机器人最大x轴速度m/s
-            max_vel_y: 0.65 # 机器人最大y轴速度m/s
-            max_vel_x_backwards: 1.0 # 机器人最大x轴后退速度m/s
-            max_vel_theta: 0.12 # 机器人最大角速度rad/s
-            acc_lim_x: 0.25 # 机器人最大x轴平移加速度m/s^2
-            acc_lim_y: 0.25 # 机器人最大y轴平移加速度m/s^2
-            acc_lim_theta: 0.15 # 机器人最大角加速度rad/s^2
+            max_vel_x: 0.25 # 首次无人机导航测试保守限速m/s
+            max_vel_y: 0.25
+            max_vel_x_backwards: 0.2
+            max_vel_theta: 0.2 # rad/s
+            acc_lim_x: 0.2 # m/s^2
+            acc_lim_y: 0.2
+            acc_lim_theta: 0.2 # rad/s^2
 
             min_turning_radius: 0.0 # 机器人最小转弯半径
 
