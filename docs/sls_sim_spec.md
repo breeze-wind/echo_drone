@@ -65,11 +65,79 @@ QSF 外环(SLS 节点) -> /mavros/setpoint_raw/attitude -> PX4 姿态环 -> PX4 
 3. **几何轨迹多数分支传 `t=0`**（`:362-403`），只有 `:408` 传 elapsed。这会让轨迹在多数任务阶段被冻结在 t=0，需确认是否本意。
 4. **死代码**：`:258-261` 的第一组速率 PID 增益立即被 `:263-266` 覆盖；`sgn()` / `sat()`（`:806-816`）在基础版里未被调用（滑模补偿只存在于 `_my_change.cc`）。
 
-## 5. 对齐进度
+## 5. 第 3 步结论：QSF 变体无需新增模式（已证明等价）
+
+逐行对比 `sls_qsf_core/src/generated/QSFController.cpp` 与 `QSFGeometricController.cpp`：
+**两者控制律完全相同**，差异只有函数签名、参考生成块、以及把参考项由入参换成内部计算。即
+
+```
+QSFGeometricController(z, k, param, [R,F,C,P], t, F)
+  ==  QSFController(z, k, param, ref_x[5], ref_y[5], ref_z[5], F)
+  ref_axis = [ C + R*sin(w*t + P),  R*F*cos(w*t + P), -R*F^2*sin(w*t + P),
+               -R*F^3*cos(w*t + P),  R*F^4*sin(w*t + P) ]，w = F
+```
+
+本工程的 `circle_reference_at()` 已经解析地生成同一形式的 5 阶参考，因此
+`controller_mode=qsf` + 圆周参考，与参考插件的 `QSFGeometricController` + 等价 `[R,F,C,P]`
+在数值上等价。映射关系：
+
+| 插件 ref | 本工程圆周参数 |
+|---|---|
+| `R_x = R_y = radius` | `radius` |
+| `F_x = F_y = angular_velocity / (2*pi)` | `angular_velocity` |
+| `P_x = phase + pi/2` | `phase`（x 轴用 cos） |
+| `P_y = phase` | `phase`（y 轴用 sin） |
+| `R_z = 0`、`C_z = -圆周平面高度` | 圆周平面高度 |
+
+**决定：不新增 `qsf_geometric` 模式。** 它只会复制一份已被证明等价的代码路径，且无法在本机编译验证。
+若后续需要**非圆轨迹**（椭圆 / 李萨如，即每轴不同 R 与 F），才需要该能力；届时建议只新增一个
+参考生成器并复用现有 `QSFController` 调用，比引入新的 C ABI 分支更安全。
+
+## 6. LESO 只能对齐一半（未对齐的部分及原因）
+
+已对齐：`wind_observer_bandwidth` 由 4.0 改为 **35.0**（参考插件 `:178` 的 `leso_wo_`）。
+三阶观测器的 `beta3` 与带宽立方成正比，原值实际差 670 倍，估计明显滞后。
+
+**未对齐，且需要机主决策：**
+
+1. **观测通道**：参考插件的 LESO 观测的是**负载**位置（`:436-443`，取自 `sls_state[0/1/2]`），
+   而本工程的 `leso` 模式观测机体 `pose_`。负载通道只有在**存在负载位姿反馈**时才有意义
+   （Gazebo 负载 odom，或实机加装负载传感器/视觉摆角）。实机没有该反馈，因此
+   实机默认仍是 `wind_estimator_mode=residual`（机体通道，本工程自有设计），
+   `wind_observer_bandwidth` 只在 `leso` 模式生效。
+2. **残差积分**：参考插件的 `Ki_res = 1.5`（`:459`）与 `:191-196` 的 **10 s 参考渐入**
+   配套使用。10 s 渐入尚未移植，因此 `wind_integral_gain` 继续保持 `0.0`。
+   **在补上渐入之前不要开启积分**，否则起步阶段会直接积分饱和。
+
+## 7. 第 6 步：内环等价验证清单（需在有 ROS2 / PX4 的机器上执行）
+
+```bash
+colcon build --packages-select sls_qsf_core sls_circle_controller_cpp sls_circle_controller --symlink-install
+./run_echo_drone.sh sls-circle-gazebo gui:=false                 # 只验证外环与话题，不代表内环
+PX4_DIR=/path/to/PX4-Autopilot ./run_echo_drone.sh sls-px4-sitl  # 内环等价平台
+```
+
+验收项：
+
+- `/sls_circle/status` 的 `controller_mode` = `qsf`、`qsf_core_loaded` = `true`
+- `actual_control_hz` / `command_publish_hz` / `pose_input_hz` 接近 `control_rate`
+- `/sls_circle/reference_pose` 与真实位姿的稳态跟随误差
+- **速率环响应**：与第 3 节内环契约的 `fcRate = 100 Hz` 量级对比；若 PX4 明显更慢，
+  外环调参结果不可外推
+- 风扰用例：`wind_estimator_mode:=residual` 且稳态时，`/sls_circle/status` 的
+  `wind_estimate_rel_error_xy_max` 应小于 `0.3`（注意要扣掉下面的已知偏差）
+
+**已知偏差**：估计器用 `mav_mass` 做加速度到力的换算，而 Gazebo 桥接把风作用在
+`mass = mav_mass + load_mass + 绳` 上，因此 `/sls_circle/wind_estimate` 系统性偏低约
+`1.51 / 1.82 = 17%`。**补偿本身不受影响**（补偿是加速度量，质量只在打印力时才乘），
+但验收该指标时必须扣掉这部分，否则会误判估计器不准。
+
+## 8. 对齐进度
 
 - [x] 建立权威规格（本文）
-- [ ] 外环参数对齐：QSF 增益、质量、力限幅
-- [ ] QSF 变体对齐：新增 `qsf_geometric` 模式（12 维轨迹参考接口）
-- [ ] LESO 对齐：负载观测通道 + `Ki_res=1.5` + 参考渐入
-- [ ] 仿真风模型对齐：常量力改为阻力模型
-- [ ] 内环等价验证：跑通 `sls-px4-sitl` 并记录速率环响应
+- [x] 外环参数对齐：QSF 增益、质量、力限幅
+- [x] QSF 变体对齐 —— 结论：已证明与现有 `qsf` 路径等价，无需新增模式（见第 5 节）
+- [x] LESO 带宽对齐；负载通道与残差积分受"实机无负载反馈"和"缺 10 s 渐入"限制（见第 6 节）
+- [x] 仿真风模型对齐：常量力 + 正弦 改为参考插件的线性阻力模型
+- [ ] 内环等价验证：跑通 `sls-px4-sitl` 并记录速率环响应（见第 7 节）
+- [ ] 待定：`mav_mass` 实机称重；`drown` 侧风坐标系 bug（`:526`）是否先修再当基准
