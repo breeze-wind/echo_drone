@@ -56,37 +56,41 @@ sls_circle_controller:
     yaw: 0.0
 
     # 兜底 PD 控制参数：QSF 失败或 controller_mode=pd 时使用。
+    # 下面的加速度限幅已对齐参考插件的 3*m*g 总推力限幅（换算为加速度即 3g），
+    # 因此不再构成约束；当前实际约束是 max_thrust 与 max_tilt_deg。
     kp_xy: 1.8
     kp_z: 2.5
     kd_xy: 1.4
     kd_z: 1.6
-    max_acc_xy: 2.5
-    max_acc_z: 2.0
-    max_total_acc: 4.0
+    max_acc_xy: 29.42
+    max_acc_z: 29.42
+    max_total_acc: 29.42
     max_tilt_deg: 25.0
     gravity: 9.80665
     hover_thrust: 0.5
     min_thrust: 0.05
     max_thrust: 0.85
 
-    # QSF/SLS 参数：质量、绳长和各轴增益必须与 ROS1/drown 版本和实机配置对齐。
+    # QSF/SLS 外环参数：权威值取自 drown 的 gazebo_sls_force_control_plugin.cc
+    # 的 K_[10] 与 param_[4]，对照表见 docs/sls_sim_spec.md。
+    # mav_mass 为参考仿真的取值，实机必须重新称重后覆盖。
     require_connected: true
     require_offboard: false
     require_armed: false
     controller_mode: "qsf"
-    mav_mass: 1.56
+    mav_mass: 1.51
     load_mass: 0.25
     cable_length: 0.85
-    qsf_kp_x: 10.0
-    qsf_kv_x: 5.0
-    qsf_ka_x: 0.0
-    qsf_kj_x: 0.0
-    qsf_kp_y: 10.0
-    qsf_kv_y: 5.0
-    qsf_ka_y: 0.0
-    qsf_kj_y: 0.0
-    qsf_kp_z: 20.0
-    qsf_kv_z: 10.0
+    qsf_kp_x: 24.0
+    qsf_kv_x: 50.0
+    qsf_ka_x: 35.0
+    qsf_kj_x: 10.0
+    qsf_kp_y: 24.0
+    qsf_kv_y: 50.0
+    qsf_ka_y: 35.0
+    qsf_kj_y: 10.0
+    qsf_kp_z: 2.0
+    qsf_kv_z: 3.0
     qsf_ki_x: 12.0
     qsf_ki_y: 12.0
     qsf_ki_z: 1.0
