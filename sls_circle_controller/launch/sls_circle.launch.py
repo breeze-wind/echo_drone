@@ -187,7 +187,7 @@ def generate_launch_description():
         DeclareLaunchArgument('nav_goal_max_speed_z', default_value='0.5'),
         DeclareLaunchArgument('nav_goal_tolerance', default_value='0.10'),
         DeclareLaunchArgument('use_load_pose', default_value='false'),
-        DeclareLaunchArgument('mav_mass', default_value='1.56'),
+        DeclareLaunchArgument('mav_mass', default_value='1.51'),
         DeclareLaunchArgument('load_mass', default_value='0.25'),
         DeclareLaunchArgument('cable_length', default_value='0.85'),
         DeclareLaunchArgument('qsf_reference_is_load', default_value='false'),
