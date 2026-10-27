@@ -99,12 +99,18 @@ sls_circle_controller:
     # 抗风估计与补偿：当前策略只允许水平 x/y 生效，z 轴扰动应在控制器内保持禁用或清零。
     enable_anti_wind: true
     wind_estimator_mode: "residual"
-    wind_observer_bandwidth: 4.0
+    # 参考插件 :178 的 leso_wo_ = 35.0 rad/s。
+    # 注意：参考插件的 LESO 观测的是【负载】位置（:436-443），只有存在负载位姿反馈的
+    # 场合（Gazebo 负载 odom 或负载传感器）才有意义。实机没有该反馈，因此实机默认走
+    # wind_estimator_mode=residual（机体通道），本参数只在 leso 模式下生效。
+    wind_observer_bandwidth: 35.0
     wind_estimate_filter_tau: 0.2
     wind_estimate_force_limit: 5.0
     wind_compensation_gain: 0.0
     wind_compensation_warmup_time: 10.0
     wind_compensation_ramp_time: 4.0
+    # 参考插件 :459,469 的残差积分是 Ki_res = 1.5，且配合 :191-196 的 10 s 参考渐入
+    # 一起使用。10 s 渐入尚未移植，因此这里保持 0.0；在补上渐入之前不要开启积分。
     wind_integral_gain: 0.0
     wind_integral_limit: 5.0
     enable_wind_debug_log: true

@@ -217,7 +217,7 @@ class SlsCircleController(Node):
             'qsf_reference_is_load': False,
             'enable_anti_wind': False,
             'wind_estimator_mode': 'residual',
-            'wind_observer_bandwidth': 4.0,
+            'wind_observer_bandwidth': 35.0,
             'wind_estimate_filter_tau': 0.5,
             'wind_estimate_force_limit': 5.0,
             'wind_compensation_gain': 0.7,

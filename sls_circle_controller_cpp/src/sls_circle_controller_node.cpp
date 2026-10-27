@@ -490,7 +490,7 @@ private:
     declare_parameter<bool>("qsf_reference_is_load", false);
     declare_parameter<bool>("enable_anti_wind", false);
     declare_parameter<std::string>("wind_estimator_mode", "residual");
-    declare_parameter<double>("wind_observer_bandwidth", 4.0);
+    declare_parameter<double>("wind_observer_bandwidth", 35.0);
     declare_parameter<double>("wind_estimate_filter_tau", 0.5);
     declare_parameter<double>("wind_estimate_force_limit", 5.0);
     declare_parameter<double>("wind_compensation_gain", 0.7);
@@ -2208,7 +2208,7 @@ private:
   bool qsf_reference_is_load_{false};
   bool enable_anti_wind_{false};
   std::string wind_estimator_mode_{"residual"};
-  double wind_observer_bandwidth_{4.0};
+  double wind_observer_bandwidth_{35.0};
   double wind_estimate_filter_tau_{0.5};
   double wind_estimate_force_limit_{5.0};
   double wind_compensation_gain_{0.7};

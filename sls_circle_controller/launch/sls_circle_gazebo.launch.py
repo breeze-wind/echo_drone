@@ -227,7 +227,7 @@ def generate_launch_description():
         DeclareLaunchArgument('max_total_acc', default_value='2.0'),
         DeclareLaunchArgument('max_tilt_deg', default_value='12.0'),
         DeclareLaunchArgument('wind_estimator_mode', default_value='residual'),
-        DeclareLaunchArgument('wind_observer_bandwidth', default_value='4.0'),
+        DeclareLaunchArgument('wind_observer_bandwidth', default_value='35.0'),
         DeclareLaunchArgument('wind_estimate_filter_tau', default_value='0.2'),
         DeclareLaunchArgument('wind_estimate_force_limit', default_value='5.0'),
         DeclareLaunchArgument('wind_compensation_gain', default_value='0.0'),

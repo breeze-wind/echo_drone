@@ -154,7 +154,7 @@ def generate_launch_description():
             description='true 时启用 LESO 加残差积分抗风扰。',
         ),
         DeclareLaunchArgument('wind_estimator_mode', default_value='residual'),
-        DeclareLaunchArgument('wind_observer_bandwidth', default_value='4.0'),
+        DeclareLaunchArgument('wind_observer_bandwidth', default_value='35.0'),
         DeclareLaunchArgument('wind_estimate_filter_tau', default_value='0.5'),
         DeclareLaunchArgument('wind_estimate_force_limit', default_value='5.0'),
         DeclareLaunchArgument('wind_compensation_gain', default_value='1.0'),
