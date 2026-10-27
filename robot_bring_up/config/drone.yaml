@@ -22,10 +22,8 @@ behavior_control_node: #雷达离地面高度带货0.39m，不带货0.31m
         takeoff_circle_speed: 0.2
         takeoff_circle_direction: 1.0
         detection_height: 1.5
-        H_detection_height: 1.4
         passing_door_height: 0.6
         eject_height: 0.5
-        dynamic_eject_height: 0.86
         if_hit_tank: true
         if_hit_car: true
         if_hit_pillbox: true
