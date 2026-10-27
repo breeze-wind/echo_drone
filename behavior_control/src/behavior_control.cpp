@@ -42,10 +42,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->declare_parameter<std::vector<std::string>>("target_sequence", std::vector<std::string>{"tent", "car", "pillbox", "tank"});
     this->declare_parameter("cruise_height", 0.6);
     this->declare_parameter("detection_height", 1.5);
-    this->declare_parameter("H_detection_height", 1.5);
     this->declare_parameter("passing_door_height", 0.4);
     this->declare_parameter("eject_height", 0.25);
-    this->declare_parameter("dynamic_eject_height", 0.5);
     this->declare_parameter("if_hit_tank", false);
     this->declare_parameter("if_hit_car", false);
     this->declare_parameter("if_hit_pillbox", false);
@@ -93,10 +91,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     this->get_parameter<std::vector<double>>("prev_random_tank_target", prev_random_tank_target_);
     this->get_parameter("cruise_height", cruise_height_);
     this->get_parameter("detection_height", detection_height_);
-    this->get_parameter("H_detection_height", H_detection_height_);
     this->get_parameter("passing_door_height", passing_door_height_);
     this->get_parameter("eject_height", eject_height_);
-    this->get_parameter("dynamic_eject_height", dynamic_eject_height_);
     this->get_parameter("if_hit_tank", if_hit_tank_);
     this->get_parameter("if_hit_car", if_hit_car_);
     this->get_parameter("if_hit_pillbox", if_hit_pillbox_);
@@ -161,15 +157,11 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_x_ = 0.0;
     current_y_ = 0.0;
     current_z_ = 0.0;
-    dynamic_detection_height_ = detection_height_ + 0.35;
 
     eject_cnt = 0;
     detection_cnt = 0;
     turning_cnt = 0;
-    passing_cnt_1_ = 0;
-    passing_cnt_2_ = 0;
     eject_cnt_threshold_ = 4.0 / 0.25; //等待投掷时间
-    dynamic_eject_cnt_threshold_ = 1.5 / 0.25; //动态靶等待投掷时间
     detection_cnt_threshold_ = 2.5 / 0.25; //等待识别时间
     dynamic_detection_cnt_threshold_ = 5.0 / 0.25; //在初始起飞后寻找随机靶的等待时间
     turning_cnt_threshold_ = 5.0 / 0.25; //等待转向时间
@@ -180,13 +172,9 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     last_servo_index_ = 0;
     current_nav_mode = 0;
     last_nav_mode = 0;
-    eject_last_x = 0.0;
-    eject_last_y = 0.0;
     arming_state = false;
-    if_landing = false;
     if_nav = false;
 
-    is_tank_or_bridge_ = false;
     takeoff_circle_started_ = false;
     takeoff_circle_center_x_ = 0.0;
     takeoff_circle_center_y_ = 0.0;
@@ -197,7 +185,6 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     current_target_position_.transform.rotation.w = 1.0;
 
     map_frame_ = "map";
-    camera_frame_ = "camera_link";
     target_frame_ = "target_position";
 
     livox_to_camera = tf_buffer_->lookupTransform("livox", "camera_link", rclcpp::Time(),
@@ -205,8 +192,6 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     // RCLCPP_INFO(this->get_logger(), "-----------------+++++++++++++++livox_to_camera x y z: %lf, %lf, %lf",
     //     livox_to_camera.transform.translation.x, livox_to_camera.transform.translation.y, livox_to_camera.transform.translation.z);
     livox_to_camera_affine = tf2::transformToEigen(livox_to_camera);
-    Eigen::Affine3d map_to_livox_affine = Eigen::Affine3d::Identity(); //map->雷达
-    Eigen::Affine3d map_to_camera_affine = Eigen::Affine3d::Identity();
 
     camera_pt_.header.frame_id = "camera_link";
     camera_pt_.point.z = 0.0;
@@ -237,10 +222,8 @@ BehaviorControl::BehaviorControl(std::string name) : Node("behavior_control")
     navigate_to_pose_action_.pose.pose.orientation.y = 0.0;
     navigate_to_pose_action_.pose.pose.orientation.z = 0.0;
     navigate_to_pose_action_.pose.pose.orientation.w = 1.0;
-    navigate_to_pose_goal_ = nav2_msgs::action::NavigateToPose::Goal();
 
     target_pose_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/robot/target_pose", 10);
-    goal_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal_pose", 10);
     nav_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/nav_state", 10);
     passing_door_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/passing_door_state", 10);
     turning_state_pub_ = this->create_publisher<std_msgs::msg::Bool>("/robot/turning_state", 10);

@@ -17,7 +17,6 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "rcl_interfaces/srv/set_parameters.hpp"
 
-#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
 #include "std_msgs/msg/bool.hpp"
@@ -61,9 +60,7 @@ private:
 
     /// 发布目标点位姿
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr target_pose_pub_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pose_pub_;
     rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigate_to_pose_client_;
-    rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::Goal navigate_to_pose_goal_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr nav_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr passing_door_state_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr turning_state_pub_;
@@ -99,8 +96,6 @@ private:
     std::vector<double> passing_door_src_1_;
     std::vector<double> passing_door_src_2_;
     std::vector<double> passing_door_des_;
-
-    bool camera_choose_; //True -- d435
 
     /// 起飞点附近随机靶搜索坐标
     std::vector<double> random_target_init_search_1_;
@@ -142,14 +137,10 @@ private:
     double cruise_height_;
     /// 识别高度
     double detection_height_;
-    double H_detection_height_;
-    double dynamic_detection_height_;
     /// 穿门高度
     double passing_door_height_;
     /// 投掷高度
     double eject_height_;
-    /// 动态靶投掷高度
-    double dynamic_eject_height_;
     double obstacle_height_;
 
     /* 是否投掷该目标 */
@@ -169,11 +160,7 @@ private:
 
     /// 当前是否已经解锁
     bool arming_state;
-    /// 是否在准备降落状态
-    bool if_landing;
     bool if_nav;
-
-    bool is_tank_or_bridge_;
 
     /* 当前位置 */
     double current_x_;
@@ -183,26 +170,17 @@ private:
     /// 当前步骤
     int current_step;
 
-    float eject_last_x;
-    float eject_last_y;
     /* 计时计数及阈值 */
     int eject_cnt;
     int detection_cnt;
     int turning_cnt;
-    int passing_cnt_1_;
-    int passing_cnt_2_;
     int eject_cnt_threshold_;
-    int dynamic_eject_cnt_threshold_;
     int detection_cnt_threshold_;
     int dynamic_detection_cnt_threshold_;
     int turning_cnt_threshold_;
-    /// 舵机投放位置参数控制
-    rclcpp::Parameter servo_param;
     /// 舵机投放位置序号
     int servo_index_;
     int last_servo_index_;
-    /// 相机坐标系
-    std::string camera_frame_;
     /// 目标坐标系
     std::string target_frame_;
     /// 世界系
