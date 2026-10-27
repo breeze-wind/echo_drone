@@ -46,7 +46,7 @@ Nav2 / TEB ----------------> PX4 flight controller
 | 飞控桥接 | `flight_control/launch/mavros_state.launch.py`、`flight_control/launch/mavros_adapter.launch.py` | 前者只检查 MAVROS 到飞控连接，后者只运行旧接口到 MAVROS 的适配器 |
 | 感知/里程计 | `livox_ros_driver2`、`Point-LIO/launch/pointlio.launch.py`、`obstacle_segmentation_tc/launch/obstacle_segmentation.launch.py` | 按雷达驱动、LIO、点云障碍物分割的顺序启动 |
 | 导航层 | `robot_bring_up/launch/bringup_launch.py`、`navigation_launch.py`、`localization_launch.py` | 封装 Nav2 的地图、规划、控制和生命周期节点 |
-| 决策层 | `behavior_control/launch/behavior_control.launch.py` | 当前只用于起飞后圆周运动截断调试，后续再拆 HSM |
+| 决策层 | `behavior_control/launch/behavior_control.launch.py` | 旧数字 step 任务逻辑仍在运行；新增了任务图、状态/事件发布和 dry-run 调试服务。默认 `takeoff_circle_enabled=true` 时起飞后会进入圆周截断调试；设为 false 才走完整任务流程 |
 | 旧整机入口 | `robot_bring_up/launch/drone.launch.py` | 一次性拉起多模块，容易掩盖 CPU/TF 问题，仅在分层验证后使用 |
 
 `run_echo_drone.sh` 的模式按风险分为四类：
@@ -67,23 +67,25 @@ behavior_control
     v
 flight_control/mavros_adapter_node
     |
-    | /mavros/vision_pose/pose
-    | /mavros/setpoint_position/local
-    | /mavros/setpoint_velocity/cmd_vel
-    | /mavros/cmd/arming
+    | /mavros/mavros/pose        (/robot/current_pose -> vision)
+    | /mavros/mavros/local       (/robot/target_pose -> position)
+    | /mavros/mavros/cmd_vel     (/cmd_vel -> velocity)
+    | /mavros/mavros/arming      (配置中的解锁服务)
     | /mavros/set_mode
     v
 MAVROS -> PX4
 ```
+
+上表是 `flight_control/config/mavros_adapter.yaml` 的默认值。SLS 单节点 launch、PX4 SITL 和部分诊断工具会使用不同的 MAVROS 端点，不能混用。
 
 `mavlink_control` 仍保留在仓库里，但只作为 fallback，默认不启动。
 
 需要继续处理的架构债：
 
 - `drone.launch.py` 还把感知、里程计、导航、RViz 混在一个入口里，容易掩盖 CPU 或 TF 问题。
-- MAVROS 插件白名单/黑名单还没有在 Foxy 下最终定型，当前只读测试会出现 ODOM TF 刷屏。
+- MAVROS 当前通过 `mavros_vision_px4.yaml` 的 allowlist 和 `mavros_px4_sitl.yaml` 的 SITL allowlist 收窄插件；实机多插件组合仍需重新核对。
 - TF 偏移分散在 launch、Point-LIO、MAVROS adapter 和行为层参数中，还需要单独收敛为一个 TF 管理包或统一配置。
-- `behavior_control` 仍是大 step 状态机，当前只新增了起飞后圆周运动截断逻辑，后续应按下方 HSM 方案继续拆分。
+- `behavior_control` 仍由旧数字 step 分支执行正常转移；命名图和调试服务已落地，但还没有完全迁移为下方设计的 HSM。
 
 ---
 

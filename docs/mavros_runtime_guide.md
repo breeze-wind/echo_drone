@@ -1,15 +1,15 @@
 # MAVROS Runtime Guide
 
-本文记录当前仓库从旧 `mavlink_control` 直连 MAVLink 迁移到 MAVROS 后的实际运行方式、实测话题和待处理问题。
+本文记录仓库从旧 `mavlink_control` 直连 MAVLink 迁移到 MAVROS 的过程、历史实测和当前配置入口。
 
-## 当前实测状态
+> 文档状态：第 1 节是 2026-07-23 的历史实测快照；端点表和配置说明已于 2026-10-27 按源码重新核对。本文没有在 2026-10-27 重新连接飞控。当前实际 topic/service 仍以目标机 `ros2 topic info -v` 为准。
 
-测试日期：2026-07-23。
+## 历史实测状态（2026-07-23）
 
 测试环境：
 
 - Ubuntu 20.04 / ROS2 Foxy。
-- 当前机器是 WSL2 x86_64，不是 ARM 试验机。
+- 该次测试机器是 WSL2 x86_64，不是 ARM 试验机。
 - 飞控通过 Windows `usbipd` 透传到 WSL。
 - WSL 侧飞控串口为 `/dev/ttyACM0`。
 - MAVROS 连接参数为 `/dev/ttyACM0:230400`。
@@ -17,7 +17,7 @@
 只读连接测试命令：
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh mavros-state
 ```
 
@@ -50,7 +50,7 @@ usbipd attach --wsl --busid 1-3
 WSL：
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh check
 ls -l /dev/ttyACM* /dev/ttyUSB*
 ```
@@ -87,13 +87,15 @@ behavior_control -> /robot/target_pose or /cmd_vel -> flight_control/mavros_adap
 
 | 旧接口 | 新 MAVROS 接口 | 方向 | 说明 |
 |---|---|---|---|
-| `/robot/current_pose` | `/mavros/vision_pose/pose` | adapter -> MAVROS | 向 PX4 喂视觉位姿 |
-| `/robot/target_pose` | `/mavros/setpoint_position/local` | adapter -> MAVROS | 非导航模式的位置设定点 |
-| `/cmd_vel` | `/mavros/setpoint_velocity/cmd_vel` | adapter -> MAVROS | 导航模式速度设定点 |
+| `/robot/current_pose` | `/mavros/mavros/pose` | adapter -> MAVROS | 向 PX4 喂视觉位姿（当前 `mavros_adapter.yaml` 默认值） |
+| `/robot/target_pose` | `/mavros/mavros/local` | adapter -> MAVROS | 非导航模式的位置设定点（当前默认值） |
+| `/cmd_vel` | `/mavros/mavros/cmd_vel` | adapter -> MAVROS | 导航模式速度设定点（当前默认值） |
 | `/mavros/state` | `/robot/arm_state` | MAVROS -> adapter -> legacy | 兼容旧决策代码的解锁状态 |
 | `/mavros/state` | `/flight_control/status` | MAVROS -> adapter -> debug | JSON 调试状态 |
-| `/mavros/rc/in` | `/mavros/cmd/arming` | MAVROS -> adapter -> MAVROS service | 摇杆组合触发解锁，`dry_run=false` 时才会调用 |
+| `/mavros/rc/in` | `/mavros/mavros/arming` | MAVROS -> adapter -> MAVROS service | 摇杆组合触发解锁，`dry_run=false` 且配置允许时才会调用 |
 | adapter 内部状态 | `/mavros/set_mode` | adapter -> MAVROS service | `auto_set_mode=true` 且 `dry_run=false` 时才会调用 |
+
+上表是 `flight_control/config/mavros_adapter.yaml` 的当前默认值。代码内部仍保留 `/mavros/vision_pose/pose`、`/mavros/setpoint_position/local`、`/mavros/setpoint_velocity/cmd_vel` 等通用默认名，SLS 单节点 launch 和部分诊断工具也使用它们；不要把这组名称与 adapter 默认值混为一谈。
 
 ## MAVROS 实测话题
 
@@ -146,13 +148,13 @@ MAVLink router 端点：
 
 - `/mavros/state` 实测类型为 `mavros_msgs/msg/State`，发布者为 namespace `/mavros` 下的 `mavros` 节点。
 - 当前还观察到了大量 `/mavros/mavros/...` 嵌套话题，这是 MAVROS 2.4.0 在当前启动方式下的实际表现。
-- 这些嵌套话题不要先当成稳定业务接口，业务代码优先使用 `mavros_adapter.yaml` 里显式配置的 MAVROS topic。
+- `mavros_adapter.yaml` 当前明确使用 `/mavros/mavros/pose`、`/mavros/mavros/local`、`/mavros/mavros/cmd_vel` 和 `/mavros/mavros/arming`，因为它们与当前 Foxy/MAVROS 2.4 的插件节点结构对应；实际部署仍应逐项核对。
 
 查看状态建议使用：
 
 ```bash
 source /opt/ros/foxy/setup.bash
-source /home/sfx/echo_drone/install/setup.bash
+source /path/to/echo_drone/install/setup.bash
 ros2 topic info -v /mavros/state
 ros2 topic echo /mavros/state mavros_msgs/msg/State --qos-durability transient_local
 ```
@@ -195,9 +197,9 @@ ROS2 Foxy 下直接用 `/opt/ros/foxy/share/mavros/launch/px4.launch` 会失败�
 
 重启、重插、重新 attach 后权限可能恢复为 `root:dialout`，应使用 `dialout` 用户组或 udev 规则长期处理。
 
-6. 真机控制前还缺少安全门。
+6. 真机控制前还缺少完整安全门。
 
-`mavros_adapter` 已有 `dry_run`、状态发布和 setpoint 新鲜度检查，但还需要在实机前确认：
+`mavros_adapter` 已有 `dry_run`、状态发布、速度路径的位姿/命令新鲜度检查和 SLS 租约超时，但位置路径只检查目标年龄，不检查 `/robot/current_pose` 新鲜度。实机前还需要确认：
 
 - MAVROS disconnected 时拒绝进入任务。
 - 起飞前 setpoint 预热。
@@ -210,7 +212,7 @@ ROS2 Foxy 下直接用 `/opt/ros/foxy/share/mavros/launch/px4.launch` 会失败�
 所有命令默认从仓库根目录执行：
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ```
 
 ### 环境和构建

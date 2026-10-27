@@ -1,5 +1,8 @@
 # 重构与调试工作顺序规划表
 
+> **状态：历史/计划文档。** 本文件记录特定阶段的目标或盘点，不是当前实现状态。当前接口与文档核对结论见 [`documentation_consistency_audit.md`](documentation_consistency_audit.md) 和 [`system_contract.md`](system_contract.md)。
+
+
 > 本文档规划 behavior_control 包重构和调试的详细步骤与依赖关系。
 > 目标环境：ROS2 Foxy + Jetson Nano NX (ARM64) | 开发环境：WSL Ubuntu 20.04 + ROS1 Noetic
 >

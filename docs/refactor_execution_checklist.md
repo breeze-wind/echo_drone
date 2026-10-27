@@ -1,5 +1,8 @@
 # 全面重构执行清单
 
+> **状态：历史/计划文档。** 本文件记录特定阶段的目标或盘点，不是当前实现状态。当前接口与文档核对结论见 [`documentation_consistency_audit.md`](documentation_consistency_audit.md) 和 [`system_contract.md`](system_contract.md)。
+
+
 本清单按用户确认的硬约束组织：MAVROS 包装、决策层可调试、清理 BT/遗留版本、TF 单独管理、launch/config 齐全、面向 Foxy + ARM64 + 试验机验证。
 
 ## 当前执行状态（2026-07-20）

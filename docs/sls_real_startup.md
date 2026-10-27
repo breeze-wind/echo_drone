@@ -6,12 +6,14 @@
 
 控制主线只通过 MAVROS 读取飞控状态和发布 setpoint，不再裸连 MAVLink。
 
+> 端点说明：本文按 2026-10-27 的 `run_echo_drone.sh` 实机入口描述。`sls_circle.launch.py` 单节点默认仍使用 `/mavros/local_position/pose` 和 `/mavros/setpoint_position/local`；脚本的 `real-*` 入口会覆盖为 `/mavros/mavros/pose` 和 `/mavros/mavros/local`。
+
 ## 启动前提
 
 实机启动前必须先确认下面三条链路已经通。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh field-precheck
 ./run_echo_drone.sh mavros-check
 CHECK_SECONDS=30 ./run_echo_drone.sh sensing-check
@@ -23,7 +25,8 @@ CHECK_SECONDS=30 ./run_echo_drone.sh sensing-check
 - `/livox/lidar` 和 `/livox/imu` 能持续发布。
 - `/Odometry` 能持续发布。
 - `/cloud_registered_body` 能持续发布。
-- `/tf_static` 里有 `map -> odom`、`livox_raw -> livox`、`livox -> mavlink_body`。
+- `/tf_static` 里有 `map -> odom`、`livox -> mavlink_body`、`livox -> camera_link`。
+- Point-LIO 的动态 TF 是 `odom -> livox`；当前配置下没有 `livox_raw -> livox`。
 
 ## 本地变量整合
 
@@ -47,13 +50,13 @@ FCU_BAUD=230400
 
 | 推荐入口 | 兼容入口 | 输出到 MAVROS | 控制含义 | 自动 OFFBOARD/解锁 |
 | --- | --- | --- | --- | --- |
-| `real-point` | `sls-point-real` | `/mavros/setpoint_position/local` | 普通位置点，不启用 QSF 和抗风扰 | 否 |
-| `real-swing` | `sls-swing-real` | 起飞段位置点，绕圈段 `/mavros/setpoint_raw/attitude` | QSF 绳摆抑制，抗风扰关闭 | 否 |
-| `real-wind` | `sls-swing-wind-real` | 起飞段位置点，绕圈段 `/mavros/setpoint_raw/attitude` | QSF 绳摆抑制加残差抗风扰 | 否 |
+| `real-point` | `sls-point-real` | 起飞/定点段 `/mavros/mavros/local` | 普通位置点，不启用 QSF 和抗风扰 | 否 |
+| `real-swing` | `sls-swing-real` | 起飞段 `/mavros/mavros/local`，绕圈段 `/mavros/setpoint_raw/attitude` | QSF 绳摆抑制，抗风扰关闭 | 否 |
+| `real-wind` | `sls-swing-wind-real` | 起飞段 `/mavros/mavros/local`，绕圈段 `/mavros/setpoint_raw/attitude` | QSF 绳摆抑制加残差抗风扰 | 否 |
 
 对应的自动入口是 `real-point-auto`、`real-swing-auto` 和 `real-wind-auto`。
 
-自动入口会请求 `/mavros/set_mode` 和 `/mavros/cmd/arming`。
+自动入口会请求 `/mavros/set_mode` 和解锁服务。当前脚本中 `sls-point-real-auto` 显式使用 `/mavros/mavros/arming`，其他 SLS 自动入口使用 launch 默认的 `/mavros/cmd/arming`；现场必须先确认实际服务名。
 
 旧入口 `sls-takeoff-hold-real` 保留为起飞后定点别名，旧入口 `sls-circle-real` 保留为 `real-wind` 的兼容入口。
 
@@ -79,6 +82,7 @@ real-wind: controller_mode:=qsf, enable_anti_wind:=true, mission_mode:=takeoff_t
 - `qsf_integral`：QSF 积分版本。
 - `pd`：普通 PD 回退。
 - `leso_pd`：PD 加扰动估计。
+- `position`：纯 PX4 位置环圆轨迹，主要供 `real-position-circle`/`position-circle` 使用。
 
 ## 决策状态机
 
@@ -109,9 +113,9 @@ takeoff hold confirmed; entering circle tracking
 
 `real-point`、`real-swing` 和 `real-wind` 不会自动请求 OFFBOARD，也不会自动解锁。
 
-`real-point` 只发布 `/mavros/setpoint_position/local`，用于验证“点位 setpoint -> MAVROS -> 飞控”的基础链路。
+`real-point` 当前由脚本覆盖为发布 `/mavros/mavros/local`，用于验证“点位 setpoint -> MAVROS -> 飞控”的基础链路；单独 `sls_circle.launch.py` 的默认名字才是 `/mavros/setpoint_position/local`。
 
-`real-swing` 和 `real-wind` 在起飞和定点阶段会发布 `/mavros/setpoint_position/local`，进入绕圈阶段后才会按安全门发布 `/mavros/setpoint_raw/attitude`。
+`real-swing` 和 `real-wind` 在起飞和定点阶段会发布 `/mavros/mavros/local`，进入绕圈阶段后才会按安全门发布 `/mavros/setpoint_raw/attitude`。
 
 `sls-takeoff-hold-real` 只发布起飞和定点位置 setpoint，不进入绕圈，也不会写 `/mavros/setpoint_raw/attitude`。
 
@@ -133,21 +137,21 @@ flight_stage=circle
 第一终端，启动 MAVROS 和 adapter。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh mavros-real
 ```
 
 第二终端，启动 Livox 和 Point-LIO。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh sensing
 ```
 
 第三终端，先 dry-run 看状态机和算法输出。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh sls-takeoff-hold-dry
 ./run_echo_drone.sh sls-circle-mission-dry
 ```
@@ -155,21 +159,21 @@ cd /home/sfx/echo_drone
 第四终端，只验证位置点到 MAVROS 的链路。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh real-point
 ```
 
 第五终端，确认点位链路和定点状态稳定后，再试只消绳摆的 QSF 绕圈。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh real-swing
 ```
 
 第六终端，确认只消绳摆版本稳定后，再试绳摆加抗风扰。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh real-wind
 ```
 
@@ -178,7 +182,7 @@ cd /home/sfx/echo_drone
 运行过程中可以用只读检查入口采样关键话题。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh sls-real-check
 ```
 
@@ -187,13 +191,13 @@ cd /home/sfx/echo_drone
 只有在台架和安全流程都确认后，才使用自动入口。
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh real-point-auto
 ```
 
 然后再按风险顺序试 `real-swing-auto` 和 `real-wind-auto`。
 
-这些入口会请求 `/mavros/set_mode` 和 `/mavros/cmd/arming`。
+这些入口会请求 `/mavros/set_mode` 和解锁服务；具体解锁服务名取决于入口和 launch 覆盖值，需用 `ros2 service list` 核对。
 
 ## 常用参数覆盖
 
@@ -269,11 +273,13 @@ ros2 topic echo /sls_circle/status std_msgs/msg/String
 
 `actual_wind_input_hz` 只在 Gazebo 有 `/sls_circle/wind_actual` 时有效，实机通常应为 0。
 
-看真实姿态 setpoint。
+看真实姿态 setpoint（所有路径同名）。
 
 ```bash
 ros2 topic echo /mavros/setpoint_raw/attitude mavros_msgs/msg/AttitudeTarget
 ```
+
+看实机位置 setpoint 时，注意 `real-*` 入口通常是 `/mavros/mavros/local`，而不是单独 launch 的 `/mavros/setpoint_position/local`。
 
 看调试姿态 setpoint。
 
@@ -295,7 +301,7 @@ ros2 topic echo /sls_circle/wind_estimate geometry_msgs/msg/Vector3Stamped
 
 这个话题单位是 N，x/y 是估计外扰力，z 固定为 0。
 
-如果现场 MAVROS 位姿话题不是默认名，可以在入口后直接覆盖话题。
+`real-*` 脚本已经默认传入 `pose_topic:=/mavros/mavros/pose`。如果现场 MAVROS 实际端点不同，可以在入口后显式覆盖。
 
 ```bash
 ./run_echo_drone.sh real-point pose_topic:=/mavros/mavros/pose
@@ -303,7 +309,7 @@ ros2 topic echo /sls_circle/wind_estimate geometry_msgs/msg/Vector3Stamped
 
 ## 失败时先看什么
 
-如果 `/sls_circle/status` 里 `reason` 是 `waiting_for_pose`，先查 `/mavros/local_position/pose`。
+如果 `/sls_circle/status` 里 `reason` 是 `waiting_for_pose`，先查 `real-*` 入口实际使用的 `/mavros/mavros/pose`；只在单独启动 `sls_circle.launch.py` 时查默认 `/mavros/local_position/pose`。
 
 如果 `reason` 是 `pose_stale`，说明 MAVROS 位姿断流。
 

@@ -33,7 +33,7 @@
 决策节点启动后，另开终端运行：
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh mission-graph
 ```
 
@@ -67,14 +67,14 @@ http://127.0.0.1:8765
 ## 3. 安全启动
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 ./run_echo_drone.sh mission-dry
 ```
 
 另开终端：
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 source tools/echo_drone_env.bash
 
 ros2 param get /behavior_control_node dry_run

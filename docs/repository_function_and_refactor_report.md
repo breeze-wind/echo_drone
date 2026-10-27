@@ -1,5 +1,8 @@
 # echo_drone 仓库功能与重构计划分析报告
 
+> **状态：历史/计划文档。** 本文件记录特定阶段的目标或盘点，不是当前实现状态。当前接口与文档核对结论见 [`documentation_consistency_audit.md`](documentation_consistency_audit.md) 和 [`system_contract.md`](system_contract.md)。
+
+
 ## 1. 结论摘要
 
 `echo_drone` 是一个面向 2025 国机赛无人机任务的 ROS2 工作空间。主线代码以实机任务可跑为目标，核心链路是：

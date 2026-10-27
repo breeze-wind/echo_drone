@@ -2,6 +2,8 @@
 
 ## 当前定位
 
+> 端点提示：`sls_circle.launch.py` 的单节点默认值、`run_echo_drone.sh` 的 `real-*` 实机入口和 PX4 SITL launch 使用的 MAVROS topic 名称并不完全相同。本文分别标注；现场以 `ros2 topic info -v` 和启动参数为准。
+
 `sls_circle_controller` 是 `drown` 悬挂负载控制算法在当前 ROS2 Foxy/MAVROS 主线里的接入层。
 
 当前已经把 `drown` 里的 MATLAB Coder 生成算法拆成 `sls_qsf_core` 共享库，实机主控节点默认由 `sls_circle_controller_cpp` 提供。
@@ -28,12 +30,13 @@
 - `leso_pd` 或 `leso`：PD 加 LESO 扰动估计。
 - `qsf`：默认模式，调用原 `QSFController`。
 - `qsf_integral`：调用原 `QSFIntegralController`，带内部积分状态。
+- `position` / `position_setpoint`：纯 PX4 位置环圆轨迹模式，不启用 QSF 姿态控制，主要用于 `real-position-circle`。
 
 QSF 生成库按原算法使用 NED/负载语义，ROS2 控制节点内部使用 ENU/MAVROS 语义，所以节点里集中完成了轴向交换、Z 轴取反、重力项和负载参考高度转换。
 
 ## ROS1 公式核对
 
-已对照 `/home/sfx/drown_ws/src/drown/mrotor_controller/src/mrotor_controller/sls_controller.cpp` 和 Gazebo SLS 插件核对核心公式。
+已对照历史 `drown` 工作区中的 `mrotor_controller/src/mrotor_controller/sls_controller.cpp` 和 Gazebo SLS 插件核对核心公式。
 
 坐标映射保持一致：
 
@@ -101,7 +104,7 @@ Gazebo 风扰同样强制只施加 x/y 平面力，`wind_force_z` 目前为兼�
 
 真实 setpoint 必须同时满足 `dry_run=false` 和 `enable_real_setpoint=true`。
 
-起飞和定点阶段使用 `/mavros/setpoint_position/local`，进入 `circle` 后才会按安全门输出 `/mavros/setpoint_raw/attitude`。
+单独 launch 默认：起飞/定点阶段使用 `/mavros/setpoint_position/local`，进入 `circle` 后按安全门输出 `/mavros/setpoint_raw/attitude`。`run_echo_drone.sh` 的 `real-*` 入口当前把起飞位置改为 `/mavros/mavros/local`、位姿输入改为 `/mavros/mavros/pose`；绕圈姿态仍是 `/mavros/setpoint_raw/attitude`。
 
 推荐实机入口已经收敛为 `real-point`、`real-swing`、`real-wind` 这类启动指令，脚本内部会设置必要确认。
 
@@ -109,9 +112,12 @@ Gazebo 风扰同样强制只施加 x/y 平面力，`wind_force_z` 目前为兼�
 
 ## 主要话题
 
+单独 `sls_circle.launch.py` 默认：
+
 - 输入：`/mavros/local_position/pose`
 - 输入：`/mavros/state`
 - 可选输入：`/sls_circle/load_pose`
+- 输出：`/mavros/setpoint_position/local`（起飞/定点位置）
 - 调试输出：`/sls_circle/reference_pose`
 - 调试输出：`/sls_circle/debug/attitude_target`
 - 状态输出：`/sls_circle/status`
@@ -119,10 +125,18 @@ Gazebo 风扰同样强制只施加 x/y 平面力，`wind_force_z` 目前为兼�
 - Gazebo 实际风扰：`/sls_circle/wind_actual`
 - 真实输出：`/mavros/setpoint_raw/attitude`
 
+`run_echo_drone.sh` 的 `real-*` 入口会覆盖：
+
+- 位姿输入：`/mavros/mavros/pose`
+- 起飞/定点位置输出：`/mavros/mavros/local`
+- 部分 `-auto` 入口使用 `/mavros/mavros/arming` 作为解锁服务
+
+因此不要仅按单节点 launch 的默认 topic 判断实机链路。
+
 ## 构建
 
 ```bash
-cd /home/sfx/echo_drone
+cd /path/to/echo_drone
 source /opt/ros/foxy/setup.bash
 colcon build --packages-select sls_qsf_core sls_circle_controller_cpp sls_circle_controller --symlink-install
 source install/setup.bash
@@ -145,7 +159,7 @@ Gazebo 图形仿真。
 原版 PX4 SITL/Gazebo 多旋翼吊载闭环仿真。
 
 ```bash
-PX4_DIR=/home/sfx/PX4-Autopilot ./run_echo_drone.sh sls-px4-sitl
+PX4_DIR=/path/to/PX4-Autopilot ./run_echo_drone.sh sls-px4-sitl
 ```
 
 Gazebo headless 烟测。

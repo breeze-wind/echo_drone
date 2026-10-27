@@ -1,5 +1,8 @@
 # Echo Drone 重构交接上下文
 
+> **状态：历史/计划文档。** 本文件记录特定阶段的目标或盘点，不是当前实现状态。当前接口与文档核对结论见 [`documentation_consistency_audit.md`](documentation_consistency_audit.md) 和 [`system_contract.md`](system_contract.md)。
+
+
 本文用于在新的 AI 上下文中继续 `/home/sfx/echo_drone` 的重构任务。
 
 生成时间：2026-08-03。
