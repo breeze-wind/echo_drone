@@ -5,42 +5,22 @@
 #ifndef OBSTACLE_SEGMENTATION_NODE_HPP
 #define OBSTACLE_SEGMENTATION_NODE_HPP
 
-#include <chrono>
 #include <memory>
 #include <string>
-#include <vector>
-#include <thread>
-#include <utility>
 
 #include "rclcpp/rclcpp.hpp"
 
 #include <pcl_conversions/pcl_conversions.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/passthrough.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/kdtree/kdtree.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
 #include <pcl/common/transforms.h>
-#include <pcl/segmentation/sac_segmentation.h>
-#include <pcl/segmentation/extract_clusters.h>
-#include <pcl/filters/radius_outlier_removal.h>      //半径滤波器头文件
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
-#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
-#include "geometry_msgs/msg/pose_stamped.hpp"
 
 #include "sensor_msgs/msg/point_cloud2.hpp"
 
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64.hpp"
-
-#include <tf2_eigen/tf2_eigen.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 class ObstacleSegmentationNode : public rclcpp::Node
 {
