@@ -48,10 +48,10 @@ case "$SCENARIO" in
     validator_args+=(--require-qsf)
     ;;
   wind-open-loop)
-    launch_args+=(controller_mode:=pd radius:=0.0 angular_velocity:=0.0 use_load_pose:=false enable_wind:=true wind_force_x:=0.30 wind_force_y:=0.15 wind_turbulence:=0.0 enable_anti_wind:=false wind_compensation_gain:=0.0)
+    launch_args+=(controller_mode:=pd radius:=0.0 angular_velocity:=0.0 use_load_pose:=false enable_wind:=true wind_force_x:=0.30 wind_force_y:=0.15 wind_turbulence:=0.0 wind_speed_x:=0.0 wind_speed_y:=0.0 wind_drag_coeff_x:=0.0 wind_drag_coeff_y:=0.0 enable_anti_wind:=false wind_compensation_gain:=0.0)
     ;;
   wind-truth)
-    launch_args+=(controller_mode:=pd radius:=0.0 angular_velocity:=0.0 use_load_pose:=false enable_wind:=true wind_force_x:=0.30 wind_force_y:=0.15 wind_turbulence:=0.0 enable_anti_wind:=true wind_estimator_mode:=actual_feedback wind_compensation_gain:=1.0 wind_compensation_warmup_time:=3.0 wind_compensation_ramp_time:=3.0)
+    launch_args+=(controller_mode:=pd radius:=0.0 angular_velocity:=0.0 use_load_pose:=false enable_wind:=true wind_force_x:=0.30 wind_force_y:=0.15 wind_turbulence:=0.0 wind_speed_x:=0.0 wind_speed_y:=0.0 wind_drag_coeff_x:=0.0 wind_drag_coeff_y:=0.0 enable_anti_wind:=true wind_estimator_mode:=actual_feedback wind_compensation_gain:=1.0 wind_compensation_warmup_time:=3.0 wind_compensation_ramp_time:=3.0)
     ;;
   *)
     echo "unknown scenario: $SCENARIO" >&2

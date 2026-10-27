@@ -1,6 +1,7 @@
 """Gazebo 和 MAVROS 风格话题之间的轻量桥接节点。"""
 
 import math
+import random
 import sys
 
 import rclpy
@@ -52,6 +53,9 @@ class GazeboMavrosBridge(Node):
         self.current_orientation = None
         self.current_angular_velocity = [0.0, 0.0, 0.0]
         self.commanded_wind = None
+        self.current_velocity = [0.0, 0.0, 0.0]
+        self.wind_noise = [0.0, 0.0, 0.0]
+        self.last_wind_update_time = 0.0
 
         self.odom_sub = self.create_subscription(
             Odometry, self.odom_topic, self.odom_callback, 20)
@@ -102,10 +106,18 @@ class GazeboMavrosBridge(Node):
             'max_torque': 1.0,
             'state_rate': 100.0,
             'enable_wind': False,
+            # 兼容保留：叠加在阻力模型之上的常量力，默认 0（旧模型的主项）。
             'wind_force_x': 0.0,
             'wind_force_y': 0.0,
             'wind_force_z': 0.0,
-            'wind_turbulence': 0.0,
+            # 参考插件 gazebo_sls_force_control_plugin.cc:295-301 的阻力模型参数。
+            'wind_speed_x': 2.0,
+            'wind_speed_y': 1.5,
+            'wind_speed_z': 0.0,
+            'wind_drag_coeff_x': 0.7,
+            'wind_drag_coeff_y': 0.7,
+            'wind_drag_coeff_z': 0.0,
+            'wind_turbulence': 0.5,
             'wind_change_rate': 0.2,
             'wind_command_force_limit': 5.0,
             'enable_wind_debug_log': True,
@@ -122,6 +134,8 @@ class GazeboMavrosBridge(Node):
             'hover_thrust', 'max_force', 'attitude_kp', 'attitude_kd',
             'max_torque', 'state_rate', 'enable_wind',
             'wind_force_x', 'wind_force_y', 'wind_force_z',
+            'wind_speed_x', 'wind_speed_y', 'wind_speed_z',
+            'wind_drag_coeff_x', 'wind_drag_coeff_y', 'wind_drag_coeff_z',
             'wind_turbulence', 'wind_change_rate', 'wind_command_force_limit',
             'enable_wind_debug_log', 'wind_debug_log_period',
         ]:
@@ -213,6 +227,10 @@ class GazeboMavrosBridge(Node):
             msg.twist.twist.angular, msg.pose.pose.orientation)
         self.current_angular_velocity = [
             angular_world.x, angular_world.y, angular_world.z]
+        # 阻力模型需要世界系机体速度（rotate_body_to_world 之后的值）。
+        self.current_velocity = [
+            velocity.twist.linear.x, velocity.twist.linear.y,
+            velocity.twist.linear.z]
         self.velocity_pub.publish(velocity)
 
     @staticmethod
@@ -295,19 +313,41 @@ class GazeboMavrosBridge(Node):
         return torque
 
     def current_wind_force(self):
-        # 简化风模型只在水平面为主要验证对象，z 轴风力保持配置值，默认应为 0。
+        # 与参考插件 gazebo_sls_force_control_plugin.cc:777-803 一致的线性阻力模型：
+        #     F = drag_coeff .* (wind_speed + turbulence_noise - mavVel)
+        # 湍流是限幅随机游走（dt>0.02 s 才更新，步长 turbulence*sqrt(dt)，限幅 1.5），
+        # 既不是正弦也不是常量力。drag_coeff_z 为 0，与参考插件 :300 一致。
+        # 注意：这里返回的是世界系力，因此调用方必须用世界系应用方式（参考插件 :526
+        # 用 AddRelativeForce 施加世界系量是坐标系错误，本桥接用世界系 Wrench，正确）。
         if self.commanded_wind is not None:
             return list(self.commanded_wind)
         if not self.enable_wind:
             return [0.0, 0.0, 0.0]
-        t = self.now_seconds()
-        noise = float(self.wind_turbulence)
-        rate = float(self.wind_change_rate)
-        return [
-            float(self.wind_force_x) + noise * math.sin(rate * t),
-            float(self.wind_force_y) + noise * math.sin(0.7 * rate * t + 1.3),
-            0.0,
-        ]
+
+        now = self.now_seconds()
+        if self.last_wind_update_time <= 0.0:
+            self.last_wind_update_time = now
+        dt = now - self.last_wind_update_time
+        if dt > 0.02:
+            step = float(self.wind_turbulence) * math.sqrt(dt)
+            for i in range(3):
+                self.wind_noise[i] = clamp(
+                    self.wind_noise[i] + (2.0 * random.random() - 1.0) * step,
+                    -1.5, 1.5)
+            self.last_wind_update_time = now
+
+        wind_speed = [float(self.wind_speed_x), float(self.wind_speed_y),
+                      float(self.wind_speed_z)]
+        drag_coeff = [float(self.wind_drag_coeff_x), float(self.wind_drag_coeff_y),
+                      float(self.wind_drag_coeff_z)]
+        legacy = [float(self.wind_force_x), float(self.wind_force_y),
+                  float(self.wind_force_z)]
+        force = [0.0, 0.0, 0.0]
+        for i in range(3):
+            rel = (wind_speed[i] + self.wind_noise[i]
+                   - self.current_velocity[i])
+            force[i] = drag_coeff[i] * rel + legacy[i]
+        return force
 
     def wind_command_callback(self, msg):
         """接收 GUI 的水平风力指令，并在桥接层覆盖静态风参数。"""

@@ -155,12 +155,20 @@ gazebo_mavros_bridge:
     attitude_kd: 0.30
     max_torque: 1.0
     state_rate: 100.0
-    # 代码内模拟风：默认只给水平风，wind_force_z 应保持 0。
+    # 代码内模拟风：与参考插件 gazebo_sls_force_control_plugin.cc:777-803 一致的线性阻力模型
+    #     F = drag_coeff .* (wind_speed + turbulence_noise - mavVel)
+    # wind_drag_coeff_z 应为 0（参考插件 :300）；wind_force_* 是兼容保留的常量力叠加项，默认 0。
     enable_wind: true
-    wind_force_x: 0.2
-    wind_force_y: 0.1
+    wind_speed_x: 2.0
+    wind_speed_y: 1.5
+    wind_speed_z: 0.0
+    wind_drag_coeff_x: 0.7
+    wind_drag_coeff_y: 0.7
+    wind_drag_coeff_z: 0.0
+    wind_force_x: 0.0
+    wind_force_y: 0.0
     wind_force_z: 0.0
-    wind_turbulence: 0.03
+    wind_turbulence: 0.5
     wind_change_rate: 0.3
     wind_command_force_limit: 5.0
     enable_wind_debug_log: true
