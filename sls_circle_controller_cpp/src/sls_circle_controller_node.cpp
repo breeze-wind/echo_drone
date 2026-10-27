@@ -1414,6 +1414,8 @@ private:
     last_commanded_accel_ = accel;
     last_commanded_accel_valid_ = true;
     const auto attitude_msg = build_attitude_target(accel);
+    last_attitude_thrust_ = attitude_msg.thrust;
+    last_attitude_thrust_valid_ = true;
 
     debug_attitude_pub_->publish(attitude_msg);
     command_publish_rate_.tick(now);
@@ -1908,12 +1910,13 @@ private:
 
   void publish_takeoff_position(const geometry_msgs::msg::PoseStamped & msg)
   {
-    // 起飞前以位置目标给 PX4 预热 OFFBOARD；一旦已解锁并进入 OFFBOARD，
-    // 必须停止位置目标，避免和 PD/QSF 的姿态+推力目标并发竞争。
-    // 起飞瞬态仍使用 PX4 位置控制，确认已到达目标高度后再进行姿态控制交接。
-    // 这避免带吊载模型在离地瞬间受到未标定推力的冲击。
-    const bool attitude_handover_stage =
-      flight_stage_ == "hold" || flight_stage_ == "circle";
+    // 起飞和 hold 阶段始终保持 PX4 位置环。不能刚进入 hold 就停止位置
+    // setpoint：那会使高度掉出阈值、状态机退回 takeoff，并在两者间反复切换。
+    // 只有真正进入 circle 后才交给 PD/QSF 的姿态+推力链路。唯一例外是
+    // 显式授权的 SITL 定推力标定：它需要在 hold 阶段接管一次，才能测得
+    // PX4/Gazebo 所需的归一化悬停推力。
+    const bool attitude_handover_stage = flight_stage_ == "circle" ||
+      fixed_thrust_calibration_stage();
     const bool attitude_handover_active = attitude_handover_stage &&
       !dry_run_ && enable_real_setpoint_ && mavros_state_.connected &&
       mavros_state_.armed && mavros_state_.mode == offboard_mode_;
@@ -1923,6 +1926,12 @@ private:
       return;
     }
     takeoff_pose_pub_->publish(msg);
+  }
+
+  bool fixed_thrust_calibration_stage() const
+  {
+    return controller_mode_ == "thrust_calibration" &&
+      allow_fixed_thrust_calibration_ && flight_stage_ == "hold";
   }
 
   void maybe_request_offboard_and_arm(double now)
@@ -1985,9 +1994,11 @@ private:
   std::pair<bool, std::string> real_setpoint_gate() const
   {
     // 真实 setpoint gate 是最后一道保护，状态字符串会写入 /sls_circle/status。
-    // preflight/takeoff 仅使用位置设定值：先让 PX4 平稳离地，随后在 hold/circle
-    // 才交给 PD/QSF 姿态+推力控制。
-    if (flight_stage_ != "hold" && flight_stage_ != "circle") {
+    // preflight/takeoff/hold 仅使用位置设定值，让 PX4 完成起飞和稳定等待。
+    // 仅 circle 阶段才交给 PD/QSF 姿态+推力控制，避免尚未稳定便失去高度环。
+    // 定推力标定是唯一的显式例外，且还受 allow_fixed_thrust_calibration
+    // 安全开关保护。
+    if (flight_stage_ != "circle" && !fixed_thrust_calibration_stage()) {
       return {false, flight_stage_};
     }
     if (dry_run_) {
@@ -2005,7 +2016,8 @@ private:
     if (require_armed_ && !mavros_state_.armed) {
       return {false, "not_armed"};
     }
-    return {true, "real_setpoint_active"};
+    return {true, fixed_thrust_calibration_stage() ?
+      "thrust_calibration_active" : "real_setpoint_active"};
   }
 
   void publish_status(
@@ -2052,6 +2064,9 @@ private:
         << "\"qsf_ref_z_down\":" << json_array(qsf_ref_z_) << ","
         << "\"qsf_thrust_accel_enu\":" << json_vec(qsf_thrust_accel_enu_) << ","
         << "\"qsf_net_accel_enu\":" << json_vec(qsf_net_accel_enu_) << ","
+        << "\"attitude_thrust\":"
+        << (last_attitude_thrust_valid_ ? std::to_string(last_attitude_thrust_) : "null")
+        << ","
         << "\"pose_received\":" << json_bool(pose_valid_) << ","
         << "\"pose_age\":" << (pose_valid_ ? std::to_string(now - pose_time_) : "null") << ","
         << "\"velocity_topic_active\":" << json_bool(
@@ -2244,6 +2259,8 @@ private:
   bool last_control_time_valid_{false};
   Vec3 last_commanded_accel_;
   bool last_commanded_accel_valid_{false};
+  double last_attitude_thrust_{0.0};
+  bool last_attitude_thrust_valid_{false};
   std::string flight_stage_{"preflight"};
   bool center_locked_{false};
   double last_mode_request_time_{0.0};
