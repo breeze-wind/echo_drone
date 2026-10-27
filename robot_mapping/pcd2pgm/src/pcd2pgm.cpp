@@ -15,7 +15,7 @@ Pcd2Pgm::Pcd2Pgm(std::string name) : Node(name)
     this->declare_parameter("thre_z_min", 0.2);
     this->declare_parameter("thre_z_max", 1.0);
     this->declare_parameter("thre_radius", 0.25);
-    this->declare_parameter("thres_point_count", 5);
+    this->declare_parameter("thre_point_count", 5);
     this->declare_parameter("map_resolution", 0.05);
     this->declare_parameter("thre_x_min", -10.0);
     this->declare_parameter("thre_x_max", 10.0);
@@ -39,7 +39,7 @@ Pcd2Pgm::Pcd2Pgm(std::string name) : Node(name)
     this->get_parameter("thre_z_min", thre_z_min);
     this->get_parameter("thre_z_max", thre_z_max);
     this->get_parameter("thre_radius", thre_radius);
-    this->get_parameter("thres_point_count", thre_point_count);
+    this->get_parameter("thre_point_count", thre_point_count);
     this->get_parameter("map_resolution", map_resolution);
     this->get_parameter("thre_x_min", thre_x_min);
     this->get_parameter("thre_x_max", thre_x_max);
@@ -52,8 +52,8 @@ Pcd2Pgm::Pcd2Pgm(std::string name) : Node(name)
     this->get_parameter("leaf_size", leaf_size);
     this->get_parameter("angle_threshold", angle_threshold);
     this->get_parameter("height_threshold", height_threshold);
-    this->get_parameter("point_num_for_statistical", point_num_for_normal);
-    this->get_parameter("standard_deviation_multiplier", angle_threshold);
+    this->get_parameter("point_num_for_statistical", point_num_for_statistical);
+    this->get_parameter("standard_deviation_multiplier", standard_deviation_multiplier);
 
     cloud.reset(new pcl::PointCloud<pcl::PointXYZ>);
 
