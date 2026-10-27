@@ -3,6 +3,7 @@
 > **基准文件**：`drown/controller_sitl_gazebo/src/gazebo_sls_force_control_plugin.cc`（822 行）
 > **策略**：方案 A —— 外环对齐 + PX4-SITL 作内环桥梁
 > **目的**：让 echo_drone 的 SLS 实机链路与参考仿真在**外环**上逐位一致，并把内环差异显式化，
+> **配套**：调参手册见 `docs/sls_tuning.md`。
 > 避免后人误以为仿真结果可以直接外推到实机。
 
 ## 1. 仿真与实机的边界
