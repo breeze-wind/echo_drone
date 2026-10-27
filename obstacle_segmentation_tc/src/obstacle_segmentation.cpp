@@ -7,52 +7,10 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
     // 声明参数
     this->declare_parameter("input_cloud_topic", "input_cloud");
     this->declare_parameter("output_cloud_topic", "output_cloud");
-    this->declare_parameter("base_frame", "base_link");
-    this->declare_parameter("leaf_size", 0.1);
-    this->declare_parameter("point_num_for_normal", 50);
-    this->declare_parameter("angle_threshold", 0.1);
-    this->declare_parameter("obstacle_x_min", -10.0);
-    this->declare_parameter("obstacle_x_max", 10.0);
-    this->declare_parameter("obstacle_y_min", -10.0);
-    this->declare_parameter("obstacle_y_max", 10.0);
-    this->declare_parameter("obstacle_z_min", 0.0);
-    this->declare_parameter("obstacle_z_max", 2.0);
-    this->declare_parameter("obstacle_range_min", 0.5);
-    this->declare_parameter("obstacle_range_max", 2.0);
-    this->declare_parameter("body_min_x", -0.3);
-    this->declare_parameter("body_max_x", 0.3);
-    this->declare_parameter("body_min_y", -0.2);
-    this->declare_parameter("body_max_y", 0.2);
-    this->declare_parameter("use_downsample", true);
 
     RCLCPP_INFO(this->get_logger(), "点云分割节点初始化");
     this->get_parameter("input_cloud_topic", input_cloud_topic_);
     this->get_parameter("output_cloud_topic", output_cloud_topic_);
-    this->get_parameter("base_frame", base_frame_);
-    this->get_parameter("leaf_size", leaf_size_);
-    this->get_parameter("point_num_for_normal", point_num_for_normal_);
-    this->get_parameter("angle_threshold", angle_threshold_);
-    this->get_parameter("obstacle_x_min", obstacle_x_min_);
-    this->get_parameter("obstacle_x_max", obstacle_x_max_);
-    this->get_parameter("obstacle_y_min", obstacle_y_min_);
-    this->get_parameter("obstacle_y_max", obstacle_y_max_);
-    this->get_parameter("obstacle_z_min", obstacle_z_min_);
-    this->get_parameter("obstacle_z_max", obstacle_z_max_);
-    this->get_parameter("obstacle_range_min", obstacle_range_min_);
-    this->get_parameter("obstacle_range_max", obstacle_range_max_);
-    this->get_parameter("use_downsample", use_downsample_);
-
-    // 设置滤波器的体素大小
-    pass_through_filter_x_.setFilterFieldName("x");
-    pass_through_filter_x_.setFilterLimits(obstacle_x_min_, obstacle_x_max_);
-    pass_through_filter_x_.setFilterLimitsNegative(false);
-    pass_through_filter_y_.setFilterFieldName("y");
-    pass_through_filter_y_.setFilterLimits(obstacle_y_min_, obstacle_y_max_);
-    pass_through_filter_y_.setFilterLimitsNegative(false);
-    pass_through_filter_z_.setFilterFieldName("z");
-    pass_through_filter_z_.setFilterLimits(obstacle_z_min_, obstacle_z_max_);
-    pass_through_filter_z_.setFilterLimitsNegative(false);
-    voxfilter.setLeafSize(leaf_size_, leaf_size_, leaf_size_);
 
     current_z_ = 0.0;
     obstacle_height_ = 2.0;
@@ -63,11 +21,8 @@ ObstacleSegmentationNode::ObstacleSegmentationNode(std::string name, const rclcp
 
     output_cloud = std::make_shared<sensor_msgs::msg::PointCloud2>();
 
-    blank_cloud.reset(new pcl::PointCloud<pcl::PointXYZ>);
     segement_cloud.reset(new pcl::PointCloud<pcl::PointXYZ>);
 
-    tfbuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tfbuffer_);
     // 初始化pub和sub
     output_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(output_cloud_topic_, 10);
     input_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
