@@ -4,20 +4,14 @@ import time
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import PoseStamped, Twist, TransformStamped
+from geometry_msgs.msg import Twist, TransformStamped
 from std_msgs.msg import Bool
-
-from tf2_ros import TransformException
-from tf2_ros.buffer import Buffer
-from tf2_ros.transform_listener import TransformListener
 
 # from tf2.transformations import quaternion_from_euler, euler_from_quaternion
 import transforms3d as tfs
 
 import serial
 import serial.tools.list_ports
-RED = "\033[1;31m"
-BLUE="\033[34m"
 YELLOW="\033[43;97m"
 RESET = "\033[0m"
 class MavlinkControl(Node):
@@ -30,9 +24,6 @@ class MavlinkControl(Node):
 
         self.cruise_height = self.get_parameter('cruise_height').get_parameter_value().double_value
         self.passing_door_height = self.get_parameter('passing_door_height').get_parameter_value().double_value
-
-        self.target_frame = "map" #世界系
-        self.source_frame = "livox" #雷达系
 
         self.pid_height = 0.65
         self.current_x = 0.0
@@ -64,7 +55,6 @@ class MavlinkControl(Node):
         )
 
         self.arm_state_pub = self.create_publisher(Bool, '/robot/arm_state', 10)
-        self.v_pub = self.create_publisher(Twist, '/robot/v', 10)
 
         self.current_pose_sub = self.create_subscription(
             TransformStamped,
@@ -103,14 +93,10 @@ class MavlinkControl(Node):
         self.turning_state_sub
         self.current_pose_sub
 
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-
         #读取遥控杆位置
         self.channel_position_timer = self.create_timer(0.1, self.channel_position_timer_callback)
         #监测心跳信号，是否已经解锁
         self.state_timer = self.create_timer(1.0, self.state_timer_callback)
-        # self.curr_vel_timer = self.create_timer(0.1, self.curr_vel_timer_callback)
 
     #接收决策传来的自身当前测量位置，并发送到飞控, 10Hz
     def current_pose_callback(self, msg):
@@ -175,24 +161,6 @@ class MavlinkControl(Node):
 
             msg.data = self.arming_state
             self.arm_state_pub.publish(msg)
-
-    def curr_vel_timer_callback(self):
-        cv = self.master.recv_match(type='LOCAL_POSITION_NED', blocking=False)
-        if cv:
-            curr_vx = cv.vx  # 北向速度 (单位: 米/秒)
-            curr_vy = cv.vy  # 东向速度 (单位: 米/秒)
-            curr_vz = cv.vz  # 下向速度 (单位: 米/秒)
-
-            msg = Twist()
-            msg.linear.x = curr_vx
-            msg.linear.y = curr_vy
-            msg.linear.z = curr_vz
-            msg.angular.x = 0.0
-            msg.angular.y = 0.0
-            msg.angular.z = 0.0
-            self.v_pub.publish(msg)
-
-            self.get_logger().info(f"{YELLOW}mavlink: curr_vx=%f, curr_vy=%f, curr_vz=%f{RESET}" %(curr_vx, curr_vy, curr_vz))
 
     #发送teb速度到飞控
     def cmd_vel_callback(self, msg):
