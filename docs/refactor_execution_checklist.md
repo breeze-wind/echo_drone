@@ -280,7 +280,7 @@ config/
 
 ### 6.3 配置规则
 
-- [x] 硬件参数已拆出 `config/hardware/ports.yaml`、`mavros.yaml`、`servo.yaml`、`openmv.yaml`。
+- [x] 硬件参数已拆出 `config/hardware/ports.yaml` 与 `servo.yaml`；`mavros.yaml`、`openmv.yaml` 没有任何加载点，已删除（MAVROS 连接参数由 launch 参数传入，OpenMV 驱动尚未实现）。
 - [ ] 非硬件参数继续从 `drone.yaml` 拆分。
 - [x] `servo_node` 只加载舵机参数。
 - [ ] 试验机路径不写死在代码里。
